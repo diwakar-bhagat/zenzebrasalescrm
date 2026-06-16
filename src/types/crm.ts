@@ -1,26 +1,26 @@
 export type Severity = "critical" | "high" | "medium" | "low";
 
-export interface Order {
+export interface Project {
   id: string;
-  refNo: string;
-  buyer: string;
-  brand: string | null;
-  styleId: string;
-  styleName: string | null;
-  orderQty: number;
+  referenceNo: string;
+  client: string;
+  category: string | null;
+  typeId: string;
+  typeName: string | null;
+  budget: number;
   deliveryDate: Date;
-  pfhStatus: string;
-  sopStatus: string;
-  ppmStatus: string;
+  phase1Status: string;
+  phase2Status: string;
+  phase3Status: string;
   approvalPending: boolean;
-  vendorLastActive: Date;
+  assigneeLastActive: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface DerivedSignals {
   id?: string;
-  orderId: string;
+  projectId: string;
   isDelayed: boolean;
   delayDays: number;
   isBlocked: boolean;
@@ -34,7 +34,7 @@ export interface DerivedSignals {
 
 export interface PriorityScore {
   id?: string;
-  orderId: string;
+  projectId: string;
   score: number;
   severity: Severity;
   reasonCodes: string[];
@@ -43,14 +43,14 @@ export interface PriorityScore {
 }
 
 export interface PriorityItem {
-  orderId: string;
-  refNo: string;
-  buyer: string;
-  styleId: string;
+  projectId: string;
+  referenceNo: string;
+  client: string;
+  typeId: string;
   deliveryDate: Date;
-  pfhStatus: string;
-  sopStatus: string;
-  ppmStatus: string;
+  phase1Status: string;
+  phase2Status: string;
+  phase3Status: string;
   approvalPending: boolean;
   score: number;
   severity: Severity;

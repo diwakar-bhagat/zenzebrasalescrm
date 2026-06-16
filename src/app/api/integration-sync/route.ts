@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { computeDerivedSignals, computePriorityScore } from "@/lib/priority-engine";
 import { CACHE_KEYS, redis } from "@/lib/redis";
-import type { Order } from "@/types/erp";
+import type { Project } from "@/types/crm";
 
-const SYNC_SECRET = process.env.ERP_SYNC_SECRET;
+const SYNC_SECRET = process.env.INTEGRATION_SYNC_SECRET;
 const SYNC_RATE_LIMIT_WINDOW_SECONDS = 60;
 const SYNC_RATE_LIMIT_MAX_REQUESTS = 10;
 
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   try {
     const requesterId = getRequesterId(request);
     const windowBucket = Math.floor(Date.now() / 1000 / SYNC_RATE_LIMIT_WINDOW_SECONDS);
-    const rateLimitKey = `rate_limit:erp_sync:{${requesterId}}:${windowBucket}`;
+    const rateLimitKey = `rate_limit:integration_sync:{${requesterId}}:${windowBucket}`;
 
     const requestCount = await redis.incr(rateLimitKey);
     if (requestCount === 1) {
@@ -56,40 +56,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: rateLimitHeaders });
     }
 
-    // 2. Fetch "Raw" Orders from DB (simulating an ERP fetch)
-    // In reality, you'd fetch from process.env.ERP_API_BASE_URL here
-    const rawOrders = await sql`
+    // 2. Fetch "Raw" Projects from DB (simulating an external fetch)
+    const rawProjects = await sql`
       SELECT 
-        id, ref_no as "refNo", buyer, brand, style_id as "styleId", style_name as "styleName",
-        order_qty as "orderQty", delivery_date as "deliveryDate", pfh_status as "pfhStatus",
-        sop_status as "sopStatus", ppm_status as "ppmStatus", approval_pending as "approvalPending",
-        vendor_last_active as "vendorLastActive", created_at as "createdAt", updated_at as "updatedAt"
-      FROM public.orders
+        id, reference_no as "referenceNo", client, category, type_id as "typeId", type_name as "typeName",
+        budget, delivery_date as "deliveryDate", phase1_status as "phase1Status",
+        phase2_status as "phase2Status", phase3_status as "phase3Status", approval_pending as "approvalPending",
+        assignee_last_active as "assigneeLastActive", created_at as "createdAt", updated_at as "updatedAt"
+      FROM public.projects
     `;
 
     let processedCount = 0;
 
-    // 3. Process each order through the Priority Engine
-    for (const row of rawOrders) {
-      const order = row as Order;
+    // 3. Process each project through the Priority Engine
+    for (const row of rawProjects) {
+      const project = row as Project;
 
       // Step A: Derive signals
-      const signals = computeDerivedSignals(order);
+      const signals = computeDerivedSignals(project);
 
       // Step B: Compute strict priority score
-      const scoreData = computePriorityScore(order, signals);
+      const scoreData = computePriorityScore(project, signals);
 
       // Step C: Upsert into Postgres
       // Upsert derived_signals
       await sql`
         INSERT INTO public.derived_signals (
-          order_id, is_delayed, delay_days, is_blocked, blocked_reason, 
+          project_id, is_delayed, delay_days, is_blocked, blocked_reason, 
           inactivity_hours, cascade_risk, cascade_reason, deadline_proximity, computed_at
         ) VALUES (
-          ${signals.orderId}, ${signals.isDelayed}, ${signals.delayDays}, ${signals.isBlocked}, ${signals.blockedReason},
+          ${signals.projectId}, ${signals.isDelayed}, ${signals.delayDays}, ${signals.isBlocked}, ${signals.blockedReason},
           ${signals.inactivityHours}, ${signals.cascadeRisk}, ${signals.cascadeReason}, ${signals.deadlineProximity}, NOW()
         )
-        ON CONFLICT (order_id) DO UPDATE SET
+        ON CONFLICT (project_id) DO UPDATE SET
           is_delayed = EXCLUDED.is_delayed,
           delay_days = EXCLUDED.delay_days,
           is_blocked = EXCLUDED.is_blocked,
@@ -104,12 +103,12 @@ export async function POST(request: Request) {
       // Upsert priority_scores
       await sql`
         INSERT INTO public.priority_scores (
-          order_id, score, severity, reason_codes, recommended_action, updated_at
+          project_id, score, severity, reason_codes, recommended_action, updated_at
         ) VALUES (
-          ${scoreData.orderId}, ${scoreData.score}, ${scoreData.severity}, 
+          ${scoreData.projectId}, ${scoreData.score}, ${scoreData.severity}, 
           ${JSON.stringify(scoreData.reasonCodes)}::jsonb, ${scoreData.recommendedAction}, NOW()
         )
-        ON CONFLICT (order_id) DO UPDATE SET
+        ON CONFLICT (project_id) DO UPDATE SET
           score = EXCLUDED.score,
           severity = EXCLUDED.severity,
           reason_codes = EXCLUDED.reason_codes,
@@ -122,14 +121,14 @@ export async function POST(request: Request) {
 
     // 4. Invalidate and Update Redis Cache
     if (redis) {
-      await redis.del(CACHE_KEYS.PRIORITY_LIST);
-      await redis.set(CACHE_KEYS.SYNC_LAST_RUN, new Date().toISOString());
+      await redis.del(CACHE_KEYS.PRIORITY_LIST || "PRIORITY_LIST");
+      await redis.set(CACHE_KEYS.SYNC_LAST_RUN || "SYNC_LAST_RUN", new Date().toISOString());
     }
 
     return NextResponse.json(
       {
         success: true,
-        message: `Sync completed. Processed ${processedCount} orders.`,
+        message: `Sync completed. Processed ${processedCount} projects.`,
         timestamp: new Date().toISOString(),
       },
       {
@@ -137,7 +136,7 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    console.error("ERP Sync API Error:", error);
+    console.error("Integration Sync API Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

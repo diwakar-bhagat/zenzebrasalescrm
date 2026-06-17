@@ -1,69 +1,113 @@
-import { calculateGrowth, buildWhereClause } from "./comparison";
+import type { DashboardFilters } from "@/lib/founder/types";
 
-export async function getSalesKpis(db: any, periods: any, filters: any) {
-  const where = buildWhereClause(filters);
-  const result = await (db as any).query(`
-    SELECT 
-      SUM(CASE WHEN ${periods.current} THEN net_amount ELSE 0 END) as current_revenue,
-      SUM(CASE WHEN ${periods.previous} THEN net_amount ELSE 0 END) as previous_revenue,
-      COUNT(DISTINCT CASE WHEN ${periods.current} THEN bill_no END) as current_bills,
-      COUNT(DISTINCT CASE WHEN ${periods.previous} THEN bill_no END) as previous_bills,
-      SUM(CASE WHEN ${periods.current} THEN quantity ELSE 0 END) as current_qty,
-      SUM(CASE WHEN ${periods.previous} THEN quantity ELSE 0 END) as previous_qty
+import { calculateGrowth, type ComparisonPeriods } from "./comparison";
+
+type FounderSql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Record<string, unknown>[]>;
+
+function numberValue(value: unknown) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export async function getSalesKpis(db: FounderSql, periods: ComparisonPeriods, filters: DashboardFilters) {
+  const result = await db`
+    SELECT
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN net_amount ELSE 0 END), 0) AS current_revenue,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.previousStart}::date AND sale_date <= ${periods.previousEnd}::date THEN net_amount ELSE 0 END), 0) AS previous_revenue,
+      COUNT(DISTINCT CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN bill_no END) AS current_bills,
+      COUNT(DISTINCT CASE WHEN sale_date >= ${periods.previousStart}::date AND sale_date <= ${periods.previousEnd}::date THEN bill_no END) AS previous_bills,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN quantity ELSE 0 END), 0) AS current_qty,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.previousStart}::date AND sale_date <= ${periods.previousEnd}::date THEN quantity ELSE 0 END), 0) AS previous_qty
     FROM sales_fact
-    WHERE ${where}
-  `);
+    WHERE (${filters.store ?? null}::text IS NULL OR store = ${filters.store ?? null})
+      AND (${filters.category ?? null}::text IS NULL OR category = ${filters.category ?? null})
+      AND (${filters.brand ?? null}::text IS NULL OR brand = ${filters.brand ?? null})
+      AND (${filters.sku ?? null}::text IS NULL OR sku ILIKE '%' || ${filters.sku ?? null} || '%')
+  `;
 
-  const row = result[0] || {};
-  const currentRevenue = parseFloat(row.current_revenue || "0");
-  const previousRevenue = parseFloat(row.previous_revenue || "0");
-  const currentBills = parseInt(row.current_bills || "0");
-  const previousBills = parseInt(row.previous_bills || "0");
-  const currentQty = parseInt(row.current_qty || "0");
-  const previousQty = parseInt(row.previous_qty || "0");
+  const row = result[0] ?? {};
+  const currentRevenue = numberValue(row.current_revenue);
+  const previousRevenue = numberValue(row.previous_revenue);
+  const currentBills = numberValue(row.current_bills);
+  const previousBills = numberValue(row.previous_bills);
+  const currentQty = numberValue(row.current_qty);
+  const previousQty = numberValue(row.previous_qty);
 
   return {
     revenue: {
       current: currentRevenue,
-      growth: calculateGrowth(currentRevenue, previousRevenue) || 0
+      previous: previousRevenue,
+      growth: calculateGrowth(currentRevenue, previousRevenue),
     },
     billCuts: {
       current: currentBills,
-      growth: calculateGrowth(currentBills, previousBills) || 0
+      previous: previousBills,
+      growth: calculateGrowth(currentBills, previousBills),
     },
     unitsSold: {
       current: currentQty,
-      growth: calculateGrowth(currentQty, previousQty) || 0
-    }
+      previous: previousQty,
+      growth: calculateGrowth(currentQty, previousQty),
+    },
   };
 }
 
-export async function getCategoryPerformance(db: any, currentPeriod: string, filters: any) {
-  const where = buildWhereClause(filters);
-  const result = await (db as any).query(`
-    SELECT category, SUM(net_amount) as revenue
+export async function getCategoryPerformance(db: FounderSql, periods: ComparisonPeriods, filters: DashboardFilters) {
+  const result = await db`
+    SELECT
+      category,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN net_amount ELSE 0 END), 0) AS current_revenue,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.previousStart}::date AND sale_date <= ${periods.previousEnd}::date THEN net_amount ELSE 0 END), 0) AS previous_revenue
     FROM sales_fact
-    WHERE ${currentPeriod} AND ${where}
+    WHERE (${filters.store ?? null}::text IS NULL OR store = ${filters.store ?? null})
+      AND (${filters.category ?? null}::text IS NULL OR category = ${filters.category ?? null})
+      AND (${filters.brand ?? null}::text IS NULL OR brand = ${filters.brand ?? null})
+      AND (${filters.sku ?? null}::text IS NULL OR sku ILIKE '%' || ${filters.sku ?? null} || '%')
     GROUP BY category
-    ORDER BY revenue DESC
-    LIMIT 5
-  `);
-  return result.map((r: any) => ({ category: r.category || 'Unknown', revenue: parseFloat(r.revenue || 0) }));
+    ORDER BY current_revenue DESC
+    LIMIT 10
+  `;
+
+  return result.map((row) => {
+    const revenue = numberValue(row.current_revenue);
+    const previousRevenue = numberValue(row.previous_revenue);
+    return {
+      category: String(row.category || "Unknown"),
+      revenue,
+      previousRevenue,
+      growth: calculateGrowth(revenue, previousRevenue),
+    };
+  });
 }
 
-export async function getProductPerformance(db: any, currentPeriod: string, filters: any) {
-  const where = buildWhereClause(filters);
-  const result = await (db as any).query(`
-    SELECT product_name as item, SUM(quantity) as quantity, SUM(net_amount) as revenue
+export async function getProductPerformance(db: FounderSql, periods: ComparisonPeriods, filters: DashboardFilters) {
+  const result = await db`
+    SELECT
+      sku,
+      product_name,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN quantity ELSE 0 END), 0) AS current_quantity,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN net_amount ELSE 0 END), 0) AS current_revenue,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.previousStart}::date AND sale_date <= ${periods.previousEnd}::date THEN net_amount ELSE 0 END), 0) AS previous_revenue
     FROM sales_fact
-    WHERE ${currentPeriod} AND ${where}
-    GROUP BY product_name
-    ORDER BY quantity DESC
+    WHERE (${filters.store ?? null}::text IS NULL OR store = ${filters.store ?? null})
+      AND (${filters.category ?? null}::text IS NULL OR category = ${filters.category ?? null})
+      AND (${filters.brand ?? null}::text IS NULL OR brand = ${filters.brand ?? null})
+      AND (${filters.sku ?? null}::text IS NULL OR sku ILIKE '%' || ${filters.sku ?? null} || '%')
+    GROUP BY sku, product_name
+    ORDER BY current_quantity DESC
     LIMIT 10
-  `);
-  return result.map((r: any) => ({ 
-    item: r.item || 'Unknown', 
-    quantity: parseInt(r.quantity || 0),
-    revenue: parseFloat(r.revenue || 0)
-  }));
+  `;
+
+  return result.map((row) => {
+    const revenue = numberValue(row.current_revenue);
+    const previousRevenue = numberValue(row.previous_revenue);
+    return {
+      sku: String(row.sku || ""),
+      item: String(row.product_name || "Unknown"),
+      quantity: numberValue(row.current_quantity),
+      revenue,
+      previousRevenue,
+      growth: calculateGrowth(revenue, previousRevenue),
+    };
+  });
 }

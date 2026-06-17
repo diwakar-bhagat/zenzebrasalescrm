@@ -1,12 +1,30 @@
 import { create } from "zustand";
 
+function toISODate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function defaultDateRange() {
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 29);
+
+  return {
+    startDate: toISODate(start),
+    endDate: toISODate(end),
+  };
+}
+
 interface FilterState {
-  days: string;
+  startDate: string;
+  endDate: string;
   store: string;
   category: string;
   brand: string;
   sku: string;
-  setDays: (days: string) => void;
+  setStartDate: (startDate: string) => void;
+  setEndDate: (endDate: string) => void;
+  setDateRange: (startDate: string, endDate: string) => void;
   setStore: (store: string) => void;
   setCategory: (category: string) => void;
   setBrand: (brand: string) => void;
@@ -14,22 +32,33 @@ interface FilterState {
   reset: () => void;
 }
 
-export const useFilterStore = create<FilterState>((set) => ({
-  days: "30",
-  store: "All Stores",
-  category: "All Categories",
-  brand: "All Brands",
-  sku: "",
-  setDays: (days) => set({ days }),
-  setStore: (store) => set({ store }),
-  setCategory: (category) => set({ category }),
-  setBrand: (brand) => set({ brand }),
-  setSku: (sku) => set({ sku }),
-  reset: () => set({
-    days: "30",
+export const useFilterStore = create<FilterState>((set) => {
+  const range = defaultDateRange();
+
+  return {
+    startDate: range.startDate,
+    endDate: range.endDate,
     store: "All Stores",
     category: "All Categories",
     brand: "All Brands",
-    sku: ""
-  })
-}));
+    sku: "",
+    setStartDate: (startDate) => set({ startDate }),
+    setEndDate: (endDate) => set({ endDate }),
+    setDateRange: (startDate, endDate) => set({ startDate, endDate }),
+    setStore: (store) => set({ store }),
+    setCategory: (category) => set({ category }),
+    setBrand: (brand) => set({ brand }),
+    setSku: (sku) => set({ sku }),
+    reset: () => {
+      const nextRange = defaultDateRange();
+      set({
+        startDate: nextRange.startDate,
+        endDate: nextRange.endDate,
+        store: "All Stores",
+        category: "All Categories",
+        brand: "All Brands",
+        sku: "",
+      });
+    },
+  };
+});

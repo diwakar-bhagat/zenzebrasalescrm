@@ -2,18 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Bar, 
-  BarChart, 
-  CartesianGrid, 
-  ResponsiveContainer, 
-  Tooltip, 
-  XAxis, 
-  YAxis,
-  PieChart,
-  Pie,
-  Cell
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Upload, TrendingUp, TrendingDown, ShoppingCart, DollarSign, BarChart3, Store } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -29,18 +18,34 @@ export default function FounderDashboardPage() {
   const [data, setData] = useState<any>(null);
   const [status, setStatus] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasInitializedDateRange, setHasInitializedDateRange] = useState(false);
   
-  const { days, store, category, brand, sku } = useFilterStore();
+  const { startDate, endDate, store, category, brand, sku, setDateRange } = useFilterStore();
 
   useEffect(() => {
     fetchStatus();
   }, []);
 
   useEffect(() => {
-    if (status?.isSeeded) {
+    if (status?.hasData && status.maxDate && !hasInitializedDateRange) {
+      const end = new Date(`${status.maxDate}T00:00:00.000Z`);
+      const start = new Date(end);
+      start.setUTCDate(start.getUTCDate() - 29);
+
+      if (status.minDate) {
+        const min = new Date(`${status.minDate}T00:00:00.000Z`);
+        if (start < min) start.setTime(min.getTime());
+      }
+
+      setDateRange(start.toISOString().slice(0, 10), end.toISOString().slice(0, 10));
+      setHasInitializedDateRange(true);
+      return;
+    }
+
+    if (status?.hasData && hasInitializedDateRange) {
       fetchDashboardData();
     }
-  }, [status, days, store, category, brand, sku]);
+  }, [status, hasInitializedDateRange, startDate, endDate, store, category, brand, sku, setDateRange]);
 
   const fetchStatus = async () => {
     try {
@@ -57,11 +62,11 @@ export default function FounderDashboardPage() {
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
-      const params = new URLSearchParams({ days });
+      const params = new URLSearchParams({ startDate, endDate });
       if (store !== "All Stores") params.set("store", store);
       if (category !== "All Categories") params.set("category", category);
       if (brand !== "All Brands") params.set("brand", brand);
-      if (sku) params.set("item", sku); // item maps to sku
+      if (sku) params.set("sku", sku);
 
       const res = await fetch(`/api/founder/dashboard?${params.toString()}`);
       const json = await res.json();
@@ -79,7 +84,7 @@ export default function FounderDashboardPage() {
     return <div className="p-8"><Skeleton className="h-[400px] w-full" /></div>;
   }
 
-  if (!status.isSeeded) {
+  if (!status.hasData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 text-center space-y-6">
         <div className="bg-muted/30 p-8 rounded-full">
@@ -96,8 +101,6 @@ export default function FounderDashboardPage() {
       </div>
     );
   }
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
 
   return (
     <div className="flex flex-col space-y-2 p-4 md:p-8 pt-4">
@@ -123,8 +126,8 @@ export default function FounderDashboardPage() {
 
       {isLoading || !data ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
+          {["revenue", "bill-cuts", "units", "aov"].map((key) => (
+            <Skeleton key={key} className="h-32 rounded-xl" />
           ))}
         </div>
       ) : (

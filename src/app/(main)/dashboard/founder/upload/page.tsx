@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UploadCloud, FileType, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -34,22 +33,13 @@ export default function FounderUploadPage() {
     setValidationResult(null);
     
     try {
-      const buffer = await file.arrayBuffer();
-      setProgress(30);
+      const formData = new FormData();
+      formData.append("file", file);
+      setProgress(40);
       
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      
-      // Convert to array of arrays first to ensure headers are preserved even if empty
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-      setProgress(50);
-      
-      // Send for validation
       const res = await fetch("/api/founder/imports?mode=validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: jsonData }),
+        body: formData,
       });
       
       setProgress(80);
@@ -71,15 +61,17 @@ export default function FounderUploadPage() {
   };
 
   const handleCommit = async () => {
-    if (!validationResult || !validationResult.validData) return;
+    if (!validationResult || !file) return;
     
     setIsProcessing(true);
     
     try {
+      const formData = new FormData();
+      formData.append("file", file);
+
       const res = await fetch("/api/founder/imports?mode=commit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: validationResult.validData }),
+        body: formData,
       });
       
       const data = await res.json();
@@ -168,7 +160,7 @@ export default function FounderUploadPage() {
                 Validation Results
                 {validationResult.isValid ? (
                   <Badge variant="outline" className="ml-2 bg-green-500/10 text-green-600 border-green-500/20">
-                    <CheckCircle2 className="mr-1 size-3" /> Passed
+                    <CheckCircle2 className="mr-1 size-3" /> Ready
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="ml-2 bg-red-500/10 text-red-600 border-red-500/20">
@@ -189,18 +181,26 @@ export default function FounderUploadPage() {
                     <p className="text-2xl font-bold text-green-600">{validationResult.validRows || 0}</p>
                   </div>
                 </div>
+                {validationResult.dateRange?.start && validationResult.dateRange?.end && (
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Date Range</p>
+                    <p className="font-medium">
+                      {validationResult.dateRange.start} to {validationResult.dateRange.end}
+                    </p>
+                  </div>
+                )}
 
-                {!validationResult.isValid && validationResult.errors && (
+                {validationResult.errors?.length > 0 && (
                   <div className="mt-4">
-                    <h4 className="font-medium text-sm text-red-600 mb-2 flex items-center">
+                    <h4 className="font-medium text-sm text-amber-600 mb-2 flex items-center">
                       <AlertCircle className="mr-2 size-4" /> 
-                      Errors Found (first 10)
+                      Quarantined Rows (first 10)
                     </h4>
-                    <div className="bg-red-500/5 border border-red-500/20 rounded-md p-3 max-h-60 overflow-y-auto">
+                    <div className="bg-amber-500/5 border border-amber-500/20 rounded-md p-3 max-h-60 overflow-y-auto">
                       <ul className="text-sm space-y-2">
                         {validationResult.errors.slice(0, 10).map((err: any, i: number) => (
-                          <li key={i} className="text-red-700">
-                            <strong>Row {err.row}:</strong> [{err.field}] {err.error}
+                          <li key={`${err.rowNumber}-${i}`} className="text-amber-700">
+                            <strong>Row {err.rowNumber}:</strong> {err.errors?.join(", ")}
                           </li>
                         ))}
                         {validationResult.errors.length > 10 && (
@@ -222,7 +222,7 @@ export default function FounderUploadPage() {
                 onClick={handleCommit}
               >
                 {isProcessing && <Loader2 className="mr-2 size-4 animate-spin" />}
-                {validationResult.isValid ? "Commit to Database" : "Fix Errors to Continue"}
+                {validationResult.isValid ? "Commit Valid Rows" : "No Valid Rows to Commit"}
               </Button>
             </CardFooter>
           </Card>

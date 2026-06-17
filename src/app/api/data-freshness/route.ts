@@ -7,7 +7,7 @@ export async function GET() {
   try {
     // Get latest sale date from sales_fact
     const salesResult = await sql`
-      SELECT MAX(date) as latest_sale_date 
+      SELECT MAX(sale_date) as latest_sale_date 
       FROM sales_fact
     `;
     
@@ -15,7 +15,7 @@ export async function GET() {
     const uploadResult = await sql`
       SELECT MAX(uploaded_at) as last_uploaded_at 
       FROM upload_batches
-      WHERE status = 'completed'
+      WHERE status = 'success'
     `;
 
     const latestSaleDate = salesResult[0]?.latest_sale_date || null;

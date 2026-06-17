@@ -23,9 +23,19 @@ async function migrate() {
       status TEXT NOT NULL,
       row_count INTEGER NOT NULL DEFAULT 0,
       error_count INTEGER NOT NULL DEFAULT 0,
+      valid_row_count INTEGER NOT NULL DEFAULT 0,
+      quarantined_row_count INTEGER NOT NULL DEFAULT 0,
+      date_range_start DATE,
+      date_range_end DATE,
       uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
   `;
+
+  console.log("Ensuring upload_batches columns...");
+  await sql`ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS valid_row_count INTEGER NOT NULL DEFAULT 0;`;
+  await sql`ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS quarantined_row_count INTEGER NOT NULL DEFAULT 0;`;
+  await sql`ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS date_range_start DATE;`;
+  await sql`ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS date_range_end DATE;`;
 
   console.log("Creating sales_fact table...");
   await sql`
@@ -54,6 +64,7 @@ async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS idx_sales_fact_brand ON sales_fact (brand);`;
   await sql`CREATE INDEX IF NOT EXISTS idx_sales_fact_sku ON sales_fact (sku);`;
   await sql`CREATE INDEX IF NOT EXISTS idx_sales_fact_bill_no ON sales_fact (bill_no);`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sales_fact_date_bill_sku ON sales_fact (sale_date, bill_no, sku);`;
 
   console.log("Migration complete!");
 }

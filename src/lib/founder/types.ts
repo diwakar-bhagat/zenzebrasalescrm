@@ -4,6 +4,10 @@ export interface FounderUploadBatch {
   status: "success" | "failed";
   rowCount: number;
   errorCount: number;
+  validRowCount?: number;
+  quarantinedRowCount?: number;
+  dateRangeStart?: string | null;
+  dateRangeEnd?: string | null;
   uploadedAt: string;
 }
 
@@ -69,10 +73,30 @@ export interface UploadRowError {
   errors: string[];
 }
 
+export interface CanonicalSalesRow {
+  sale_date: string;
+  bill_no: string;
+  store: string;
+  category: string;
+  brand: string;
+  sku: string;
+  product_name: string;
+  quantity: number;
+  net_amount: number;
+  customer_id: string | null;
+  row_number: number;
+}
+
 export interface ValidationResult {
   isValid: boolean;
   totalRows: number;
+  validRows: number;
   errorCount: number;
   errors: UploadRowError[];
-  parsedData?: any[]; // The canonical array of rows ready for insert
+  validData: CanonicalSalesRow[];
+  dateRange: {
+    start: string | null;
+    end: string | null;
+  };
+  parsedData?: CanonicalSalesRow[];
 }

@@ -1,42 +1,52 @@
-import { calculateGrowth, buildWhereClause } from "./comparison";
+import type { DashboardFilters } from "@/lib/founder/types";
 
-export async function getStorePerformance(db: any, periods: any, filters: any) {
-  const where = buildWhereClause(filters);
-  const result = await (db as any).query(`
-    SELECT 
+import { calculateGrowth, type ComparisonPeriods } from "./comparison";
+
+type FounderSql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Record<string, unknown>[]>;
+
+function numberValue(value: unknown) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export async function getStorePerformance(db: FounderSql, periods: ComparisonPeriods, filters: DashboardFilters) {
+  const result = await db`
+    SELECT
       store,
-      SUM(CASE WHEN ${periods.current} THEN net_amount ELSE 0 END) as current_revenue,
-      SUM(CASE WHEN ${periods.previous} THEN net_amount ELSE 0 END) as previous_revenue,
-      COUNT(DISTINCT CASE WHEN ${periods.current} THEN bill_no END) as current_bills,
-      COUNT(DISTINCT CASE WHEN ${periods.previous} THEN bill_no END) as previous_bills,
-      SUM(CASE WHEN ${periods.current} THEN quantity ELSE 0 END) as current_qty,
-      SUM(CASE WHEN ${periods.previous} THEN quantity ELSE 0 END) as previous_qty
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN net_amount ELSE 0 END), 0) AS current_revenue,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.previousStart}::date AND sale_date <= ${periods.previousEnd}::date THEN net_amount ELSE 0 END), 0) AS previous_revenue,
+      COUNT(DISTINCT CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN bill_no END) AS current_bills,
+      COUNT(DISTINCT CASE WHEN sale_date >= ${periods.previousStart}::date AND sale_date <= ${periods.previousEnd}::date THEN bill_no END) AS previous_bills,
+      COALESCE(SUM(CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN quantity ELSE 0 END), 0) AS current_qty
     FROM sales_fact
-    WHERE ${where} AND store IS NOT NULL
+    WHERE store IS NOT NULL
+      AND (${filters.store ?? null}::text IS NULL OR store = ${filters.store ?? null})
+      AND (${filters.category ?? null}::text IS NULL OR category = ${filters.category ?? null})
+      AND (${filters.brand ?? null}::text IS NULL OR brand = ${filters.brand ?? null})
+      AND (${filters.sku ?? null}::text IS NULL OR sku ILIKE '%' || ${filters.sku ?? null} || '%')
     GROUP BY store
     ORDER BY current_revenue DESC
-  `);
+  `;
 
-  let totalRevenue = 0;
-  
-  const parsedResult = result.map((r: any) => {
-    const rev = parseFloat(r.current_revenue || "0");
-    totalRevenue += rev;
-    
+  const parsed = result.map((row) => {
+    const revenue = numberValue(row.current_revenue);
+    const billCuts = numberValue(row.current_bills);
+
     return {
-      store: r.store,
-      revenue: rev,
-      revenueGrowth: calculateGrowth(rev, parseFloat(r.previous_revenue || "0")) || 0,
-      billCuts: parseInt(r.current_bills || "0"),
-      billCutsGrowth: calculateGrowth(parseInt(r.current_bills || "0"), parseInt(r.previous_bills || "0")) || 0,
-      units: parseInt(r.current_qty || "0"),
-      aov: rev / Math.max(1, parseInt(r.current_bills || "0")),
+      store: String(row.store || "Unknown"),
+      revenue,
+      revenueGrowth: calculateGrowth(revenue, numberValue(row.previous_revenue)),
+      billCuts,
+      billCutsGrowth: calculateGrowth(billCuts, numberValue(row.previous_bills)),
+      units: numberValue(row.current_qty),
+      aov: billCuts > 0 ? revenue / billCuts : 0,
     };
   });
 
-  // Calculate contribution %
-  return parsedResult.map((store: any) => ({
+  const totalRevenue = parsed.reduce((sum, store) => sum + store.revenue, 0);
+
+  return parsed.map((store) => ({
     ...store,
-    contributionPercent: totalRevenue > 0 ? (store.revenue / totalRevenue) * 100 : 0
+    contributionPercent: totalRevenue > 0 ? (store.revenue / totalRevenue) * 100 : 0,
   }));
 }

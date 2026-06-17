@@ -7,6 +7,7 @@ const mockSql = async (strings: TemplateStringsArray, ...values: any[]) => {
 	return [];
 };
 (mockSql as any).query = mockSql;
+(mockSql as any).transaction = async () => [];
 
 export const sql = process.env.DATABASE_URL
 	? neon(process.env.DATABASE_URL)

@@ -23,10 +23,43 @@ export default function FounderDashboardPage() {
   const { startDate, endDate, store, category, brand, sku, setDateRange } = useFilterStore();
 
   useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("/api/founder/status");
+        const json = await res.json();
+        if (json.success) {
+          setStatus(json.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch status", err);
+      }
+    };
+
     fetchStatus();
   }, []);
 
   useEffect(() => {
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams({ startDate, endDate });
+        if (store !== "All Stores") params.set("store", store);
+        if (category !== "All Categories") params.set("category", category);
+        if (brand !== "All Brands") params.set("brand", brand);
+        if (sku) params.set("sku", sku);
+
+        const res = await fetch(`/api/founder/dashboard?${params.toString()}`);
+        const json = await res.json();
+        if (json.success) {
+          setData(json.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard data", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     if (status?.hasData && status.maxDate && !hasInitializedDateRange) {
       const end = new Date(`${status.maxDate}T00:00:00.000Z`);
       const start = new Date(end);
@@ -46,39 +79,6 @@ export default function FounderDashboardPage() {
       fetchDashboardData();
     }
   }, [status, hasInitializedDateRange, startDate, endDate, store, category, brand, sku, setDateRange]);
-
-  const fetchStatus = async () => {
-    try {
-      const res = await fetch("/api/founder/status");
-      const json = await res.json();
-      if (json.success) {
-        setStatus(json.data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch status", err);
-    }
-  };
-
-  const fetchDashboardData = async () => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams({ startDate, endDate });
-      if (store !== "All Stores") params.set("store", store);
-      if (category !== "All Categories") params.set("category", category);
-      if (brand !== "All Brands") params.set("brand", brand);
-      if (sku) params.set("sku", sku);
-
-      const res = await fetch(`/api/founder/dashboard?${params.toString()}`);
-      const json = await res.json();
-      if (json.success) {
-        setData(json.data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch dashboard data", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   if (!status) {
     return <div className="p-8"><Skeleton className="h-[400px] w-full" /></div>;
@@ -236,8 +236,8 @@ export default function FounderDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.storePerformance.map((store: any, idx: number) => (
-                        <tr key={store.store || idx} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                      {data.storePerformance.map((store: any) => (
+                        <tr key={store.store} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                           <td className="px-4 py-3 font-medium">{store.store}</td>
                           <td className="px-4 py-3 text-right font-semibold">{formatCurrency(store.revenue)}</td>
                           <td className={`px-4 py-3 text-right ${store.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"}`}>
@@ -292,8 +292,8 @@ export default function FounderDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {data.productPerformance.map((item: any, i: number) => (
-                    <div key={item.item || i} className="flex items-center justify-between">
+                  {data.productPerformance.map((item: any) => (
+                    <div key={item.sku || item.item} className="flex items-center justify-between">
                       <div className="space-y-1">
                         <p className="text-sm font-medium leading-none">{item.item}</p>
                         <p className="text-sm text-muted-foreground">

@@ -108,7 +108,10 @@ export default function FounderUploadPage() {
             <CardDescription>Upload an Excel (.xlsx) or CSV file matching the canonical schema.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="border-2 border-dashed border-border rounded-lg p-10 flex flex-col items-center justify-center text-center bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer" onClick={() => document.getElementById("file-upload")?.click()}>
+            <label
+              htmlFor="file-upload"
+              className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/20 p-10 text-center transition-colors hover:bg-muted/40"
+            >
               <input
                 id="file-upload"
                 type="file"
@@ -129,7 +132,7 @@ export default function FounderUploadPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </label>
             
             {isProcessing && (
               <div className="space-y-2 mt-4">
@@ -198,8 +201,8 @@ export default function FounderUploadPage() {
                     </h4>
                     <div className="bg-amber-500/5 border border-amber-500/20 rounded-md p-3 max-h-60 overflow-y-auto">
                       <ul className="text-sm space-y-2">
-                        {validationResult.errors.slice(0, 10).map((err: any, i: number) => (
-                          <li key={`${err.rowNumber}-${i}`} className="text-amber-700">
+                        {validationResult.errors.slice(0, 10).map((err: any) => (
+                          <li key={`${err.rowNumber}-${err.errors?.join("|")}`} className="text-amber-700">
                             <strong>Row {err.rowNumber}:</strong> {err.errors?.join(", ")}
                           </li>
                         ))}

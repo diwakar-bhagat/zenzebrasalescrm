@@ -2,7 +2,7 @@ import { calculateGrowth, buildWhereClause } from "./comparison";
 
 export async function getSalesKpis(db: any, periods: any, filters: any) {
   const where = buildWhereClause(filters);
-  const result = await db(`
+  const result = await (db as any).query(`
     SELECT 
       SUM(CASE WHEN ${periods.current} THEN net_amount ELSE 0 END) as current_revenue,
       SUM(CASE WHEN ${periods.previous} THEN net_amount ELSE 0 END) as previous_revenue,
@@ -40,7 +40,7 @@ export async function getSalesKpis(db: any, periods: any, filters: any) {
 
 export async function getCategoryPerformance(db: any, currentPeriod: string, filters: any) {
   const where = buildWhereClause(filters);
-  const result = await db(`
+  const result = await (db as any).query(`
     SELECT category, SUM(net_amount) as revenue
     FROM sales_fact
     WHERE ${currentPeriod} AND ${where}
@@ -53,7 +53,7 @@ export async function getCategoryPerformance(db: any, currentPeriod: string, fil
 
 export async function getProductPerformance(db: any, currentPeriod: string, filters: any) {
   const where = buildWhereClause(filters);
-  const result = await db(`
+  const result = await (db as any).query(`
     SELECT product_name as item, SUM(quantity) as quantity, SUM(net_amount) as revenue
     FROM sales_fact
     WHERE ${currentPeriod} AND ${where}

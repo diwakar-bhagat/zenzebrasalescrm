@@ -62,7 +62,13 @@ export async function GET() {
 
     console.error("Failed to fetch founder status:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to fetch database status" },
+      { 
+        success: false, 
+        error: "Failed to fetch database status", 
+        message: error?.message || String(error),
+        code: error?.code,
+        fullError: JSON.stringify(error)
+      },
       { status: 500 }
     );
   }

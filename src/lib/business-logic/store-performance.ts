@@ -2,7 +2,7 @@ import { calculateGrowth, buildWhereClause } from "./comparison";
 
 export async function getStorePerformance(db: any, periods: any, filters: any) {
   const where = buildWhereClause(filters);
-  const result = await db(`
+  const result = await (db as any).query(`
     SELECT 
       store,
       SUM(CASE WHEN ${periods.current} THEN net_amount ELSE 0 END) as current_revenue,

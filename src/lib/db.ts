@@ -6,6 +6,7 @@ const mockSql = async (strings: TemplateStringsArray, ...values: any[]) => {
 	console.warn("Neon DB not configured. Missing DATABASE_URL.");
 	return [];
 };
+(mockSql as any).query = mockSql;
 
 export const sql = process.env.DATABASE_URL
 	? neon(process.env.DATABASE_URL)

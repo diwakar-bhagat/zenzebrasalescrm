@@ -2,7 +2,9 @@ import type { DashboardFilters } from "@/lib/founder/types";
 
 import { calculateGrowth, type ComparisonPeriods } from "./comparison";
 
-type FounderSql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Record<string, unknown>[]>;
+import type { NeonQueryFunction } from "@neondatabase/serverless";
+
+type FounderSql = NeonQueryFunction<false, false>;
 
 function numberValue(value: unknown) {
   const parsed = Number(value ?? 0);

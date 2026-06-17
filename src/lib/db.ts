@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
 // Define a placeholder SQL executor if the database URL isn't present
 // This ensures Next.js can compile pages without breaking on missing DB env vars
@@ -9,6 +9,6 @@ const mockSql = async (strings: TemplateStringsArray, ...values: any[]) => {
 (mockSql as any).query = mockSql;
 (mockSql as any).transaction = async () => [];
 
-export const sql = process.env.DATABASE_URL
+export const sql = (process.env.DATABASE_URL
 	? neon(process.env.DATABASE_URL)
-	: mockSql;
+	: mockSql) as NeonQueryFunction<false, false>;

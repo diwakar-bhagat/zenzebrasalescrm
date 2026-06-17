@@ -3,12 +3,9 @@ import * as xlsx from "xlsx";
 import { validateCanonicalSheet } from "./validation";
 import type { CanonicalSalesRow, ValidationResult } from "./types";
 
-type FounderSql = {
-  (strings: TemplateStringsArray, ...values: unknown[]): Promise<Record<string, unknown>[]>;
-  transaction?: (
-    queriesOrFn: (sql: (strings: TemplateStringsArray, ...values: unknown[]) => unknown) => unknown[],
-  ) => Promise<Record<string, unknown>[][]>;
-};
+import type { NeonQueryFunction } from "@neondatabase/serverless";
+
+type FounderSql = NeonQueryFunction<false, false>;
 
 const INSERT_CHUNK_SIZE = 1000;
 

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     // Date range constraint
     let dateFilter = "";
     if (!isNaN(days) && days > 0) {
-      dateFilter = `date >= CURRENT_DATE - INTERVAL '${days} days'`;
+      dateFilter = `sale_date >= CURRENT_DATE - INTERVAL '${days} days'`;
     }
     
     const filters = {

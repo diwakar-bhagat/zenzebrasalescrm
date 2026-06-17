@@ -44,7 +44,22 @@ export async function GET() {
         isSeeded: parseInt(stats.total_rows || "0", 10) > 0,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === '42P01') {
+      // Table doesn't exist yet - return empty state
+      return NextResponse.json({
+        success: true,
+        data: {
+          totalRows: 0,
+          minDate: null,
+          maxDate: null,
+          totalRevenue: 0,
+          latestBatch: null,
+          isSeeded: false,
+        },
+      });
+    }
+
     console.error("Failed to fetch founder status:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch database status" },

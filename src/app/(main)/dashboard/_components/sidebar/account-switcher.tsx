@@ -1,8 +1,8 @@
 "use client";
 
-import { useClerk, useUser } from "@clerk/nextjs";
 import { BadgeCheck, Bell, CreditCard, LogOut } from "lucide-react";
 
+import { useAuth } from "@/components/providers/auth-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -16,12 +16,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getInitials } from "@/lib/utils";
 
 export function AccountSwitcher() {
-  const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
+  const { user, isLoaded, signOut } = useAuth();
 
   const handleLogout = async () => {
     await signOut();
-    window.location.href = "/login";
   };
 
   if (!isLoaded) {
@@ -30,9 +28,9 @@ export function AccountSwitcher() {
 
   if (!user) return null;
 
-  const userName = user.fullName ?? "User";
-  const userEmail = user.primaryEmailAddress?.emailAddress ?? "";
-  const userAvatar = user.imageUrl;
+  const userName = user.name ?? "User";
+  const userSubtitle = user.employeeId ?? user.username;
+  const userAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=3b82f6&color=fff&bold=true&format=svg`;
 
   return (
     <DropdownMenu>
@@ -51,7 +49,7 @@ export function AccountSwitcher() {
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-semibold">{userName}</span>
-              <span className="truncate text-xs">{userEmail}</span>
+              <span className="truncate text-xs">{userSubtitle}</span>
             </div>
           </div>
         </DropdownMenuItem>

@@ -10,6 +10,7 @@ import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sideb
 import { LayoutControls } from "@/app/(main)/dashboard/_components/sidebar/layout-controls";
 import { SearchDialog } from "@/app/(main)/dashboard/_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "@/app/(main)/dashboard/_components/sidebar/theme-switcher";
+import { DataFreshnessSystem } from "@/components/dashboard/data-freshness-system";
 import { DotMatrixBackground } from "@/components/dashboard/dot-matrix-background";
 import { NotificationsPanel } from "@/components/dashboard/notifications-panel";
 import { SimpleIcon } from "@/components/simple-icon";
@@ -64,6 +65,7 @@ export async function OperationsLayout({ children }: Readonly<{ children: ReactN
               <SearchDialog />
             </div>
             <div className="flex items-center gap-2">
+              <DataFreshnessSystem />
               <LayoutControls />
               <ThemeSwitcher />
               <NotificationsPanel />

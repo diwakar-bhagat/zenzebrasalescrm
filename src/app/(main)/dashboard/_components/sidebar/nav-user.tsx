@@ -1,9 +1,9 @@
 "use client";
 
-import { useClerk, useUser } from "@clerk/nextjs";
 import { CircleUser, CreditCard, EllipsisVertical, LogOut, MessageSquareDot } from "lucide-react";
 import { toast } from "sonner";
 
+import { useAuth } from "@/components/providers/auth-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -20,13 +20,11 @@ import { getInitials } from "@/lib/utils";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
-  const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
+  const { user, isLoaded, signOut } = useAuth();
 
   const handleLogout = async () => {
     await signOut();
     toast.info("Signed out successfully");
-    window.location.href = "/login";
   };
 
   if (!isLoaded) {
@@ -47,15 +45,10 @@ export function NavUser() {
 
   if (!user) return null;
 
-  const userName = user.fullName ?? user.username ?? "User";
-  const userEmail = user.primaryEmailAddress?.emailAddress ?? "";
+  const userName = user.name ?? "User";
+  const userSubtitle = user.employeeId ?? user.username;
   const initials = getInitials(userName);
-  // Only use Clerk's imageUrl when the user actually has a real profile picture
-  // (e.g. signed up via Google). For email/password users, Clerk returns a blank
-  // default avatar, so we fall back to a generated initials avatar instead.
-  const userAvatar = user.hasImage
-    ? user.imageUrl
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=3b82f6&color=fff&bold=true&format=svg`;
+  const userAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=3b82f6&color=fff&bold=true&format=svg`;
 
   return (
     <SidebarMenu>
@@ -72,7 +65,7 @@ export function NavUser() {
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{userName}</span>
-                <span className="truncate text-muted-foreground text-xs">{userEmail}</span>
+                <span className="truncate text-muted-foreground text-xs">{userSubtitle}</span>
               </div>
               <EllipsisVertical className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -91,7 +84,7 @@ export function NavUser() {
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{userName}</span>
-                  <span className="truncate text-muted-foreground text-xs">{userEmail}</span>
+                  <span className="truncate text-muted-foreground text-xs">{userSubtitle}</span>
                 </div>
               </div>
             </DropdownMenuLabel>

@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { APP_CONFIG } from "@/config/app-config";
+import { ZenZebraLogo } from "@/components/brand/ZenZebraLogo";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
@@ -78,8 +78,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link prefetch={false} href="/dashboard/default" className="flex items-center gap-3">
-                <img src="/favicon.svg" alt="CTA Apparels Logo" className="size-6 shrink-0" />
-                <span className="font-semibold text-base leading-none">{APP_CONFIG.name}</span>
+                <ZenZebraLogo size="sm" showTagline={false} />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

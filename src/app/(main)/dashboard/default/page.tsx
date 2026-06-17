@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 
-import { TNAProgressOverview } from "../tna-tracker/_components/tna-progress-overview";
+import { TNAProgressOverview } from "../sla-tracker/_components/tna-progress-overview";
 import { ActivityFeed } from "./_components/activity-feed";
 import { AlertsPanel } from "./_components/alerts-panel";
 import { KPICards } from "./_components/kpi-cards";

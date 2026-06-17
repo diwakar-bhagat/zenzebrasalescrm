@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-import { useClerk } from "@clerk/nextjs";
+import { useAuth } from "@/components/providers/auth-provider";
 import { motion } from "framer-motion";
 import { ChevronRight } from "lucide-react";
 
@@ -164,11 +164,10 @@ export function NavMain({ items }: NavMainProps) {
   const path = usePathname();
   const _router = useRouter();
   const { state, isMobile } = useSidebar();
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
-    window.location.href = "/login";
   };
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {

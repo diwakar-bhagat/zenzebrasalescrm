@@ -6,9 +6,6 @@ import {
   Bar, 
   BarChart, 
   CartesianGrid, 
-  Legend, 
-  Line, 
-  LineChart, 
   ResponsiveContainer, 
   Tooltip, 
   XAxis, 
@@ -17,20 +14,23 @@ import {
   Pie,
   Cell
 } from "recharts";
-import { Filter, Upload, TrendingUp, AlertCircle, ShoppingCart, DollarSign, BarChart3, TrendingDown } from "lucide-react";
+import { Upload, TrendingUp, TrendingDown, ShoppingCart, DollarSign, BarChart3, Store } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency } from "@/lib/utils";
+import { useFilterStore } from "@/stores/founder/filter-store";
+import { GlobalFilterBar } from "@/components/founder/global-filter-bar";
+import { DataFreshnessSystem } from "@/components/dashboard/data-freshness-system";
 
 export default function FounderDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [status, setStatus] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [daysFilter, setDaysFilter] = useState("30");
+  
+  const { days, store, category, brand, sku } = useFilterStore();
 
   useEffect(() => {
     fetchStatus();
@@ -40,7 +40,7 @@ export default function FounderDashboardPage() {
     if (status?.isSeeded) {
       fetchDashboardData();
     }
-  }, [status, daysFilter]);
+  }, [status, days, store, category, brand, sku]);
 
   const fetchStatus = async () => {
     try {
@@ -57,7 +57,13 @@ export default function FounderDashboardPage() {
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/founder/dashboard?days=${daysFilter}`);
+      const params = new URLSearchParams({ days });
+      if (store !== "All Stores") params.set("store", store);
+      if (category !== "All Categories") params.set("category", category);
+      if (brand !== "All Brands") params.set("brand", brand);
+      if (sku) params.set("item", sku); // item maps to sku
+
+      const res = await fetch(`/api/founder/dashboard?${params.toString()}`);
       const json = await res.json();
       if (json.success) {
         setData(json.data);
@@ -80,7 +86,7 @@ export default function FounderDashboardPage() {
           <BarChart3 className="size-20 text-muted-foreground" />
         </div>
         <div className="max-w-md space-y-2">
-          <h2 className="text-2xl font-bold">Welcome to Founder Dashboard</h2>
+          <h2 className="text-2xl font-bold">Welcome to ZenZebra</h2>
           <p className="text-muted-foreground">No data has been uploaded yet. Upload your first daily sales sheet to unlock insights.</p>
         </div>
         <Button size="lg" onClick={() => router.push("/dashboard/founder/upload")}>
@@ -94,32 +100,26 @@ export default function FounderDashboardPage() {
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
 
   return (
-    <div className="flex flex-col space-y-6 p-4 md:p-8 pt-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex flex-col space-y-2 p-4 md:p-8 pt-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Founder Dashboard</h2>
-          <p className="text-muted-foreground mt-1">Executive overview of sales performance.</p>
+          <p className="text-muted-foreground mt-1">System of Attention</p>
         </div>
         <div className="flex items-center gap-3">
-          <Select value={daysFilter} onValueChange={setDaysFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Time Period" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 Days</SelectItem>
-              <SelectItem value="30">Last 30 Days</SelectItem>
-              <SelectItem value="90">Last 90 Days</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon" title="More Filters">
-            <Filter className="size-4" />
-          </Button>
-          <Button onClick={() => router.push("/dashboard/founder/upload")}>
+          <DataFreshnessSystem />
+          <Button variant="outline" onClick={() => router.push("/dashboard/founder/upload")}>
             <Upload className="mr-2 size-4" />
             Upload Data
           </Button>
         </div>
       </div>
+
+      <GlobalFilterBar 
+        availableStores={status.availableStores || []}
+        availableCategories={status.availableCategories || []}
+        availableBrands={status.availableBrands || []}
+      />
 
       {isLoading || !data ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -129,6 +129,30 @@ export default function FounderDashboardPage() {
         </div>
       ) : (
         <>
+          {/* Revenue Driver Section */}
+          {data.revenueDriver && (
+            <div className={`p-4 rounded-xl border flex items-center gap-4 ${
+              data.revenueDriver.revenueStatus === "Up" ? "bg-green-500/10 border-green-500/20" : 
+              data.revenueDriver.revenueStatus === "Down" ? "bg-red-500/10 border-red-500/20" : 
+              "bg-muted/50 border-border"
+            }`}>
+              <div className="p-3 bg-background rounded-full shrink-0 shadow-sm">
+                {data.revenueDriver.revenueStatus === "Up" ? <TrendingUp className="size-6 text-green-600" /> : 
+                 data.revenueDriver.revenueStatus === "Down" ? <TrendingDown className="size-6 text-red-600" /> : 
+                 <BarChart3 className="size-6 text-muted-foreground" />}
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  Revenue is {data.revenueDriver.revenueStatus} 
+                  <span className="text-sm font-normal opacity-80">
+                    ({data.revenueDriver.revenueGrowth > 0 ? "+" : ""}{data.revenueDriver.revenueGrowth.toFixed(1)}%)
+                  </span>
+                </h3>
+                <p className="text-sm opacity-90 font-medium mt-1">{data.revenueDriver.primaryDriver}</p>
+              </div>
+            </div>
+          )}
+
           {/* 1. Daily Business Health (KPIs) */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -137,36 +161,36 @@ export default function FounderDashboardPage() {
                 <DollarSign className="size-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(data.dailyHealth.currentRevenue)}</div>
-                <p className={`text-xs mt-1 flex items-center ${data.dailyHealth.revenueGrowth >= 0 ? "text-green-500" : "text-red-500"}`}>
-                  {data.dailyHealth.revenueGrowth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
-                  {data.dailyHealth.revenueGrowth > 0 ? "+" : ""}{data.dailyHealth.revenueGrowth.toFixed(1)}% vs prev
+                <div className="text-2xl font-bold">{formatCurrency(data.salesKpis.revenue.current)}</div>
+                <p className={`text-xs mt-1 flex items-center ${data.salesKpis.revenue.growth >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  {data.salesKpis.revenue.growth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
+                  {data.salesKpis.revenue.growth > 0 ? "+" : ""}{data.salesKpis.revenue.growth.toFixed(1)}% vs prev
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Bills</CardTitle>
+                <CardTitle className="text-sm font-medium">Bill Cuts</CardTitle>
                 <ShoppingCart className="size-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{data.dailyHealth.currentBills.toLocaleString()}</div>
-                <p className={`text-xs mt-1 flex items-center ${data.dailyHealth.billsGrowth >= 0 ? "text-green-500" : "text-red-500"}`}>
-                  {data.dailyHealth.billsGrowth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
-                  {data.dailyHealth.billsGrowth > 0 ? "+" : ""}{data.dailyHealth.billsGrowth.toFixed(1)}% vs prev
+                <div className="text-2xl font-bold">{data.salesKpis.billCuts.current.toLocaleString()}</div>
+                <p className={`text-xs mt-1 flex items-center ${data.salesKpis.billCuts.growth >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  {data.salesKpis.billCuts.growth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
+                  {data.salesKpis.billCuts.growth > 0 ? "+" : ""}{data.salesKpis.billCuts.growth.toFixed(1)}% vs prev
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Items Sold (Qty)</CardTitle>
+                <CardTitle className="text-sm font-medium">Units Sold</CardTitle>
                 <BarChart3 className="size-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{data.dailyHealth.currentQuantity.toLocaleString()}</div>
-                <p className={`text-xs mt-1 flex items-center ${data.dailyHealth.quantityGrowth >= 0 ? "text-green-500" : "text-red-500"}`}>
-                  {data.dailyHealth.quantityGrowth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
-                  {data.dailyHealth.quantityGrowth > 0 ? "+" : ""}{data.dailyHealth.quantityGrowth.toFixed(1)}% vs prev
+                <div className="text-2xl font-bold">{data.salesKpis.unitsSold.current.toLocaleString()}</div>
+                <p className={`text-xs mt-1 flex items-center ${data.salesKpis.unitsSold.growth >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  {data.salesKpis.unitsSold.growth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
+                  {data.salesKpis.unitsSold.growth > 0 ? "+" : ""}{data.salesKpis.unitsSold.growth.toFixed(1)}% vs prev
                 </p>
               </CardContent>
             </Card>
@@ -176,17 +200,67 @@ export default function FounderDashboardPage() {
                 <TrendingUp className="size-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(data.aovAnalysis.current)}</div>
-                <p className={`text-xs mt-1 flex items-center ${data.aovAnalysis.growth >= 0 ? "text-green-500" : "text-red-500"}`}>
-                  {data.aovAnalysis.growth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
-                  {data.aovAnalysis.growth > 0 ? "+" : ""}{data.aovAnalysis.growth.toFixed(1)}% vs prev
+                <div className="text-2xl font-bold">{formatCurrency(data.aovKpi.current)}</div>
+                <p className={`text-xs mt-1 flex items-center ${data.aovKpi.growth >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  {data.aovKpi.growth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
+                  {data.aovKpi.growth > 0 ? "+" : ""}{data.aovKpi.growth.toFixed(1)}% vs prev
                 </p>
               </CardContent>
             </Card>
           </div>
 
+          {/* Store Comparison */}
+          {data.storePerformance && data.storePerformance.length > 0 && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle>Store Comparison</CardTitle>
+                  <CardDescription>Which store is carrying the business?</CardDescription>
+                </div>
+                <Store className="size-5 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Store</th>
+                        <th className="px-4 py-3 font-medium text-right">Revenue</th>
+                        <th className="px-4 py-3 font-medium text-right">Growth</th>
+                        <th className="px-4 py-3 font-medium text-right">Contribution</th>
+                        <th className="px-4 py-3 font-medium text-right">Bill Cuts</th>
+                        <th className="px-4 py-3 font-medium text-right">AOV</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.storePerformance.map((store: any, idx: number) => (
+                        <tr key={store.store || idx} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-3 font-medium">{store.store}</td>
+                          <td className="px-4 py-3 text-right font-semibold">{formatCurrency(store.revenue)}</td>
+                          <td className={`px-4 py-3 text-right ${store.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            {store.revenueGrowth > 0 ? "+" : ""}{store.revenueGrowth.toFixed(1)}%
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <span>{store.contributionPercent.toFixed(1)}%</span>
+                              <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-primary" style={{ width: `${store.contributionPercent}%` }} />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">{store.billCuts.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(store.aov)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            {/* 2. Category Performance */}
+            {/* Category Performance */}
             <Card className="lg:col-span-4">
               <CardHeader>
                 <CardTitle>Category Performance</CardTitle>
@@ -198,7 +272,7 @@ export default function FounderDashboardPage() {
                     <BarChart data={data.categoryPerformance}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="category" />
-                      <YAxis tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} />
+                      <YAxis tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} />
                       <Tooltip formatter={(val: any) => formatCurrency(Number(val) || 0)} />
                       <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     </BarChart>
@@ -207,42 +281,8 @@ export default function FounderDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* 3. Brand Performance */}
+            {/* Product Performance */}
             <Card className="lg:col-span-3">
-              <CardHeader>
-                <CardTitle>Brand Market Share</CardTitle>
-                <CardDescription>Revenue distribution across brands</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={data.brandPerformance}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
-                        paddingAngle={5}
-                        dataKey="revenue"
-                        nameKey="brand"
-                        label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                      >
-                        {data.brandPerformance.map((_: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(val: any) => formatCurrency(Number(val) || 0)} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            {/* 4. Product Performance */}
-            <Card className="lg:col-span-4">
               <CardHeader>
                 <CardTitle>Top Moving Items</CardTitle>
                 <CardDescription>Best selling products by quantity</CardDescription>
@@ -265,35 +305,6 @@ export default function FounderDashboardPage() {
                   {data.productPerformance.length === 0 && (
                     <div className="text-sm text-muted-foreground py-4 text-center">No product data available</div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 5. Bill Cut Analysis */}
-            <Card className="lg:col-span-3">
-              <CardHeader>
-                <CardTitle>Bill Cut Analysis</CardTitle>
-                <CardDescription>Number of bills processed per day</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[250px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data.billCutAnalysis}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis 
-                        dataKey="date" 
-                        tickFormatter={(val) => {
-                          const d = new Date(val);
-                          return `${d.getMonth()+1}/${d.getDate()}`;
-                        }}
-                      />
-                      <YAxis />
-                      <Tooltip 
-                        labelFormatter={(val) => new Date(val).toLocaleDateString()}
-                      />
-                      <Line type="monotone" dataKey="bills" stroke="#8b5cf6" strokeWidth={2} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>

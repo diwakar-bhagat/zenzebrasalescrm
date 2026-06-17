@@ -1,9 +1,7 @@
 import type { ReactNode } from "react";
 
-import { OperationsLayout } from "@/components/operations/operations-layout";
-
 export default function Layout({
-	children,
+  children,
 }: Readonly<{ children: ReactNode }>) {
-	return <OperationsLayout>{children}</OperationsLayout>;
+  return <div className="w-full">{children}</div>;
 }

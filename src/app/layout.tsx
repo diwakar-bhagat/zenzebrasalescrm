@@ -42,6 +42,11 @@ export const metadata: Metadata = {
     description: APP_CONFIG.meta.description,
     images: ["/og-image.png"],
   },
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

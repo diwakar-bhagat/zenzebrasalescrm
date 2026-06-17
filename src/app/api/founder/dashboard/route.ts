@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { 
-  getDailyHealth, 
-  getCategoryPerformance, 
-  getBrandPerformance, 
-  getProductPerformance, 
-  getBillCutAnalysis, 
-  getAovAnalysis,
-  getComparisonPeriods
-} from "@/lib/founder/sql-helpers";
+import { getComparisonPeriods } from "@/lib/business-logic/comparison";
+import { getSalesKpis, getCategoryPerformance, getProductPerformance } from "@/lib/business-logic/sales";
+import { getAovKpi } from "@/lib/business-logic/aov";
+import { getStorePerformance } from "@/lib/business-logic/store-performance";
+import { analyzeRevenueDriver } from "@/lib/business-logic/revenue-driver";
 
 export const runtime = "nodejs";
 
@@ -45,30 +41,34 @@ export async function GET(req: NextRequest) {
 
     // Fetch all dashboard data concurrently
     const [
-      dailyHealth,
+      salesKpis,
       categoryPerformance,
-      brandPerformance,
       productPerformance,
-      billCutAnalysis,
-      aovAnalysis
+      aovKpi,
+      storePerformance
     ] = await Promise.all([
-      getDailyHealth(sql, periods, filters),
+      getSalesKpis(sql, periods, filters),
       getCategoryPerformance(sql, periods.current, filters),
-      getBrandPerformance(sql, periods.current, filters),
       getProductPerformance(sql, periods.current, filters),
-      getBillCutAnalysis(sql, periods.current, filters),
-      getAovAnalysis(sql, periods, filters)
+      getAovKpi(sql, periods, filters),
+      getStorePerformance(sql, periods, filters)
     ]);
+
+    const revenueDriver = analyzeRevenueDriver(
+      salesKpis.revenue.growth,
+      salesKpis.billCuts.growth,
+      aovKpi.growth
+    );
 
     return NextResponse.json({
       success: true,
       data: {
-        dailyHealth,
+        salesKpis,
         categoryPerformance,
-        brandPerformance,
         productPerformance,
-        billCutAnalysis,
-        aovAnalysis,
+        aovKpi,
+        storePerformance,
+        revenueDriver,
         periods
       }
     });

@@ -25,8 +25,8 @@ export async function GET() {
       sql`
         SELECT
           COUNT(*) AS total_rows,
-          MIN(sale_date) AS min_date,
-          MAX(sale_date) AS max_date,
+          MIN(sale_date)::text AS min_date,
+          MAX(sale_date)::text AS max_date,
           COALESCE(SUM(net_amount), 0) AS total_revenue
         FROM sales_fact
       `,
@@ -39,8 +39,8 @@ export async function GET() {
           error_count AS "errorCount",
           valid_row_count AS "validRowCount",
           quarantined_row_count AS "quarantinedRowCount",
-          date_range_start AS "dateRangeStart",
-          date_range_end AS "dateRangeEnd",
+          date_range_start::text AS "dateRangeStart",
+          date_range_end::text AS "dateRangeEnd",
           uploaded_at AS "uploadedAt"
         FROM upload_batches
         ORDER BY uploaded_at DESC

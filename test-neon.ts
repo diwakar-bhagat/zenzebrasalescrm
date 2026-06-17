@@ -3,8 +3,11 @@ const sql = neon(process.env.DATABASE_URL!);
 
 async function main() {
   try {
-    const rawSql = `SELECT 1 as num`;
-    const res = await (sql as any).query(rawSql);
+    const res = await (sql as any).query(`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'upload_batches';
+    `);
     console.log(res);
   } catch(e) {
     console.error(e);

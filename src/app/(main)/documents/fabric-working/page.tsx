@@ -1,5 +1,5 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { OperationsScreen } from "@/components/operations/operations-screen";
 
 export default function FabricWorkingPage() {
-  return <OperationsScreen mode="fabric-working" title="Fabric Reports" />;
+	return <OperationsScreen mode="fabric-working" title="Fabric Reports" />;
 }

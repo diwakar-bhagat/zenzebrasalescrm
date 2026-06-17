@@ -1,5 +1,10 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { OperationsScreen } from "@/components/operations/operations-screen";
 
 export default function MaterialRequisitionPage() {
-  return <OperationsScreen mode="material-requisition" title="Material Requisition" />;
+	return (
+		<OperationsScreen
+			mode="material-requisition"
+			title="Material Requisition"
+		/>
+	);
 }

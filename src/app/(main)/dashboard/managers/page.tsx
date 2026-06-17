@@ -1,5 +1,5 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { OperationsScreen } from "@/components/operations/operations-screen";
 
 export default function MerchantDashboardPage() {
-  return <OperationsScreen mode="merchant" />;
+	return <OperationsScreen mode="merchant" />;
 }

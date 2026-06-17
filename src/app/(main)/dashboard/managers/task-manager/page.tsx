@@ -1,5 +1,5 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { OperationsScreen } from "@/components/operations/operations-screen";
 
 export default function MerchantTaskManagerPage() {
-  return <OperationsScreen mode="task-manager" />;
+	return <OperationsScreen mode="task-manager" />;
 }

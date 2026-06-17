@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
-import { OperationsLayout } from "@/components/cta/operations-layout";
+import { OperationsLayout } from "@/components/operations/operations-layout";
 
-export default function NotificationLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <OperationsLayout>{children}</OperationsLayout>;
+export default function NotificationLayout({
+	children,
+}: Readonly<{ children: ReactNode }>) {
+	return <OperationsLayout>{children}</OperationsLayout>;
 }

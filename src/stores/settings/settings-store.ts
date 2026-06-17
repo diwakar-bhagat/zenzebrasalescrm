@@ -11,25 +11,25 @@ import type { GlobalConfig } from "@/types/app";
  */
 
 const SETTINGS_DEFAULTS: GlobalConfig = {
-  currency: "INR",
-  currencySymbol: "₹",
-  currencyLocale: "en-IN",
-  location: "India",
-  companyName: "CTA Apparels",
-  timezone: "Asia/Kolkata",
+	currency: "INR",
+	currencySymbol: "₹",
+	currencyLocale: "en-IN",
+	location: "India",
+	companyName: "ZenZebra",
+	timezone: "Asia/Kolkata",
 };
 
 export type SettingsState = GlobalConfig & {
-  isLoaded: boolean;
-  setSettings: (config: Partial<GlobalConfig>) => void;
-  hydrate: (config: GlobalConfig) => void;
+	isLoaded: boolean;
+	setSettings: (config: Partial<GlobalConfig>) => void;
+	hydrate: (config: GlobalConfig) => void;
 };
 
 export const createSettingsStore = (init?: Partial<GlobalConfig>) =>
-  createStore<SettingsState>()((set) => ({
-    ...SETTINGS_DEFAULTS,
-    ...init,
-    isLoaded: false,
-    setSettings: (config) => set((prev) => ({ ...prev, ...config })),
-    hydrate: (config) => set({ ...config, isLoaded: true }),
-  }));
+	createStore<SettingsState>()((set) => ({
+		...SETTINGS_DEFAULTS,
+		...init,
+		isLoaded: false,
+		setSettings: (config) => set((prev) => ({ ...prev, ...config })),
+		hydrate: (config) => set({ ...config, isLoaded: true }),
+	}));

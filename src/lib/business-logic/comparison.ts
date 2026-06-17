@@ -14,8 +14,8 @@ export function getComparisonPeriods(days: number) {
   // Last 30 -> Previous 30
   // Everything is relative to the provided number of days.
   return {
-    current: `date >= CURRENT_DATE - INTERVAL '${days} days'`,
-    previous: `date >= CURRENT_DATE - INTERVAL '${days * 2} days' AND date < CURRENT_DATE - INTERVAL '${days} days'`
+    current: `sale_date >= CURRENT_DATE - INTERVAL '${days} days'`,
+    previous: `sale_date >= CURRENT_DATE - INTERVAL '${days * 2} days' AND sale_date < CURRENT_DATE - INTERVAL '${days} days'`
   };
 }
 

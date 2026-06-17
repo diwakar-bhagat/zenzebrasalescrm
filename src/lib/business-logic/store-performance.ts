@@ -5,8 +5,8 @@ export async function getStorePerformance(db: any, periods: any, filters: any) {
   const result = await db(`
     SELECT 
       store,
-      SUM(CASE WHEN ${periods.current} THEN amount ELSE 0 END) as current_revenue,
-      SUM(CASE WHEN ${periods.previous} THEN amount ELSE 0 END) as previous_revenue,
+      SUM(CASE WHEN ${periods.current} THEN net_amount ELSE 0 END) as current_revenue,
+      SUM(CASE WHEN ${periods.previous} THEN net_amount ELSE 0 END) as previous_revenue,
       COUNT(DISTINCT CASE WHEN ${periods.current} THEN bill_no END) as current_bills,
       COUNT(DISTINCT CASE WHEN ${periods.previous} THEN bill_no END) as previous_bills,
       SUM(CASE WHEN ${periods.current} THEN quantity ELSE 0 END) as current_qty,

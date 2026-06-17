@@ -10,9 +10,9 @@ export async function GET() {
     const statsResult = await sql`
       SELECT 
         COUNT(*) as total_rows,
-        MIN(date) as min_date,
-        MAX(date) as max_date,
-        SUM(amount) as total_revenue
+        MIN(sale_date) as min_date,
+        MAX(sale_date) as max_date,
+        SUM(net_amount) as total_revenue
       FROM sales_fact
     `;
     

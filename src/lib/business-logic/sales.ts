@@ -4,8 +4,8 @@ export async function getSalesKpis(db: any, periods: any, filters: any) {
   const where = buildWhereClause(filters);
   const result = await db(`
     SELECT 
-      SUM(CASE WHEN ${periods.current} THEN amount ELSE 0 END) as current_revenue,
-      SUM(CASE WHEN ${periods.previous} THEN amount ELSE 0 END) as previous_revenue,
+      SUM(CASE WHEN ${periods.current} THEN net_amount ELSE 0 END) as current_revenue,
+      SUM(CASE WHEN ${periods.previous} THEN net_amount ELSE 0 END) as previous_revenue,
       COUNT(DISTINCT CASE WHEN ${periods.current} THEN bill_no END) as current_bills,
       COUNT(DISTINCT CASE WHEN ${periods.previous} THEN bill_no END) as previous_bills,
       SUM(CASE WHEN ${periods.current} THEN quantity ELSE 0 END) as current_qty,
@@ -41,7 +41,7 @@ export async function getSalesKpis(db: any, periods: any, filters: any) {
 export async function getCategoryPerformance(db: any, currentPeriod: string, filters: any) {
   const where = buildWhereClause(filters);
   const result = await db(`
-    SELECT category, SUM(amount) as revenue
+    SELECT category, SUM(net_amount) as revenue
     FROM sales_fact
     WHERE ${currentPeriod} AND ${where}
     GROUP BY category
@@ -54,10 +54,10 @@ export async function getCategoryPerformance(db: any, currentPeriod: string, fil
 export async function getProductPerformance(db: any, currentPeriod: string, filters: any) {
   const where = buildWhereClause(filters);
   const result = await db(`
-    SELECT item, SUM(quantity) as quantity, SUM(amount) as revenue
+    SELECT product_name as item, SUM(quantity) as quantity, SUM(net_amount) as revenue
     FROM sales_fact
     WHERE ${currentPeriod} AND ${where}
-    GROUP BY item
+    GROUP BY product_name
     ORDER BY quantity DESC
     LIMIT 10
   `);

@@ -22,7 +22,20 @@ export async function GET() {
     const settings = config as unknown as GlobalConfig;
 
     return NextResponse.json({ settings, cached: false });
-  } catch (error) {
+  } catch (error: any) {
+    // If the table doesn't exist yet, return a default config instead of a 500 error
+    if (error.code === '42P01') {
+      const defaultSettings = {
+        currency: "INR",
+        currencySymbol: "₹",
+        currencyLocale: "en-IN",
+        location: "India",
+        companyName: "ZenZebra",
+        timezone: "Asia/Kolkata"
+      };
+      return NextResponse.json({ settings: defaultSettings, cached: false });
+    }
+    
     console.error("Settings GET Error:", error);
     return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });
   }

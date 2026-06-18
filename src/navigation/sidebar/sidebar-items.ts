@@ -3,6 +3,10 @@ import {
   LogOut,
   Settings,
   Upload,
+  ShoppingBag,
+  BarChart3,
+  DollarSign,
+  LineChart,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,9 +42,29 @@ export const sidebarItems: NavGroup[] = [
     label: "Platform",
     items: [
       {
-        title: "Founder Dashboard",
-        url: "/dashboard/founder",
+        title: "Sales Dashboard",
+        url: "/dashboard/sales",
         icon: LayoutDashboard,
+      },
+      {
+        title: "E-commerce",
+        url: "/dashboard/ecommerce",
+        icon: ShoppingBag,
+      },
+      {
+        title: "CRM",
+        url: "/dashboard/crm",
+        icon: BarChart3,
+      },
+      {
+        title: "Finance",
+        url: "/dashboard/finance",
+        icon: DollarSign,
+      },
+      {
+        title: "Analytics",
+        url: "/dashboard/analytics",
+        icon: LineChart,
       },
       {
         title: "Upload Data",
@@ -66,3 +90,4 @@ export const sidebarItems: NavGroup[] = [
     ],
   },
 ];
+

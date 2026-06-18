@@ -1,8 +1,8 @@
-import { GET } from "./src/app/api/founder/dashboard/route";
+import { GET } from "./src/app/api/sales/dashboard/route";
 import { NextRequest } from "next/server";
 
 async function main() {
-  const req = new NextRequest("http://localhost:3000/api/founder/dashboard?days=30");
+  const req = new NextRequest("http://localhost:3000/api/sales/dashboard?days=30");
   try {
     const res = await GET(req);
     const json = await res.json();

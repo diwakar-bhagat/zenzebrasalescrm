@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Upload, TrendingUp, TrendingDown, ShoppingCart, DollarSign, BarChart3, Store } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar } from "@/components/ui/calendar";
 import { formatCurrency } from "@/lib/utils";
 import { useFilterStore } from "@/stores/founder/filter-store";
 import { GlobalFilterBar } from "@/components/founder/global-filter-bar";
 import { DataFreshnessSystem } from "@/components/dashboard/data-freshness-system";
 
-export default function FounderDashboardPage() {
+export default function SalesDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [status, setStatus] = useState<any>(null);
@@ -25,7 +25,7 @@ export default function FounderDashboardPage() {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const res = await fetch("/api/founder/status");
+        const res = await fetch("/api/sales/status");
         const json = await res.json();
         if (json.success) {
           setStatus(json.data);
@@ -48,7 +48,7 @@ export default function FounderDashboardPage() {
         if (brand !== "All Brands") params.set("brand", brand);
         if (sku) params.set("sku", sku);
 
-        const res = await fetch(`/api/founder/dashboard?${params.toString()}`);
+        const res = await fetch(`/api/sales/dashboard?${params.toString()}`);
         const json = await res.json();
         if (json.success) {
           setData(json.data);
@@ -94,7 +94,7 @@ export default function FounderDashboardPage() {
           <h2 className="text-2xl font-bold">Welcome to ZenZebra</h2>
           <p className="text-muted-foreground">No data has been uploaded yet. Upload your first daily sales sheet to unlock insights.</p>
         </div>
-        <Button size="lg" onClick={() => router.push("/dashboard/founder/upload")}>
+        <Button size="lg" onClick={() => router.push("/dashboard/sales/upload")}>
           <Upload className="mr-2 size-5" />
           Upload Sales Data
         </Button>
@@ -106,12 +106,12 @@ export default function FounderDashboardPage() {
     <div className="flex flex-col space-y-2 p-4 md:p-8 pt-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Founder Dashboard</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Sales Dashboard</h2>
           <p className="text-muted-foreground mt-1">System of Attention</p>
         </div>
         <div className="flex items-center gap-3">
           <DataFreshnessSystem />
-          <Button variant="outline" onClick={() => router.push("/dashboard/founder/upload")}>
+          <Button variant="outline" onClick={() => router.push("/dashboard/sales/upload")}>
             <Upload className="mr-2 size-4" />
             Upload Data
           </Button>
@@ -135,13 +135,13 @@ export default function FounderDashboardPage() {
           {/* Revenue Driver Section */}
           {data.revenueDriver && (
             <div className={`p-4 rounded-xl border flex items-center gap-4 ${
-              data.revenueDriver.revenueStatus === "Up" ? "bg-green-500/10 border-green-500/20" : 
-              data.revenueDriver.revenueStatus === "Down" ? "bg-red-500/10 border-red-500/20" : 
+              data.revenueDriver.revenueStatus === "Up" ? "bg-status-on-track-bg border-status-on-track/20" : 
+              data.revenueDriver.revenueStatus === "Down" ? "bg-status-delayed-bg border-status-delayed/20" : 
               "bg-muted/50 border-border"
             }`}>
               <div className="p-3 bg-background rounded-full shrink-0 shadow-sm">
-                {data.revenueDriver.revenueStatus === "Up" ? <TrendingUp className="size-6 text-green-600" /> : 
-                 data.revenueDriver.revenueStatus === "Down" ? <TrendingDown className="size-6 text-red-600" /> : 
+                {data.revenueDriver.revenueStatus === "Up" ? <TrendingUp className="size-6 text-status-on-track" /> : 
+                 data.revenueDriver.revenueStatus === "Down" ? <TrendingDown className="size-6 text-status-delayed" /> : 
                  <BarChart3 className="size-6 text-muted-foreground" />}
               </div>
               <div>
@@ -165,7 +165,7 @@ export default function FounderDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatCurrency(data.salesKpis.revenue.current)}</div>
-                <p className={`text-xs mt-1 flex items-center ${data.salesKpis.revenue.growth >= 0 ? "text-green-500" : "text-red-500"}`}>
+                <p className={`text-xs mt-1 flex items-center ${data.salesKpis.revenue.growth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
                   {data.salesKpis.revenue.growth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
                   {data.salesKpis.revenue.growth > 0 ? "+" : ""}{data.salesKpis.revenue.growth.toFixed(1)}% vs prev
                 </p>
@@ -178,7 +178,7 @@ export default function FounderDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{data.salesKpis.billCuts.current.toLocaleString()}</div>
-                <p className={`text-xs mt-1 flex items-center ${data.salesKpis.billCuts.growth >= 0 ? "text-green-500" : "text-red-500"}`}>
+                <p className={`text-xs mt-1 flex items-center ${data.salesKpis.billCuts.growth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
                   {data.salesKpis.billCuts.growth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
                   {data.salesKpis.billCuts.growth > 0 ? "+" : ""}{data.salesKpis.billCuts.growth.toFixed(1)}% vs prev
                 </p>
@@ -191,7 +191,7 @@ export default function FounderDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{data.salesKpis.unitsSold.current.toLocaleString()}</div>
-                <p className={`text-xs mt-1 flex items-center ${data.salesKpis.unitsSold.growth >= 0 ? "text-green-500" : "text-red-500"}`}>
+                <p className={`text-xs mt-1 flex items-center ${data.salesKpis.unitsSold.growth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
                   {data.salesKpis.unitsSold.growth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
                   {data.salesKpis.unitsSold.growth > 0 ? "+" : ""}{data.salesKpis.unitsSold.growth.toFixed(1)}% vs prev
                 </p>
@@ -204,7 +204,7 @@ export default function FounderDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatCurrency(data.aovKpi.current)}</div>
-                <p className={`text-xs mt-1 flex items-center ${data.aovKpi.growth >= 0 ? "text-green-500" : "text-red-500"}`}>
+                <p className={`text-xs mt-1 flex items-center ${data.aovKpi.growth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
                   {data.aovKpi.growth >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
                   {data.aovKpi.growth > 0 ? "+" : ""}{data.aovKpi.growth.toFixed(1)}% vs prev
                 </p>
@@ -240,7 +240,7 @@ export default function FounderDashboardPage() {
                         <tr key={store.store} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                           <td className="px-4 py-3 font-medium">{store.store}</td>
                           <td className="px-4 py-3 text-right font-semibold">{formatCurrency(store.revenue)}</td>
-                          <td className={`px-4 py-3 text-right ${store.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          <td className={`px-4 py-3 text-right ${store.revenueGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
                             {store.revenueGrowth > 0 ? "+" : ""}{store.revenueGrowth.toFixed(1)}%
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -262,53 +262,23 @@ export default function FounderDashboardPage() {
             </Card>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            {/* Category Performance */}
-            <Card className="lg:col-span-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {/* Sales Coverage Calendar */}
+            <Card className="lg:col-span-1">
               <CardHeader>
-                <CardTitle>Category Performance</CardTitle>
-                <CardDescription>Revenue breakdown by top categories</CardDescription>
+                <CardTitle>Sales Coverage Calendar</CardTitle>
+                <CardDescription>Data coverage between min and max sale dates</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.categoryPerformance}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="category" />
-                      <YAxis tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(val: any) => formatCurrency(Number(val) || 0)} />
-                      <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Product Performance */}
-            <Card className="lg:col-span-3">
-              <CardHeader>
-                <CardTitle>Top Moving Items</CardTitle>
-                <CardDescription>Best selling products by quantity</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {data.productPerformance.map((item: any) => (
-                    <div key={item.sku || item.item} className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">{item.item}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatCurrency(item.revenue)} revenue
-                        </p>
-                      </div>
-                      <div className="font-medium">
-                        {item.quantity.toLocaleString()} sold
-                      </div>
-                    </div>
-                  ))}
-                  {data.productPerformance.length === 0 && (
-                    <div className="text-sm text-muted-foreground py-4 text-center">No product data available</div>
-                  )}
-                </div>
+              <CardContent className="flex justify-center pb-6">
+                <Calendar
+                  mode="range"
+                  selected={{
+                    from: status?.minDate ? new Date(status.minDate) : undefined,
+                    to: status?.maxDate ? new Date(status.maxDate) : undefined,
+                  }}
+                  defaultMonth={status?.maxDate ? new Date(status.maxDate) : new Date()}
+                  className="rounded-md border shadow-sm pointer-events-none"
+                />
               </CardContent>
             </Card>
           </div>

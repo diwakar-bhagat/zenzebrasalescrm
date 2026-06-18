@@ -37,7 +37,7 @@ export default function FounderUploadPage() {
       formData.append("file", file);
       setProgress(40);
       
-      const res = await fetch("/api/founder/imports?mode=validate", {
+      const res = await fetch("/api/sales/imports?mode=validate", {
         method: "POST",
         body: formData,
       });
@@ -69,7 +69,7 @@ export default function FounderUploadPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("/api/founder/imports?mode=commit", {
+      const res = await fetch("/api/sales/imports?mode=commit", {
         method: "POST",
         body: formData,
       });
@@ -78,7 +78,7 @@ export default function FounderUploadPage() {
       
       if (res.ok && data.success) {
         toast.success(`Successfully imported ${data.data.rowsInserted} rows!`);
-        router.push("/dashboard/founder");
+        router.push("/dashboard/sales");
       } else {
         toast.error(data.error || "Failed to commit data");
       }
@@ -94,9 +94,9 @@ export default function FounderUploadPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Upload Sales Data</h2>
-          <p className="text-muted-foreground mt-1">Upload your daily sales sheet to update the Founder Dashboard.</p>
+          <p className="text-muted-foreground mt-1">Upload your daily sales sheet to update the Sales Dashboard.</p>
         </div>
-        <Button variant="outline" onClick={() => router.push("/dashboard/founder")}>
+        <Button variant="outline" onClick={() => router.push("/dashboard/sales")}>
           Back to Dashboard
         </Button>
       </div>

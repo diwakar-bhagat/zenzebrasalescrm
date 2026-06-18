@@ -135,7 +135,15 @@ export function validateCanonicalSheet(rows: Record<string, unknown>[]): Validat
 
     // Graceful fallbacks for all fields so we never throw errors for missing data
     const billNo = toRequiredText(row.bill_no) || "Unknown Bill";
-    const storeName = toRequiredText(row.store) || "Unknown Store";
+    
+    let storeName = toRequiredText(row.store);
+    const lowerStore = storeName.toLowerCase();
+    if (lowerStore.includes("smart") || lowerStore.includes("noida")) {
+      storeName = "Smart_Works_Noida";
+    } else {
+      storeName = "KLJ"; // Aggressive default as per requirements
+    }
+
     const categoryName = toRequiredText(row.category) || "Uncategorized";
     const brandName = toRequiredText(row.brand) || "Unknown Brand";
     const skuCode = toRequiredText(row.sku) || "Unknown SKU";

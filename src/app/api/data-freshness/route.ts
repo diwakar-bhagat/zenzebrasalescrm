@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
-export const runtime = "nodejs"; // Match founder dashboard pattern
+export const runtime = "nodejs"; // Match sales dashboard pattern
 
 export async function GET() {
   try {

@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "./aura.css";
 
 /* Theme preset styles: these override CSS variables based on the selected data-theme-preset */
 @import "../styles/presets/brutalist.css";
@@ -49,31 +48,6 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-
-  --color-surface-1: hsl(var(--surface-1));
-  --color-surface-2: hsl(var(--surface-2));
-  --color-surface-3: hsl(var(--surface-3));
-  --color-border-subtle: hsl(var(--border-subtle));
-  --color-foreground-muted: hsl(var(--foreground-muted));
-  --color-foreground-subtle: hsl(var(--foreground-subtle));
-
-  --color-status-on-track: hsl(var(--status-on-track));
-  --color-status-at-risk: hsl(var(--status-at-risk));
-  --color-status-delayed: hsl(var(--status-delayed));
-  --color-status-completed: hsl(var(--status-completed));
-  --color-status-pending: hsl(var(--status-pending));
-
-  --color-status-on-track-bg: hsl(var(--status-on-track-bg));
-  --color-status-at-risk-bg: hsl(var(--status-at-risk-bg));
-  --color-status-delayed-bg: hsl(var(--status-delayed-bg));
-  --color-status-completed-bg: hsl(var(--status-completed-bg));
-
-  --color-tna-node-active: hsl(var(--tna-node-active));
-  --color-tna-node-complete: hsl(var(--tna-node-complete));
-  --color-tna-node-delayed: hsl(var(--tna-node-delayed));
-  --color-tna-connector-track: hsl(var(--tna-connector-track));
-  --color-tna-connector-fill: hsl(var(--tna-connector-fill));
-
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
 }
@@ -117,31 +91,6 @@ These serve as the fallback; there is no separate default.css file. */
   --font-mono: var(--font-geist-mono);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-
-  /* Pranali Tokens */
-  --surface-1: 0 0% 98%;
-  --surface-2: 0 0% 96%;
-  --surface-3: 0 0% 93%;
-  --border-subtle: 0 0% 94%;
-  --foreground-muted: 0 0% 45%;
-  --foreground-subtle: 0 0% 64%;
-
-  --status-on-track: 142 71% 45%;
-  --status-at-risk: 38 92% 50%;
-  --status-delayed: 0 84% 60%;
-  --status-completed: 221 83% 53%;
-  --status-pending: 270 50% 60%;
-
-  --status-on-track-bg: 142 71% 45% / 0.08;
-  --status-at-risk-bg: 38 92% 50% / 0.08;
-  --status-delayed-bg: 0 84% 60% / 0.08;
-  --status-completed-bg: 221 83% 53% / 0.08;
-
-  --tna-node-active: 221 83% 53%;
-  --tna-node-complete: 142 71% 45%;
-  --tna-node-delayed: 0 84% 60%;
-  --tna-connector-track: 0 0% 89.8%;
-  --tna-connector-fill: 221 83% 53%;
 }
 
 .dark {
@@ -176,31 +125,6 @@ These serve as the fallback; there is no separate default.css file. */
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-
-  /* Pranali Tokens */
-  --surface-1: 0 0% 6%;
-  --surface-2: 0 0% 8.5%;
-  --surface-3: 0 0% 11%;
-  --border-subtle: 0 0% 11%;
-  --foreground-muted: 0 0% 60%;
-  --foreground-subtle: 0 0% 40%;
-
-  --status-on-track: 142 71% 45%;
-  --status-at-risk: 38 92% 50%;
-  --status-delayed: 0 84% 60%;
-  --status-completed: 221 83% 53%;
-  --status-pending: 270 50% 60%;
-
-  --status-on-track-bg: 142 71% 45% / 0.08;
-  --status-at-risk-bg: 38 92% 50% / 0.08;
-  --status-delayed-bg: 0 84% 60% / 0.08;
-  --status-completed-bg: 221 83% 53% / 0.08;
-
-  --tna-node-active: 221 83% 53%;
-  --tna-node-complete: 142 71% 45%;
-  --tna-node-delayed: 0 84% 60%;
-  --tna-connector-track: 0 0% 20%;
-  --tna-connector-fill: 221 83% 53%;
 }
 
 @layer base {
@@ -312,4 +236,49 @@ html {
 
 .disable-transitions * {
   transition: none !important;
+}
+
+[data-print-root] {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: Letter;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 8.5in !important;
+    height: 11in !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body > *:not([data-print-root]) {
+    display: none !important;
+  }
+
+  [data-print-root] {
+    display: block !important;
+    width: 8.5in !important;
+    height: 11in !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    background: white !important;
+  }
+
+  [data-print-root] [data-print-paper] {
+    width: 8.5in !important;
+    height: 11in !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  [data-print-root] [data-print-paper],
+  [data-print-root] [data-print-paper] * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }

@@ -75,6 +75,11 @@ export async function commitFounderUploadFile(db: FounderSql, file: File) {
 	await db.transaction?.((tx) => {
 		const queries = [
 			tx`
+        DELETE FROM sales_fact
+        WHERE sale_date >= ${validation.dateRange.start}::date
+          AND sale_date <= ${validation.dateRange.end}::date
+      `,
+			tx`
         INSERT INTO upload_batches (
           id,
           filename,
@@ -114,7 +119,9 @@ export async function commitFounderUploadFile(db: FounderSql, file: File) {
         INSERT INTO sales_fact (
           batch_id,
           sale_date,
+          sale_time,
           bill_no,
+          billed_by,
           store,
           category,
           brand,
@@ -122,13 +129,21 @@ export async function commitFounderUploadFile(db: FounderSql, file: File) {
           product_name,
           quantity,
           net_amount,
+          total_amount,
+          sgst,
+          cgst,
+          igst,
+          payment_method,
           customer_id,
+          customer_name,
           row_number
         )
         SELECT * FROM UNNEST (
           ${chunk.map(() => batchId)}::integer[],
           ${chunk.map((row) => row.sale_date)}::date[],
+          ${chunk.map((row) => row.sale_time)}::time[],
           ${chunk.map((row) => row.bill_no)}::text[],
+          ${chunk.map((row) => row.billed_by)}::text[],
           ${chunk.map((row) => row.store)}::text[],
           ${chunk.map((row) => row.category)}::text[],
           ${chunk.map((row) => row.brand)}::text[],
@@ -136,17 +151,31 @@ export async function commitFounderUploadFile(db: FounderSql, file: File) {
           ${chunk.map((row) => row.product_name)}::text[],
           ${chunk.map((row) => row.quantity)}::integer[],
           ${chunk.map((row) => row.net_amount)}::numeric[],
+          ${chunk.map((row) => row.total_amount)}::numeric[],
+          ${chunk.map((row) => row.sgst)}::numeric[],
+          ${chunk.map((row) => row.cgst)}::numeric[],
+          ${chunk.map((row) => row.igst)}::numeric[],
+          ${chunk.map((row) => row.payment_method)}::text[],
           ${chunk.map((row) => row.customer_id)}::text[],
+          ${chunk.map((row) => row.customer_name)}::text[],
           ${chunk.map((row) => row.row_number)}::integer[]
         )
         ON CONFLICT ON CONSTRAINT uq_sales_fact_key DO UPDATE SET
           batch_id      = EXCLUDED.batch_id,
+          sale_time     = EXCLUDED.sale_time,
+          billed_by     = EXCLUDED.billed_by,
           category      = EXCLUDED.category,
           brand         = EXCLUDED.brand,
           product_name  = EXCLUDED.product_name,
           quantity      = EXCLUDED.quantity,
           net_amount    = EXCLUDED.net_amount,
+          total_amount  = EXCLUDED.total_amount,
+          sgst          = EXCLUDED.sgst,
+          cgst          = EXCLUDED.cgst,
+          igst          = EXCLUDED.igst,
+          payment_method = EXCLUDED.payment_method,
           customer_id   = EXCLUDED.customer_id,
+          customer_name = EXCLUDED.customer_name,
           row_number    = EXCLUDED.row_number
       `);
 		}

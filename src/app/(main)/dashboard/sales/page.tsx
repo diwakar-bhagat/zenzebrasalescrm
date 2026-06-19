@@ -168,6 +168,7 @@ export default function SalesDashboardPage() {
 				availableStores={status.availableStores || []}
 				availableCategories={status.availableCategories || []}
 				availableBrands={status.availableBrands || []}
+				maxDate={status.maxDate}
 			/>
 
 			{isLoading || !data ? (
@@ -310,6 +311,118 @@ export default function SalesDashboardPage() {
 							</CardContent>
 						</Card>
 					</div>
+
+					{/* Store KPI Split cards */}
+					{data.storePerformance && data.storePerformance.length > 0 && (() => {
+						const kljStore = data.storePerformance.find((s: any) => s.store.toLowerCase().includes("klj")) || {
+							revenue: 0,
+							revenueGrowth: 0,
+							billCuts: 0,
+							billCutsGrowth: 0,
+							units: 0,
+							aov: 0,
+						};
+						const smartStore = data.storePerformance.find((s: any) => s.store.toLowerCase().includes("smart") || s.store.toLowerCase().includes("noida")) || {
+							revenue: 0,
+							revenueGrowth: 0,
+							billCuts: 0,
+							billCutsGrowth: 0,
+							units: 0,
+							aov: 0,
+						};
+
+						return (
+							<div className="grid gap-4 md:grid-cols-2 mt-4">
+								{/* KLJ Store KPIs */}
+								<Card className="border-border bg-card/40">
+									<CardHeader className="pb-3">
+										<CardTitle className="text-sm font-semibold flex items-center justify-between">
+											<span>KLJ Store KPIs</span>
+											<span className="text-xs font-normal text-muted-foreground">Store Performance</span>
+										</CardTitle>
+									</CardHeader>
+									<CardContent className="grid grid-cols-2 gap-3">
+										<div className="bg-muted/30 p-3 rounded-lg border">
+											<p className="text-xs text-muted-foreground">Revenue</p>
+											<p className="text-lg font-bold mt-1">{formatCurrency(kljStore.revenue)}</p>
+											<p className={`text-xs mt-0.5 flex items-center ${kljStore.revenueGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
+												{kljStore.revenueGrowth >= 0 ? (
+													<TrendingUp className="mr-1 size-3" />
+												) : (
+													<TrendingDown className="mr-1 size-3" />
+												)}
+												{kljStore.revenueGrowth > 0 ? "+" : ""}{safeFixed(kljStore.revenueGrowth)}% vs prev
+											</p>
+										</div>
+										<div className="bg-muted/30 p-3 rounded-lg border">
+											<p className="text-xs text-muted-foreground">Bill Cuts</p>
+											<p className="text-lg font-bold mt-1">{kljStore.billCuts.toLocaleString()}</p>
+											<p className={`text-xs mt-0.5 flex items-center ${kljStore.billCutsGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
+												{kljStore.billCutsGrowth >= 0 ? (
+													<TrendingUp className="mr-1 size-3" />
+												) : (
+													<TrendingDown className="mr-1 size-3" />
+												)}
+												{kljStore.billCutsGrowth > 0 ? "+" : ""}{safeFixed(kljStore.billCutsGrowth)}% vs prev
+											</p>
+										</div>
+										<div className="bg-muted/30 p-3 rounded-lg border">
+											<p className="text-xs text-muted-foreground">AOV</p>
+											<p className="text-lg font-bold mt-1">{formatCurrency(kljStore.aov)}</p>
+										</div>
+										<div className="bg-muted/30 p-3 rounded-lg border">
+											<p className="text-xs text-muted-foreground">Units Sold</p>
+											<p className="text-lg font-bold mt-1">{kljStore.units.toLocaleString()}</p>
+										</div>
+									</CardContent>
+								</Card>
+
+								{/* Smart Works Noida KPIs */}
+								<Card className="border-border bg-card/40">
+									<CardHeader className="pb-3">
+										<CardTitle className="text-sm font-semibold flex items-center justify-between">
+											<span>Smart Works Noida KPIs</span>
+											<span className="text-xs font-normal text-muted-foreground">Store Performance</span>
+										</CardTitle>
+									</CardHeader>
+									<CardContent className="grid grid-cols-2 gap-3">
+										<div className="bg-muted/30 p-3 rounded-lg border">
+											<p className="text-xs text-muted-foreground">Revenue</p>
+											<p className="text-lg font-bold mt-1">{formatCurrency(smartStore.revenue)}</p>
+											<p className={`text-xs mt-0.5 flex items-center ${smartStore.revenueGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
+												{smartStore.revenueGrowth >= 0 ? (
+													<TrendingUp className="mr-1 size-3" />
+												) : (
+													<TrendingDown className="mr-1 size-3" />
+												)}
+												{smartStore.revenueGrowth > 0 ? "+" : ""}{safeFixed(smartStore.revenueGrowth)}% vs prev
+											</p>
+										</div>
+										<div className="bg-muted/30 p-3 rounded-lg border">
+											<p className="text-xs text-muted-foreground">Bill Cuts</p>
+											<p className="text-lg font-bold mt-1">{smartStore.billCuts.toLocaleString()}</p>
+											<p className={`text-xs mt-0.5 flex items-center ${smartStore.billCutsGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
+												{smartStore.billCutsGrowth >= 0 ? (
+													<TrendingUp className="mr-1 size-3" />
+												) : (
+													<TrendingDown className="mr-1 size-3" />
+												)}
+												{smartStore.billCutsGrowth > 0 ? "+" : ""}{safeFixed(smartStore.billCutsGrowth)}% vs prev
+											</p>
+										</div>
+										<div className="bg-muted/30 p-3 rounded-lg border">
+											<p className="text-xs text-muted-foreground">AOV</p>
+											<p className="text-lg font-bold mt-1">{formatCurrency(smartStore.aov)}</p>
+										</div>
+										<div className="bg-muted/30 p-3 rounded-lg border">
+											<p className="text-xs text-muted-foreground">Units Sold</p>
+											<p className="text-lg font-bold mt-1">{smartStore.units.toLocaleString()}</p>
+										</div>
+									</CardContent>
+								</Card>
+							</div>
+						);
+					})()}
 
 					{/* Store Comparison */}
 					{data.storePerformance && data.storePerformance.length > 0 && (

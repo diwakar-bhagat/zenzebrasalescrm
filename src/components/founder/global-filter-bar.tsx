@@ -11,14 +11,16 @@ interface GlobalFilterBarProps {
   availableStores: string[];
   availableCategories: string[];
   availableBrands: string[];
+  maxDate?: string;
 }
 
 function toISODate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function getPresetRange(preset: string) {
-  const end = new Date();
+function getPresetRange(preset: string, maxDate?: string) {
+  const anchorDate = maxDate ? new Date(`${maxDate}T00:00:00.000Z`) : new Date();
+  const end = anchorDate;
   const start = new Date(end);
 
   if (preset === "today") {
@@ -39,7 +41,7 @@ function getPresetRange(preset: string) {
   return { startDate: toISODate(start), endDate: toISODate(end) };
 }
 
-export function GlobalFilterBar({ availableStores, availableCategories, availableBrands }: GlobalFilterBarProps) {
+export function GlobalFilterBar({ availableStores, availableCategories, availableBrands, maxDate }: GlobalFilterBarProps) {
   const {
     startDate,
     endDate,
@@ -70,7 +72,7 @@ export function GlobalFilterBar({ availableStores, availableCategories, availabl
 
         <Select
           onValueChange={(value) => {
-            const range = getPresetRange(value);
+            const range = getPresetRange(value, maxDate);
             setDateRange(range.startDate, range.endDate);
           }}
         >

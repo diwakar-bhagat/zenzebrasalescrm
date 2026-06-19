@@ -156,6 +156,7 @@ export default function Page() {
 				availableStores={status.availableStores || []}
 				availableCategories={status.availableCategories || []}
 				availableBrands={status.availableBrands || []}
+				maxDate={status.maxDate}
 			/>
 
 			{isLoading || !data ? (

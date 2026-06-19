@@ -1,5 +1,4 @@
-h;
-("use client");
+"use client";
 
 import {
 	AlertCircle,

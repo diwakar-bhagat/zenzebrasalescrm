@@ -1,74 +1,80 @@
-import * as xlsx from "xlsx";
-
-import { validateCanonicalSheet } from "./validation";
-import type { CanonicalSalesRow, ValidationResult } from "./types";
-
 import type { NeonQueryFunction } from "@neondatabase/serverless";
+import * as xlsx from "xlsx";
+import type { CanonicalSalesRow, ValidationResult } from "./types";
+import { validateCanonicalSheet } from "./validation";
 
 type FounderSql = NeonQueryFunction<false, false>;
 
 const INSERT_CHUNK_SIZE = 1000;
 
-export async function validateFounderUploadFile(file: File): Promise<ValidationResult> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const workbook = xlsx.read(buffer, { type: "buffer", cellDates: true });
-  const sheetName = workbook.SheetNames[0];
+export async function validateFounderUploadFile(
+	file: File,
+): Promise<ValidationResult> {
+	const buffer = Buffer.from(await file.arrayBuffer());
+	const workbook = xlsx.read(buffer, { type: "buffer", cellDates: true });
+	const sheetName = workbook.SheetNames[0];
 
-  if (!sheetName) {
-    return {
-      isValid: false,
-      totalRows: 0,
-      validRows: 0,
-      errorCount: 1,
-      errors: [{ rowNumber: 0, errors: ["Workbook does not contain any sheets."] }],
-      validData: [],
-      dateRange: { start: null, end: null },
-      parsedData: [],
-    };
-  }
+	if (!sheetName) {
+		return {
+			isValid: false,
+			totalRows: 0,
+			validRows: 0,
+			errorCount: 1,
+			errors: [
+				{ rowNumber: 0, errors: ["Workbook does not contain any sheets."] },
+			],
+			validData: [],
+			dateRange: { start: null, end: null },
+			parsedData: [],
+		};
+	}
 
-  const sheet = workbook.Sheets[sheetName];
-  const rows = xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-    defval: "",
-    raw: true,
-  });
+	const sheet = workbook.Sheets[sheetName];
+	const rows = xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+		defval: "",
+		raw: true,
+	});
 
-  return validateCanonicalSheet(rows);
+	return validateCanonicalSheet(rows);
 }
 
 function chunkRows(rows: CanonicalSalesRow[]) {
-  const chunks: CanonicalSalesRow[][] = [];
-  for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
-    chunks.push(rows.slice(i, i + INSERT_CHUNK_SIZE));
-  }
-  return chunks;
+	const chunks: CanonicalSalesRow[][] = [];
+	for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
+		chunks.push(rows.slice(i, i + INSERT_CHUNK_SIZE));
+	}
+	return chunks;
 }
 
 export async function commitFounderUploadFile(db: FounderSql, file: File) {
-  const validation = await validateFounderUploadFile(file);
+	const validation = await validateFounderUploadFile(file);
 
-  if (!validation.isValid || !validation.dateRange.start || !validation.dateRange.end) {
-    return {
-      success: false,
-      validation,
-      error: "No valid rows found. Cannot commit upload.",
-    };
-  }
+	if (
+		!validation.isValid ||
+		!validation.dateRange.start ||
+		!validation.dateRange.end
+	) {
+		return {
+			success: false,
+			validation,
+			error: "No valid rows found. Cannot commit upload.",
+		};
+	}
 
-  const batchIdResult = await db`
+	const batchIdResult = await db`
     SELECT nextval(pg_get_serial_sequence('upload_batches', 'id'))::integer AS id
   `;
-  const batchId = Number(batchIdResult[0]?.id);
+	const batchId = Number(batchIdResult[0]?.id);
 
-  if (!Number.isFinite(batchId)) {
-    throw new Error("Unable to allocate upload batch id.");
-  }
+	if (!Number.isFinite(batchId)) {
+		throw new Error("Unable to allocate upload batch id.");
+	}
 
-  const chunks = chunkRows(validation.validData);
+	const chunks = chunkRows(validation.validData);
 
-  await db.transaction?.((tx) => {
-    const queries = [
-      tx`
+	await db.transaction?.((tx) => {
+		const queries = [
+			tx`
         INSERT INTO upload_batches (
           id,
           filename,
@@ -91,16 +97,20 @@ export async function commitFounderUploadFile(db: FounderSql, file: File) {
           ${validation.dateRange.start},
           ${validation.dateRange.end}
         )
+        ON CONFLICT (id) DO UPDATE SET
+          filename = EXCLUDED.filename,
+          status = EXCLUDED.status,
+          row_count = EXCLUDED.row_count,
+          error_count = EXCLUDED.error_count,
+          valid_row_count = EXCLUDED.valid_row_count,
+          quarantined_row_count = EXCLUDED.quarantined_row_count,
+          date_range_start = EXCLUDED.date_range_start,
+          date_range_end = EXCLUDED.date_range_end
       `,
-      tx`
-        DELETE FROM sales_fact
-        WHERE sale_date >= ${validation.dateRange.start}::date
-          AND sale_date <= ${validation.dateRange.end}::date
-      `,
-    ];
+		];
 
-    for (const chunk of chunks) {
-      queries.push(tx`
+		for (const chunk of chunks) {
+			queries.push(tx`
         INSERT INTO sales_fact (
           batch_id,
           sale_date,
@@ -129,16 +139,25 @@ export async function commitFounderUploadFile(db: FounderSql, file: File) {
           ${chunk.map((row) => row.customer_id)}::text[],
           ${chunk.map((row) => row.row_number)}::integer[]
         )
+        ON CONFLICT ON CONSTRAINT uq_sales_fact_key DO UPDATE SET
+          batch_id      = EXCLUDED.batch_id,
+          category      = EXCLUDED.category,
+          brand         = EXCLUDED.brand,
+          product_name  = EXCLUDED.product_name,
+          quantity      = EXCLUDED.quantity,
+          net_amount    = EXCLUDED.net_amount,
+          customer_id   = EXCLUDED.customer_id,
+          row_number    = EXCLUDED.row_number
       `);
-    }
+		}
 
-    return queries;
-  });
+		return queries;
+	});
 
-  return {
-    success: true,
-    batchId,
-    rowsInserted: validation.validRows,
-    validation,
-  };
+	return {
+		success: true,
+		batchId,
+		rowsInserted: validation.validRows,
+		validation,
+	};
 }

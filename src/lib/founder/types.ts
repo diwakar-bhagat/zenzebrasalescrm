@@ -15,7 +15,9 @@ export interface FounderSalesFact {
   id: number;
   batchId: number;
   saleDate: string;
+  saleTime: string | null;
   billNo: string;
+  billedBy: string;
   store: string;
   category: string;
   brand: string;
@@ -23,7 +25,13 @@ export interface FounderSalesFact {
   productName: string;
   quantity: number;
   netAmount: number;
+  totalAmount: number;
+  paymentMethod: string | null;
+  sgst: number | null;
+  cgst: number | null;
+  igst: number | null;
   customerId?: string | null;
+  customerName: string | null;
   rowNumber: number;
 }
 
@@ -75,7 +83,9 @@ export interface UploadRowError {
 
 export interface CanonicalSalesRow {
   sale_date: string;
+  sale_time: string | null;
   bill_no: string;
+  billed_by: string;
   store: string;
   category: string;
   brand: string;
@@ -83,7 +93,13 @@ export interface CanonicalSalesRow {
   product_name: string;
   quantity: number;
   net_amount: number;
+  total_amount: number;
+  payment_method: string | null;
+  sgst: number | null;
+  cgst: number | null;
+  igst: number | null;
   customer_id: string | null;
+  customer_name: string | null;
   row_number: number;
 }
 

@@ -68,7 +68,7 @@ export const sidebarItems: NavGroup[] = [
       },
       {
         title: "Upload Data",
-        url: "/dashboard/founder/upload",
+        url: "/dashboard/sales/upload",
         icon: Upload,
       },
     ],

@@ -25,6 +25,7 @@ export default async function proxy(req: NextRequest) {
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/api/dashboard") ||
     pathname.startsWith("/api/founder") ||
+    pathname.startsWith("/api/sales") ||
     pathname === "/register";
 
   if (!isProtected) {

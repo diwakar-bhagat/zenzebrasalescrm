@@ -179,19 +179,40 @@ export function validateCanonicalSheet(rows: Record<string, unknown>[]): Validat
     });
   }
 
-  const dates = validData.map((row) => row.sale_date).sort();
+  // Deduplicate rows with the exact same (sale_date, bill_no, store, sku) key within the sheet
+  const dedupedMap = new Map<string, CanonicalSalesRow>();
+  for (const row of validData) {
+    const key = `${row.sale_date}|${row.bill_no}|${row.store}|${row.sku}`;
+    const existing = dedupedMap.get(key);
+    if (existing) {
+      existing.quantity += row.quantity;
+      existing.net_amount += row.net_amount;
+      existing.category = row.category;
+      existing.brand = row.brand;
+      existing.product_name = row.product_name;
+      if (row.customer_id) {
+        existing.customer_id = row.customer_id;
+      }
+      existing.row_number = row.row_number; // Keep the last row number
+    } else {
+      dedupedMap.set(key, { ...row });
+    }
+  }
+  const dedupedData = Array.from(dedupedMap.values());
+
+  const dates = dedupedData.map((row) => row.sale_date).sort();
 
   return {
-    isValid: validData.length > 0,
+    isValid: dedupedData.length > 0,
     totalRows: rows.length,
-    validRows: validData.length,
+    validRows: dedupedData.length,
     errorCount: 0,
     errors: [],
-    validData,
+    validData: dedupedData,
     dateRange: {
       start: dates[0] ?? null,
       end: dates.at(-1) ?? null,
     },
-    parsedData: validData,
+    parsedData: dedupedData,
   };
 }

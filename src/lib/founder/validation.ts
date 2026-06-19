@@ -300,16 +300,25 @@ export function validateCanonicalSheet(rows: Record<string, unknown>[]): Validat
       rowErrors.push("billed_by is required - needed to differentiate between stores");
     }
 
-    // Map billed_by to store name
-    let storeName = "Unknown Store";
+    // Map billed_by or store to store name (strictly KLJ or Smart_Works_Noida)
+    let storeName = "KLJ";
+    const rawStore = toRequiredText(row.store);
+    const lowerRawStore = rawStore.toLowerCase();
     const lowerBilledBy = billedBy.toLowerCase();
-    if (lowerBilledBy.includes("smart")) {
+
+    if (lowerRawStore.includes("smart") || lowerRawStore.includes("noida")) {
+      storeName = "Smart_Works_Noida";
+    } else if (lowerRawStore.includes("klj")) {
+      storeName = "KLJ";
+    } else if (lowerBilledBy.includes("smart") || lowerBilledBy.includes("noida")) {
       storeName = "Smart_Works_Noida";
     } else if (lowerBilledBy.includes("klj")) {
       storeName = "KLJ";
-    } else if (billedBy) {
-      storeName = billedBy; // Use exact value from billed_by
+    } else {
+      storeName = "KLJ"; // Default fallback
     }
+
+
 
     // Other fields
     const billNo = toRequiredText(row.bill_no) || "Unknown Bill";

@@ -36,6 +36,7 @@ export function TopProducts({ data }: { data: any }) {
       return {
         name: prod.productName,
         category: "Product SKU: " + prod.sku,
+        sku: prod.sku,
         share: `${shareVal}%`,
         sales: formatCurrency(Number(prod.current_revenue)),
       };
@@ -95,7 +96,7 @@ export function TopProducts({ data }: { data: any }) {
           <div className="text-muted-foreground text-xs">Sales</div>
 
           {products.map((product: any) => (
-            <div className="contents text-sm" key={product.name}>
+            <div className="contents text-sm" key={product.sku}>
               <div className="min-w-0">
                 <div className="truncate font-medium">{product.name}</div>
                 <div className="text-muted-foreground text-xs">{product.category}</div>

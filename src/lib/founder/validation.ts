@@ -55,7 +55,6 @@ const HEADER_ALIASES: Record<string, string> = {
   item_name: "product_name",
   product: "product_name",
   product_name: "product_name",
-  name: "product_name",
   description: "product_name",
   item_description: "product_name",
   sku: "sku",
@@ -79,7 +78,7 @@ const HEADER_ALIASES: Record<string, string> = {
   value: "net_amount",
   saleprice: "net_amount",
   sale_price: "net_amount",
-  currentSalePrice: "net_amount",
+  currentsaleprice: "net_amount",
   current_sale_price: "net_amount",
 
   // Tax fields - ✅ NEW
@@ -103,7 +102,6 @@ const HEADER_ALIASES: Record<string, string> = {
   customerid: "customer_id",
   customer_name: "customer_name",
   customername: "customer_name",
-  name: "customer_name",
   customer_mobile: "customer_id",
   customermobile: "customer_id",
   mobile: "customer_id",

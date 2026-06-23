@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 interface AuthUser {
   userId: number;
@@ -26,8 +26,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
+    if (pathname === "/login") {
+      setUser(null);
+      setIsLoaded(true);
+      return;
+    }
+
     async function fetchUser() {
       try {
         const res = await fetch("/api/auth/me");
@@ -44,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     fetchUser();
-  }, []);
+  }, [pathname]);
 
   const signOut = async () => {
     try {

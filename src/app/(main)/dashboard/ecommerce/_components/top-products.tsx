@@ -4,47 +4,64 @@ import { useMemo } from "react";
 import { ArrowUpRight } from "lucide-react";
 
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 
 const COLORS = ["var(--chart-3)", "var(--chart-2)", "var(--chart-1)", "var(--chart-4)", "var(--chart-5)"];
 
-export function TopProducts({ data }: { data: any }) {
-  const categoryPerformance = data?.categoryPerformance || [];
-  const productPerformance = data?.productPerformance || [];
-  const currentTotalRevenue = data?.salesKpis?.revenue?.current || 0;
+type ProductPerformanceRow = {
+  category?: string | null;
+  currentRevenue?: number | string | null;
+  itemName?: string | null;
+  skuCode?: string | null;
+};
 
-  // Process category shares
+function toNumber(value: unknown) {
+  const next = Number(value ?? 0);
+  return Number.isFinite(next) ? next : 0;
+}
+
+export function TopProducts({ data }: { data: any }) {
+  const productPerformance = (data?.productPerformance || []) as ProductPerformanceRow[];
+  const currentTotalRevenue = toNumber(data?.salesKpis?.revenue?.current);
+
   const categories = useMemo(() => {
-    const totalCatRevenue = categoryPerformance.reduce((acc: number, curr: any) => acc + (curr.revenue || 0), 0);
+    const totals = productPerformance.reduce<Record<string, number>>((acc, prod) => {
+      const category = prod.category ? String(prod.category) : "Uncategorized";
+      acc[category] = (acc[category] ?? 0) + toNumber(prod.currentRevenue);
+      return acc;
+    }, {});
+    const entries = Object.entries(totals) as Array<[string, number]>;
+    const totalCatRevenue = entries.reduce((acc, [, value]) => acc + value, 0);
     if (totalCatRevenue <= 0) return [];
-    
-    return categoryPerformance.slice(0, 3).map((cat: any, index: number) => {
-      const share = Math.round((cat.revenue / totalCatRevenue) * 100);
+
+    return entries.sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, revenue], index) => {
+      const share = Math.round((revenue / totalCatRevenue) * 100);
       return {
-        name: cat.category,
+        name,
         share: share > 0 ? share : 1,
         color: COLORS[index % COLORS.length],
       };
     });
-  }, [categoryPerformance]);
+  }, [productPerformance]);
 
-  // Process products list
   const products = useMemo(() => {
-    return productPerformance.slice(0, 3).map((prod: any) => {
-      const shareVal = currentTotalRevenue > 0 ? Math.round((Number(prod.current_revenue) / currentTotalRevenue) * 100) : 0;
+    return productPerformance.slice(0, 3).map((prod, index) => {
+      const revenue = toNumber(prod.currentRevenue);
+      const sku = prod.skuCode ? String(prod.skuCode) : null;
+      const name = prod.itemName ? String(prod.itemName) : sku ?? "Unnamed product";
+      const shareVal = currentTotalRevenue > 0 ? Math.round((revenue / currentTotalRevenue) * 100) : 0;
       return {
-        name: prod.productName,
-        category: "Product SKU: " + prod.sku,
-        sku: prod.sku,
+        key: `${sku ?? "product"}-${name}-${index}`,
+        name,
+        category: sku ? `SKU: ${sku}` : "SKU not available",
         share: `${shareVal}%`,
-        sales: formatCurrency(Number(prod.current_revenue)),
+        sales: formatCurrency(revenue),
       };
     });
   }, [productPerformance, currentTotalRevenue]);
 
   const topProductsShare = useMemo(() => {
-    const topProdRevenue = productPerformance.slice(0, 3).reduce((acc: number, curr: any) => acc + Number(curr.current_revenue || 0), 0);
+    const topProdRevenue = productPerformance.slice(0, 3).reduce((acc, curr) => acc + toNumber(curr.currentRevenue), 0);
     if (currentTotalRevenue <= 0) return "0%";
     return `${Math.round((topProdRevenue / currentTotalRevenue) * 100)}%`;
   }, [productPerformance, currentTotalRevenue]);
@@ -88,15 +105,13 @@ export function TopProducts({ data }: { data: any }) {
           </div>
         )}
 
-        <Separator />
-
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-3">
           <div className="text-muted-foreground text-xs">Products</div>
           <div className="text-muted-foreground text-xs">Share</div>
           <div className="text-muted-foreground text-xs">Sales</div>
 
           {products.map((product: any) => (
-            <div className="contents text-sm" key={product.sku}>
+            <div className="contents text-sm" key={product.key}>
               <div className="min-w-0">
                 <div className="truncate font-medium">{product.name}</div>
                 <div className="text-muted-foreground text-xs">{product.category}</div>
@@ -105,6 +120,11 @@ export function TopProducts({ data }: { data: any }) {
               <div className="self-center font-medium tabular-nums">{product.sales}</div>
             </div>
           ))}
+          {products.length === 0 && (
+            <div className="col-span-3 py-6 text-center text-muted-foreground text-sm">
+              Product movement will appear after SKU rows are available.
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

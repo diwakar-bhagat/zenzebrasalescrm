@@ -1,5 +1,7 @@
 import type { DashboardFilters } from "@/lib/founder/types";
 
+import { FOOD_CATEGORIES } from "./filter-sql";
+
 export interface ComparisonPeriods {
   currentStart: string;
   currentEnd: string;
@@ -8,12 +10,12 @@ export interface ComparisonPeriods {
   label: string;
 }
 
-export function calculateGrowth(current: number, previous: number): number {
-  if (previous === 0) return current === 0 ? 0 : 100;
-  return ((current - previous) / previous) * 100;
+export interface ComparisonPeriod {
+  current: { startDate: string; endDate: string };
+  previous: { startDate: string; endDate: string };
 }
 
-function toISODate(date: Date) {
+function fmt(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
@@ -25,55 +27,105 @@ function parseISODate(value: string) {
   return date;
 }
 
-function isFullMonth(start: Date, end: Date) {
-  const firstDay = start.getUTCDate() === 1;
-  const lastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0)).getUTCDate();
-  return firstDay && end.getUTCDate() === lastDay && start.getUTCMonth() === end.getUTCMonth();
+export function getMirrorPeriod(startDate: string, endDate: string): ComparisonPeriod {
+  const start = parseISODate(startDate);
+  const end = parseISODate(endDate);
+  const days = Math.ceil((end.getTime() - start.getTime()) / 86_400_000) + 1;
+
+  const prevEnd = new Date(start);
+  prevEnd.setUTCDate(prevEnd.getUTCDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setUTCDate(prevStart.getUTCDate() - (days - 1));
+
+  return {
+    current: { startDate, endDate },
+    previous: { startDate: fmt(prevStart), endDate: fmt(prevEnd) },
+  };
 }
 
-export function getComparisonPeriods(filters: Pick<DashboardFilters, "startDate" | "endDate">): ComparisonPeriods {
-  const currentStart = parseISODate(filters.startDate);
-  const currentEnd = parseISODate(filters.endDate);
+export function getDefaultPeriod(): ComparisonPeriod {
+  const today = new Date();
+  const end = fmt(today);
+  const start = new Date(today);
+  start.setUTCDate(start.getUTCDate() - 29);
+  return getMirrorPeriod(fmt(start), end);
+}
 
-  if (currentStart > currentEnd) {
-    throw new Error("startDate must be before or equal to endDate.");
+function formatDateShort(dateStr: string): string {
+  try {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const [y, m, d] = dateStr.split("-");
+    const day = parseInt(d, 10);
+    const month = months[parseInt(m, 10) - 1];
+    return `${day} ${month} ${y}`;
+  } catch (e) {
+    return dateStr;
   }
+}
 
-  if (isFullMonth(currentStart, currentEnd)) {
-    const previousStart = new Date(Date.UTC(currentStart.getUTCFullYear(), currentStart.getUTCMonth() - 1, 1));
-    const previousEnd = new Date(Date.UTC(currentStart.getUTCFullYear(), currentStart.getUTCMonth(), 0));
+export function getComparisonPeriods(filters: DashboardFilters): ComparisonPeriods {
+  const currentStartFormatted = formatDateShort(filters.startDate);
+  const currentEndFormatted = formatDateShort(filters.endDate);
 
+  if (filters.compareMode === "custom" && filters.compareStartDate && filters.compareEndDate) {
+    const prevStartFormatted = formatDateShort(filters.compareStartDate);
+    const prevEndFormatted = formatDateShort(filters.compareEndDate);
     return {
-      currentStart: toISODate(currentStart),
-      currentEnd: toISODate(currentEnd),
-      previousStart: toISODate(previousStart),
-      previousEnd: toISODate(previousEnd),
-      label: "vs previous month",
+      currentStart: filters.startDate,
+      currentEnd: filters.endDate,
+      previousStart: filters.compareStartDate,
+      previousEnd: filters.compareEndDate,
+      label: `Current: ${currentStartFormatted} – ${currentEndFormatted} | Compared: vs ${prevStartFormatted} – ${prevEndFormatted}`,
     };
   }
 
-  const days = Math.round((currentEnd.getTime() - currentStart.getTime()) / 86_400_000) + 1;
-  const previousEnd = new Date(currentStart);
-  previousEnd.setUTCDate(previousEnd.getUTCDate() - 1);
-  const previousStart = new Date(previousEnd);
-  previousStart.setUTCDate(previousStart.getUTCDate() - days + 1);
+  const mirror = getMirrorPeriod(filters.startDate, filters.endDate);
+  const prevStartFormatted = formatDateShort(mirror.previous.startDate);
+  const prevEndFormatted = formatDateShort(mirror.previous.endDate);
 
   return {
-    currentStart: toISODate(currentStart),
-    currentEnd: toISODate(currentEnd),
-    previousStart: toISODate(previousStart),
-    previousEnd: toISODate(previousEnd),
-    label: days === 1 ? "vs previous day" : `vs previous ${days} days`,
+    currentStart: mirror.current.startDate,
+    currentEnd: mirror.current.endDate,
+    previousStart: mirror.previous.startDate,
+    previousEnd: mirror.previous.endDate,
+    label: `Current: ${currentStartFormatted} – ${currentEndFormatted} | Compared: vs ${prevStartFormatted} – ${prevEndFormatted}`,
   };
+}
+
+export function growthPct(current: number, previous: number): number | null {
+  if (previous === 0) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
+export function calculateGrowth(current: number, previous: number): number {
+  return growthPct(current, previous) ?? (current === 0 ? 0 : 100);
+}
+
+export function formatGrowth(pct: number | null): string {
+  if (pct === null) return "—";
+  return pct >= 0 ? `+${pct}%` : `${pct}%`;
 }
 
 export function cleanDashboardFilters(filters: DashboardFilters): DashboardFilters {
+  const category = filters.category?.trim();
+  const brand = filters.brand?.trim();
+
   return {
     startDate: filters.startDate,
     endDate: filters.endDate,
-    store: filters.store?.trim() || undefined,
-    category: filters.category?.trim() || undefined,
-    brand: filters.brand?.trim() || undefined,
+    store: filters.store?.trim() && filters.store.trim() !== "ALL" ? filters.store.trim() : undefined,
+    category: category && category !== "All Categories" ? category : undefined,
+    brand: brand && brand !== "All Brands" ? brand : undefined,
     sku: filters.sku?.trim() || undefined,
+    categoryScope: filters.categoryScope ?? "all",
+    compareMode: filters.compareMode,
+    compareStartDate: filters.compareStartDate,
+    compareEndDate: filters.compareEndDate,
   };
 }
+
+export function isRetailScope(filters: DashboardFilters) {
+  return filters.categoryScope === "retail";
+}
+
+export { FOOD_CATEGORIES };

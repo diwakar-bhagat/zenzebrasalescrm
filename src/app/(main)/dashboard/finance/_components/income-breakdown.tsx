@@ -58,8 +58,8 @@ export function IncomeBreakdown({ data }: { data: any }) {
       </CardHeader>
 
       <CardContent className="grid grid-cols-1 gap-1 md:grid-cols-3">
-        {processedCategories.map((cat, index) => (
-          <section key={index} className="isolate flex gap-[0.5px]">
+        {processedCategories.map((cat) => (
+          <section key={cat.name} className="isolate flex gap-[0.5px]">
             <Separator
               orientation="vertical"
               className="mb-1 h-auto self-auto border-muted-foreground/50 border-l border-dashed bg-transparent"

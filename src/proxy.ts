@@ -43,7 +43,11 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  const check = await fetch(new URL("/api/auth/verify", req.url).toString(), {
+  const verifyUrl = new URL("/api/auth/verify", req.url);
+  if (verifyUrl.hostname === "localhost") {
+    verifyUrl.hostname = "127.0.0.1";
+  }
+  const check = await fetch(verifyUrl.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token: sha256(sessionToken) }),

@@ -1,6 +1,6 @@
 import * as xlsx from "xlsx";
 
-import type { CanonicalSalesRow, UploadRowError, ValidationResult } from "./types";
+import type { CanonicalSalesRow, LegacyValidationResult, UploadRowError } from "./types";
 
 const REQUIRED_FIELDS = [
   "sale_date",
@@ -270,7 +270,7 @@ function parseSaleDate(value: unknown): string | null {
   return null;
 }
 
-export function validateCanonicalSheet(rows: Record<string, unknown>[]): ValidationResult {
+export function validateCanonicalSheet(rows: Record<string, unknown>[]): LegacyValidationResult {
   const errors: UploadRowError[] = [];
   const validData: CanonicalSalesRow[] = [];
 
@@ -386,8 +386,8 @@ export function validateCanonicalSheet(rows: Record<string, unknown>[]): Validat
         sale_date: saleDate,
         sale_time: saleTime,
         bill_no: billNo,
-        billed_by: billedBy,
-        store: storeName,
+        billed_by: storeName,
+        store: rawStore,
         category: categoryName,
         brand: brandName,
         sku: skuCode,

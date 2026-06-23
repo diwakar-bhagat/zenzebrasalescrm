@@ -9,39 +9,42 @@ export interface FounderUploadBatch {
   dateRangeStart?: string | null;
   dateRangeEnd?: string | null;
   uploadedAt: string;
+  uploadType?: "full_replace" | "incremental";
+  latestSaleDate?: string | null;
 }
 
 export interface FounderSalesFact {
   id: number;
-  batchId: number;
+  uploadId: number;
   saleDate: string;
-  saleTime: string | null;
   billNo: string;
   billedBy: string;
-  store: string;
-  category: string;
-  brand: string;
-  sku: string;
-  productName: string;
+  category: string | null;
+  brand: string | null;
+  skuCode: string | null;
+  itemName: string;
   quantity: number;
   netAmount: number;
-  totalAmount: number;
+  discountAmount: number | null;
   paymentMethod: string | null;
-  sgst: number | null;
-  cgst: number | null;
-  igst: number | null;
-  customerId?: string | null;
+  customerMobile: string | null;
   customerName: string | null;
-  rowNumber: number;
 }
 
+export const STORE_WHITELIST = ["SmartworksNoida Noida", "Klj store"] as const;
+export type StoreWhitelistValue = (typeof STORE_WHITELIST)[number];
+
 export interface DashboardFilters {
-  startDate: string; // YYYY-MM-DD
-  endDate: string; // YYYY-MM-DD
+  startDate: string;
+  endDate: string;
   store?: string;
   category?: string;
   brand?: string;
   sku?: string;
+  categoryScope?: "all" | "retail";
+  compareMode?: "mirror" | "custom";
+  compareStartDate?: string;
+  compareEndDate?: string;
 }
 
 export interface FounderDashboardStatus {
@@ -52,28 +55,14 @@ export interface FounderDashboardStatus {
   availableStores: string[];
   availableCategories: string[];
   availableBrands: string[];
-}
-
-export interface KpiMetrics {
-  currentSales: number;
-  previousSales: number;
-  currentBillCuts: number;
-  previousBillCuts: number;
-  currentAov: number;
-  previousAov: number;
-  currentUnits: number;
-  previousUnits: number;
-  currentCustomers: number | null;
-  previousCustomers: number | null;
-}
-
-export interface DashboardResponse {
-  kpis: KpiMetrics;
-  categoryPerformance: Array<{ category: string; sales: number; growth: number | null }>;
-  brandPerformance: Array<{ brand: string; sales: number; growth: number | null }>;
-  productPerformance: Array<{ sku: string; productName: string; sales: number; growth: number | null }>;
-  topGainers: Array<{ name: string; type: "category" | "brand" | "sku"; delta: number; growth: number }>;
-  topDecliners: Array<{ name: string; type: "category" | "brand" | "sku"; delta: number; growth: number }>;
+  categoryBrandMap?: Record<string, string[]>;
+  dataFreshness?: {
+    latestSaleDate: string | null;
+    daysStale: number | null;
+    totalBills: number;
+    totalRevenue: number;
+    lastUploadAt: string | null;
+  };
 }
 
 export interface UploadRowError {
@@ -81,6 +70,23 @@ export interface UploadRowError {
   errors: string[];
 }
 
+export interface ParsedSalesRow {
+  bill_no: string;
+  sale_date: string;
+  billed_by: string;
+  sku_code: string | null;
+  item_name: string;
+  brand: string | null;
+  category: string | null;
+  quantity: number;
+  net_amount: number;
+  discount_amount: number;
+  customer_mobile: string | null;
+  customer_name: string | null;
+  payment_method: string | null;
+}
+
+/** Legacy CSV/header-alias upload shape */
 export interface CanonicalSalesRow {
   sale_date: string;
   sale_time: string | null;
@@ -109,10 +115,22 @@ export interface ValidationResult {
   validRows: number;
   errorCount: number;
   errors: UploadRowError[];
-  validData: CanonicalSalesRow[];
+  validData: ParsedSalesRow[];
   dateRange: {
     start: string | null;
     end: string | null;
   };
+  latestSaleDate?: string | null;
+  quarantineReasons?: string[];
+}
+
+export interface LegacyValidationResult {
+  isValid: boolean;
+  totalRows: number;
+  validRows: number;
+  errorCount: number;
+  errors: UploadRowError[];
+  validData: CanonicalSalesRow[];
+  dateRange: { start: string | null; end: string | null };
   parsedData?: CanonicalSalesRow[];
 }

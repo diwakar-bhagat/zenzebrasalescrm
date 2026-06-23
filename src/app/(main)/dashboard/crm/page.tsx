@@ -19,9 +19,8 @@ export default function Page() {
 	const [data, setData] = useState<any>(null);
 	const [status, setStatus] = useState<any>(null);
 	const [isLoading, setIsLoading] = useState(true);
-	const [hasInitializedDateRange, setHasInitializedDateRange] = useState(false);
 
-	const { startDate, endDate, store, category, brand, sku, setDateRange } =
+	const { startDate, endDate, store, category, brand, sku, categoryScope } =
 		useFilterStore();
 
 	useEffect(() => {
@@ -41,14 +40,17 @@ export default function Page() {
 	}, []);
 
 	useEffect(() => {
+		if (!status?.hasData) return;
+
 		const fetchDashboardData = async () => {
 			setIsLoading(true);
 			try {
 				const params = new URLSearchParams({ startDate, endDate });
-				if (store !== "All Stores") params.set("store", store);
+				if (store !== "ALL") params.set("store", store);
 				if (category !== "All Categories") params.set("category", category);
 				if (brand !== "All Brands") params.set("brand", brand);
 				if (sku) params.set("sku", sku);
+				if (categoryScope !== "all") params.set("categoryScope", categoryScope);
 
 				const res = await fetch(
 					`/api/sales/dashboard-extended?${params.toString()}`,
@@ -64,38 +66,8 @@ export default function Page() {
 			}
 		};
 
-		if (status?.hasData && status.maxDate && !hasInitializedDateRange) {
-			const end = new Date(`${status.maxDate}T00:00:00.000Z`);
-			const start = new Date(end);
-			start.setUTCDate(start.getUTCDate() - 29);
-
-			if (status.minDate) {
-				const min = new Date(`${status.minDate}T00:00:00.000Z`);
-				if (start < min) start.setTime(min.getTime());
-			}
-
-			setDateRange(
-				start.toISOString().slice(0, 10),
-				end.toISOString().slice(0, 10),
-			);
-			setHasInitializedDateRange(true);
-			return;
-		}
-
-		if (status?.hasData && hasInitializedDateRange) {
-			fetchDashboardData();
-		}
-	}, [
-		status,
-		hasInitializedDateRange,
-		startDate,
-		endDate,
-		store,
-		category,
-		brand,
-		sku,
-		setDateRange,
-	]);
+		fetchDashboardData();
+	}, [status, startDate, endDate, store, category, brand, sku, categoryScope]);
 
 	if (!status) {
 		return (
@@ -153,10 +125,8 @@ export default function Page() {
 			</div>
 
 			<GlobalFilterBar
-				availableStores={status.availableStores || []}
 				availableCategories={status.availableCategories || []}
 				availableBrands={status.availableBrands || []}
-				maxDate={status.maxDate}
 			/>
 
 			{isLoading || !data ? (

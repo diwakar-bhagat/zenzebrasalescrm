@@ -51,8 +51,9 @@ export function TopPages({ data }: { data: any }) {
               </TableRow>
             </TableHeader>
             <TableBody className="[&_tr]:border-border/50">
-              {pages.map((page: any) => (
-                <TableRow className="hover:bg-muted/10" key={page.path}>
+              {pages.map((page: any, index: number) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: index is required to guarantee key uniqueness
+                <TableRow className="hover:bg-muted/10" key={`${page.path}-${index}`}>
                   <TableCell className="max-w-[200px] truncate py-4 font-medium">
                     <div>
                       <div className="truncate text-sm">{page.path}</div>

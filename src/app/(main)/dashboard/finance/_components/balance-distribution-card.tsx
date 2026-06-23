@@ -46,11 +46,11 @@ export function BalanceDistributionCard({ data }: { data: any }) {
       ];
     }
 
-    return storePerformance.map((item: any) => {
+    return storePerformance.map((item: { storeDisplayName: string; billedBy: string; revenue: number }) => {
       const share = currentTotalRevenue > 0 ? (item.revenue / currentTotalRevenue) * 100 : 0;
-      const key = item.store === "Smart_Works_Noida" ? "Smart_Works_Noida" : "KLJ";
+      const key = item.billedBy === "SmartworksNoida Noida" ? "Smart_Works_Noida" : "KLJ";
       return {
-        account: item.store === "Smart_Works_Noida" ? "Smart Works Noida" : "KLJ Store",
+        account: item.storeDisplayName,
         amount: Number(item.revenue),
         key,
         percentage: Number(share.toFixed(1)),

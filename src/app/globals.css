@@ -282,3 +282,33 @@ html {
     -webkit-print-color-adjust: exact;
   }
 }
+
+/* Custom status color utilities for positive (+ve green) and negative (-ve red) changes */
+.text-status-on-track {
+  color: oklch(0.627 0.265 149.213) !important; /* Green */
+}
+.dark .text-status-on-track {
+  color: oklch(0.787 0.198 147.273) !important;
+}
+
+.text-status-delayed {
+  color: oklch(0.577 0.245 27.325) !important; /* Red / Destructive */
+}
+.dark .text-status-delayed {
+  color: oklch(0.704 0.191 22.216) !important;
+}
+
+.bg-status-on-track-bg {
+  background-color: oklch(0.962 0.035 148.595 / 0.1) !important;
+}
+.border-status-on-track\/20 {
+  border-color: oklch(0.627 0.265 149.213 / 0.2) !important;
+}
+
+.bg-status-delayed-bg {
+  background-color: oklch(0.577 0.245 27.325 / 0.1) !important;
+}
+.border-status-delayed\/20 {
+  border-color: oklch(0.577 0.245 27.325 / 0.2) !important;
+}
+

@@ -1,39 +1,56 @@
 import type { DashboardFilters } from "@/lib/founder/types";
-
-import { calculateGrowth, type ComparisonPeriods } from "./comparison";
-
+import { growthPct, type ComparisonPeriods } from "./comparison";
+import { FOOD_CATEGORIES } from "./filter-sql";
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 
 type FounderSql = NeonQueryFunction<false, false>;
+function n(v: unknown) { return Number.isFinite(Number(v ?? 0)) ? Number(v ?? 0) : 0; }
+function retailFilter(f: DashboardFilters) { return f.categoryScope === "retail" ? [...FOOD_CATEGORIES] : null; }
 
-function numberValue(value: unknown) {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-export async function getAovKpi(db: FounderSql, periods: ComparisonPeriods, filters: DashboardFilters) {
+export async function getCategoryBillCuts(db: FounderSql, periods: ComparisonPeriods, filters: DashboardFilters) {
+  const food = retailFilter(filters);
   const result = await db`
-    SELECT
-      COALESCE(SUM(CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN net_amount ELSE 0 END), 0) AS current_revenue,
-      COALESCE(SUM(CASE WHEN sale_date >= ${periods.previousStart}::date AND sale_date <= ${periods.previousEnd}::date THEN net_amount ELSE 0 END), 0) AS previous_revenue,
-      COUNT(DISTINCT CASE WHEN sale_date >= ${periods.currentStart}::date AND sale_date <= ${periods.currentEnd}::date THEN bill_no END) AS current_bills,
-      COUNT(DISTINCT CASE WHEN sale_date >= ${periods.previousStart}::date AND sale_date <= ${periods.previousEnd}::date THEN bill_no END) AS previous_bills
-    FROM sales_fact
-    WHERE (${filters.store ?? null}::text IS NULL OR store = ${filters.store ?? null})
-      AND (${filters.category ?? null}::text IS NULL OR category = ${filters.category ?? null})
-      AND (${filters.brand ?? null}::text IS NULL OR brand = ${filters.brand ?? null})
-      AND (${filters.sku ?? null}::text IS NULL OR sku ILIKE '%' || ${filters.sku ?? null} || '%')
-  `;
-
-  const row = result[0] ?? {};
-  const currentBills = numberValue(row.current_bills);
-  const previousBills = numberValue(row.previous_bills);
-  const current = currentBills > 0 ? numberValue(row.current_revenue) / currentBills : 0;
-  const previous = previousBills > 0 ? numberValue(row.previous_revenue) / previousBills : 0;
-
-  return {
-    current,
-    previous,
-    growth: calculateGrowth(current, previous),
-  };
+    WITH curr AS (SELECT category, COUNT(DISTINCT bill_no) AS bill_cuts, SUM(quantity) AS units FROM sales_fact_v
+      WHERE sale_date BETWEEN ${periods.currentStart}::date AND ${periods.currentEnd}::date
+        AND (${filters.store ?? null}::text IS NULL OR billed_by = ${filters.store ?? null}) AND category IS NOT NULL
+        AND (${food ?? null}::text[] IS NULL OR category <> ALL(${food ?? null}::text[])) GROUP BY category),
+    prev AS (SELECT category, COUNT(DISTINCT bill_no) AS bill_cuts, SUM(quantity) AS units FROM sales_fact_v
+      WHERE sale_date BETWEEN ${periods.previousStart}::date AND ${periods.previousEnd}::date
+        AND (${filters.store ?? null}::text IS NULL OR billed_by = ${filters.store ?? null}) AND category IS NOT NULL
+        AND (${food ?? null}::text[] IS NULL OR category <> ALL(${food ?? null}::text[])) GROUP BY category),
+    all_categories AS (SELECT DISTINCT category FROM sales_fact_v WHERE category IS NOT NULL
+        AND (${food ?? null}::text[] IS NULL OR category <> ALL(${food ?? null}::text[])))
+    SELECT ac.category, COALESCE(c.bill_cuts,0) AS current_bill_cuts, COALESCE(c.units,0) AS current_units,
+      COALESCE(p.bill_cuts,0) AS prev_bill_cuts, COALESCE(p.units,0) AS prev_units
+    FROM all_categories ac LEFT JOIN curr c USING (category) LEFT JOIN prev p USING (category)
+    ORDER BY current_bill_cuts DESC`;
+  return result.map((row) => ({
+    category: String(row.category), currentBillCuts: n(row.current_bill_cuts), currentUnits: n(row.current_units),
+    prevBillCuts: n(row.prev_bill_cuts), prevUnits: n(row.prev_units),
+    billCutsGrowthPct: growthPct(n(row.current_bill_cuts), n(row.prev_bill_cuts)),
+    unitsGrowthPct: growthPct(n(row.current_units), n(row.prev_units)),
+  }));
 }
+
+export async function getCategoryAov(db: FounderSql, periods: ComparisonPeriods, filters: DashboardFilters) {
+  const food = retailFilter(filters);
+  const result = await db`
+    WITH curr AS (SELECT category, SUM(net_amount) AS revenue, COUNT(DISTINCT bill_no) AS bill_cuts,
+      ROUND(SUM(net_amount)/NULLIF(COUNT(DISTINCT bill_no),0),2) AS aov FROM sales_fact_v
+      WHERE sale_date BETWEEN ${periods.currentStart}::date AND ${periods.currentEnd}::date
+        AND (${filters.store ?? null}::text IS NULL OR billed_by = ${filters.store ?? null}) AND category IS NOT NULL
+        AND (${food ?? null}::text[] IS NULL OR category <> ALL(${food ?? null}::text[])) GROUP BY category),
+    prev AS (SELECT category, ROUND(SUM(net_amount)/NULLIF(COUNT(DISTINCT bill_no),0),2) AS aov FROM sales_fact_v
+      WHERE sale_date BETWEEN ${periods.previousStart}::date AND ${periods.previousEnd}::date
+        AND (${filters.store ?? null}::text IS NULL OR billed_by = ${filters.store ?? null}) AND category IS NOT NULL
+        AND (${food ?? null}::text[] IS NULL OR category <> ALL(${food ?? null}::text[])) GROUP BY category)
+    SELECT COALESCE(c.category,p.category) AS category, COALESCE(c.aov,0) AS current_aov,
+      COALESCE(c.revenue,0) AS current_revenue, COALESCE(c.bill_cuts,0) AS current_bill_cuts, COALESCE(p.aov,0) AS prev_aov
+    FROM curr c FULL OUTER JOIN prev p USING (category) ORDER BY current_aov DESC`;
+  return result.map((row) => ({
+    category: String(row.category || "Unknown"), currentAov: n(row.current_aov), currentRevenue: n(row.current_revenue),
+    currentBillCuts: n(row.current_bill_cuts), prevAov: n(row.prev_aov), aovGrowthPct: growthPct(n(row.current_aov), n(row.prev_aov)),
+  }));
+}
+
+export const getAovKpi = getCategoryAov;

@@ -6,6 +6,7 @@ import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts"
 
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { formatSignedPercent, growthTextClass } from "@/lib/growth-ui";
 import { formatCurrency } from "@/lib/utils";
 
 const revenueOverviewConfig = {
@@ -63,8 +64,8 @@ export function KpiStrip({ data }: { data: any }) {
               </CardHeader>
               <CardContent>
                 <div className="text-sm">
-                  <span className={kpis.revenue.growth >= 0 ? "text-green-700 dark:text-green-300" : "text-destructive"}>
-                    {kpis.revenue.growth >= 0 ? "+" : ""}{kpis.revenue.growth.toFixed(1)}%
+                  <span className={growthTextClass(kpis.revenue.growth)}>
+                    {formatSignedPercent(kpis.revenue.growth)}
                   </span>
                   <span className="text-muted-foreground"> vs last period</span>
                 </div>
@@ -83,8 +84,8 @@ export function KpiStrip({ data }: { data: any }) {
               </CardHeader>
               <CardContent>
                 <div className="text-sm">
-                  <span className={kpis.billCuts.growth >= 0 ? "text-green-700 dark:text-green-300" : "text-destructive"}>
-                    {kpis.billCuts.growth >= 0 ? "+" : ""}{kpis.billCuts.growth.toFixed(1)}%
+                  <span className={growthTextClass(kpis.billCuts.growth)}>
+                    {formatSignedPercent(kpis.billCuts.growth)}
                   </span>
                   <span className="text-muted-foreground"> vs last period</span>
                 </div>
@@ -103,8 +104,8 @@ export function KpiStrip({ data }: { data: any }) {
               </CardHeader>
               <CardContent>
                 <div className="text-sm">
-                  <span className={customers.growth >= 0 ? "text-green-700 dark:text-green-300" : "text-destructive"}>
-                    {customers.growth >= 0 ? "+" : ""}{customers.growth.toFixed(1)}%
+                  <span className={growthTextClass(customers.growth)}>
+                    {formatSignedPercent(customers.growth)}
                   </span>
                   <span className="text-muted-foreground"> vs last period</span>
                 </div>
@@ -123,8 +124,8 @@ export function KpiStrip({ data }: { data: any }) {
               </CardHeader>
               <CardContent>
                 <div className="text-sm">
-                  <span className={aov.growth >= 0 ? "text-green-700 dark:text-green-300" : "text-destructive"}>
-                    {aov.growth >= 0 ? "+" : ""}{aov.growth.toFixed(1)}%
+                  <span className={growthTextClass(aov.growth)}>
+                    {formatSignedPercent(aov.growth)}
                   </span>
                   <span className="text-muted-foreground"> vs last period</span>
                 </div>

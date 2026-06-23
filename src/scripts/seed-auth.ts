@@ -25,14 +25,15 @@ async function seed() {
   const users = [
     { employee_id: "EMP001", name: "Dipu Kumar", username: "dipu" },
     { employee_id: "EMP002", name: "Surjeet", username: "surjeet" },
+    { employee_id: "TEST001", name: "Test User", username: "test", password: "test123" },
   ];
 
   console.log("\n=== ZenZebra Auth Seed ===\n");
   console.log("Generating credentials...\n");
 
   for (const user of users) {
-    // Generate a random 12-char password
-    const password = crypto.randomBytes(8).toString("base64url").slice(0, 12);
+    // Use provided password or generate a random 12-char password
+    const password = (user as any).password || crypto.randomBytes(8).toString("base64url").slice(0, 12);
 
     // Hash with Argon2id
     const passwordHash = await hash(password, ARGON2_OPTIONS);

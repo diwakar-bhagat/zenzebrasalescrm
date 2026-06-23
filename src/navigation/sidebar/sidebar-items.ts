@@ -47,7 +47,7 @@ export const sidebarItems: NavGroup[] = [
         icon: LayoutDashboard,
       },
       {
-        title: "E-commerce",
+        title: "Store Overview",
         url: "/dashboard/ecommerce",
         icon: ShoppingBag,
       },
@@ -90,4 +90,3 @@ export const sidebarItems: NavGroup[] = [
     ],
   },
 ];
-

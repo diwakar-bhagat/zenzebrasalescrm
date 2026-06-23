@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (mode === "commit") {
-      const result = await commitFounderUploadFile(sql, file);
+      const uploadType = (formData.get("uploadType") as string) === "incremental" ? "incremental" : "full_replace";
+      const result = await commitFounderUploadFile(sql, file, uploadType);
 
       if (!result.success) {
         return NextResponse.json(

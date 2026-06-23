@@ -21,6 +21,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function FounderUploadPage() {
 	const router = useRouter();
@@ -28,6 +29,7 @@ export default function FounderUploadPage() {
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [progress, setProgress] = useState(0);
 	const [validationResult, setValidationResult] = useState<any>(null);
+	const [uploadType, setUploadType] = useState<"full_replace" | "incremental">("full_replace");
 	const [preflight, setPreflight] = useState<{
 		hasExistingData: boolean;
 		existingRowCount: number;
@@ -103,6 +105,7 @@ export default function FounderUploadPage() {
 		try {
 			const formData = new FormData();
 			formData.append("file", file);
+			formData.append("uploadType", uploadType);
 
 			const res = await fetch("/api/sales/imports?mode=commit", {
 				method: "POST",
@@ -152,6 +155,13 @@ export default function FounderUploadPage() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
+						<Select value={uploadType} onValueChange={(v) => setUploadType(v as "full_replace" | "incremental")}>
+							<SelectTrigger><SelectValue placeholder="Upload type" /></SelectTrigger>
+							<SelectContent>
+								<SelectItem value="full_replace">Full replace (morning file)</SelectItem>
+								<SelectItem value="incremental">Incremental (today only)</SelectItem>
+							</SelectContent>
+						</Select>
 						<label
 							htmlFor="file-upload"
 							className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/20 p-10 text-center transition-colors hover:bg-muted/40"

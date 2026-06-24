@@ -1,30 +1,75 @@
+import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { DashboardFilters } from "@/lib/founder/types";
 import type { ComparisonPeriods } from "./comparison";
 import { FOOD_CATEGORIES } from "./filter-sql";
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import { METRICS } from "./metrics";
 
 type FounderSql = NeonQueryFunction<false, false>;
-function n(v: unknown) { return Number.isFinite(Number(v ?? 0)) ? Number(v ?? 0) : 0; }
-function retailFilter(f: DashboardFilters) { return f.categoryScope === "retail" ? [...FOOD_CATEGORIES] : null; }
+function n(v: unknown) {
+	return Number.isFinite(Number(v ?? 0)) ? Number(v ?? 0) : 0;
+}
+function retailFilter(f: DashboardFilters) {
+	return f.categoryScope === "retail" ? [...FOOD_CATEGORIES] : null;
+}
 
-export async function getPaymentAnalysis(db: FounderSql, periods: ComparisonPeriods, filters: DashboardFilters) {
-  const food = retailFilter(filters);
-  const [overall, byStore] = await Promise.all([
-    db`SELECT COALESCE(payment_method,'Unknown') AS payment_method, SUM(net_amount) AS revenue, COUNT(DISTINCT bill_no) AS bill_cuts
-      FROM sales_fact_v WHERE sale_date BETWEEN ${periods.currentStart}::date AND ${periods.currentEnd}::date
-        AND (${filters.store ?? null}::text IS NULL OR billed_by = ${filters.store ?? null})
-        AND (${filters.category ?? null}::text IS NULL OR category = ${filters.category ?? null})
-        AND (${filters.brand ?? null}::text IS NULL OR brand = ${filters.brand ?? null})
-        AND (${food ?? null}::text[] IS NULL OR category <> ALL(${food ?? null}::text[]))
-      GROUP BY payment_method ORDER BY revenue DESC`,
-    db`SELECT store_display_name, COALESCE(payment_method,'Unknown') AS payment_method, SUM(net_amount) AS revenue, COUNT(DISTINCT bill_no) AS bill_cuts
-      FROM sales_fact_v WHERE sale_date BETWEEN ${periods.currentStart}::date AND ${periods.currentEnd}::date
-        AND (${food ?? null}::text[] IS NULL OR category <> ALL(${food ?? null}::text[]))
-      GROUP BY store_display_name, payment_method ORDER BY store_display_name, revenue DESC`,
-  ]);
-  const totalRevenue = overall.reduce((s, row) => s + n(row.revenue), 0);
-  return { methods: overall.map((row) => ({ paymentMethod: String(row.payment_method), revenue: n(row.revenue),
-      billCuts: n(row.bill_cuts), revenueSharePct: totalRevenue > 0 ? Math.round((n(row.revenue) / totalRevenue) * 1000) / 10 : 0 })),
-    byStore: byStore.map((row) => ({ storeDisplayName: String(row.store_display_name), paymentMethod: String(row.payment_method),
-      revenue: n(row.revenue), billCuts: n(row.bill_cuts) })) };
+export async function getPaymentAnalysis(
+	db: FounderSql,
+	periods: ComparisonPeriods,
+	filters: DashboardFilters,
+) {
+	const food = retailFilter(filters);
+
+	const overallQueryString = `
+    SELECT COALESCE(payment_method,'Unknown') AS payment_method, ${METRICS.revenue} AS revenue, ${METRICS.bills} AS bill_cuts
+    FROM sales_fact_v WHERE sale_date BETWEEN $1::date AND $2::date
+      AND ($3::text IS NULL OR billed_by = $3)
+      AND ($4::text IS NULL OR category = $4)
+      AND ($5::text IS NULL OR brand = $5)
+      AND ($6::text[] IS NULL OR category <> ALL($6::text[]))
+    GROUP BY payment_method ORDER BY revenue DESC`;
+
+	const byStoreQueryString = `
+    SELECT store_display_name, COALESCE(payment_method,'Unknown') AS payment_method, ${METRICS.revenue} AS revenue, ${METRICS.bills} AS bill_cuts
+    FROM sales_fact_v WHERE sale_date BETWEEN $1::date AND $2::date
+      AND ($3::text[] IS NULL OR category <> ALL($3::text[]))
+    GROUP BY store_display_name, payment_method ORDER BY store_display_name, revenue DESC`;
+
+	const [overall, byStore] = await Promise.all([
+		(db as any).query(overallQueryString, [
+			periods.currentStart,
+			periods.currentEnd,
+			filters.store ?? null,
+			filters.category ?? null,
+			filters.brand ?? null,
+			food ?? null,
+		]),
+		(db as any).query(byStoreQueryString, [
+			periods.currentStart,
+			periods.currentEnd,
+			food ?? null,
+		]),
+	]);
+
+	const totalRevenue = overall.reduce(
+		(s: number, row: any) => s + n(row.revenue),
+		0,
+	);
+
+	return {
+		methods: overall.map((row: any) => ({
+			paymentMethod: String(row.payment_method),
+			revenue: n(row.revenue),
+			billCuts: n(row.bill_cuts),
+			revenueSharePct:
+				totalRevenue > 0
+					? Math.round((n(row.revenue) / totalRevenue) * 1000) / 10
+					: 0,
+		})),
+		byStore: byStore.map((row: any) => ({
+			storeDisplayName: String(row.store_display_name),
+			paymentMethod: String(row.payment_method),
+			revenue: n(row.revenue),
+			billCuts: n(row.bill_cuts),
+		})),
+	};
 }

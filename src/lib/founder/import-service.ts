@@ -1,7 +1,7 @@
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import {
-  parseExcelBuffer,
-  parseResultToValidation,
+	parseExcelBuffer,
+	parseResultToValidation,
 } from "@/lib/parser/excel-parser";
 import type { ParsedSalesRow, ValidationResult } from "./types";
 
@@ -11,67 +11,83 @@ type UploadType = "full_replace" | "incremental";
 const INSERT_CHUNK_SIZE = 1000;
 
 function chunkRows(rows: ParsedSalesRow[]) {
-  const chunks: ParsedSalesRow[][] = [];
-  for (let index = 0; index < rows.length; index += INSERT_CHUNK_SIZE) {
-    chunks.push(rows.slice(index, index + INSERT_CHUNK_SIZE));
-  }
-  return chunks;
+	const chunks: ParsedSalesRow[][] = [];
+	for (let index = 0; index < rows.length; index += INSERT_CHUNK_SIZE) {
+		chunks.push(rows.slice(index, index + INSERT_CHUNK_SIZE));
+	}
+	return chunks;
 }
 
-export async function validateFounderUploadFile(file: File): Promise<ValidationResult> {
-  const buffer = Buffer.from(await file.arrayBuffer());
+export async function validateFounderUploadFile(
+	file: File,
+): Promise<ValidationResult> {
+	const buffer = Buffer.from(await file.arrayBuffer());
 
-  try {
-    const parseResult = parseExcelBuffer(buffer);
-    return parseResultToValidation(parseResult);
-  } catch (error) {
-    return {
-      isValid: false,
-      totalRows: 0,
-      validRows: 0,
-      errorCount: 1,
-      errors: [
-        {
-          rowNumber: 0,
-          errors: [error instanceof Error ? error.message : "Failed to parse Excel file"],
-        },
-      ],
-      validData: [],
-      dateRange: { start: null, end: null },
-    };
-  }
+	try {
+		const parseResult = parseExcelBuffer(buffer);
+		return parseResultToValidation(parseResult);
+	} catch (error) {
+		return {
+			isValid: false,
+			totalRows: 0,
+			validRows: 0,
+			errorCount: 1,
+			errors: [
+				{
+					rowNumber: 0,
+					errors: [
+						error instanceof Error
+							? error.message
+							: "Failed to parse Excel file",
+					],
+				},
+			],
+			validData: [],
+			dateRange: { start: null, end: null },
+		};
+	}
 }
 
 export async function commitFounderUploadFile(
-  db: FounderSql,
-  file: File,
-  uploadType: UploadType = "full_replace",
+	db: FounderSql,
+	file: File,
+	uploadType: UploadType = "full_replace",
 ) {
-  const validation = await validateFounderUploadFile(file);
+	const validation = await validateFounderUploadFile(file);
 
-  if (!validation.isValid || validation.validData.length === 0) {
-    return {
-      success: false,
-      validation,
-      error: "No valid rows found. Cannot commit upload.",
-    };
-  }
+	if (!validation.isValid || validation.validData.length === 0) {
+		return {
+			success: false,
+			validation,
+			error: "No valid rows found. Cannot commit upload.",
+		};
+	}
 
-  const batchIdResult = await db`
+	const batchIdResult = await db`
     SELECT nextval(pg_get_serial_sequence('upload_batches', 'id'))::integer AS id
   `;
-  const batchId = Number(batchIdResult[0]?.id);
+	const batchId = Number(batchIdResult[0]?.id);
 
-  if (!Number.isFinite(batchId)) {
-    throw new Error("Unable to allocate upload batch id.");
-  }
+	if (!Number.isFinite(batchId)) {
+		throw new Error("Unable to allocate upload batch id.");
+	}
 
-  const chunks = chunkRows(validation.validData);
-  const latestSaleDate = validation.latestSaleDate ?? validation.dateRange.end;
+	const validRows = validation.validData;
+	const chunks = chunkRows(validRows);
+	const latestSaleDate = validation.latestSaleDate ?? validation.dateRange.end;
 
-  await db.transaction?.((tx) => {
-    const queries = [
-      tx`
+	// Calculate metadata for tracking
+	const storesFound = Array.from(
+		new Set(validRows.map((r) => r.billed_by).filter(Boolean)),
+	);
+	const categoriesFound = Array.from(
+		new Set(validRows.map((r) => r.category).filter(Boolean)),
+	);
+	const netSales = validRows.reduce((sum, r) => sum + (r.net_amount || 0), 0);
+
+	await db.transaction?.((tx) => {
+		const queries = [
+			tx`
         INSERT INTO upload_batches (
           id,
           filename,
@@ -86,7 +102,10 @@ export async function commitFounderUploadFile(
           latest_sale_date,
           row_count_raw,
           row_count_stored,
-          rows_quarantined
+          rows_quarantined,
+          stores_found,
+          categories_found,
+          net_sales
         )
         VALUES (
           ${batchId},
@@ -102,13 +121,16 @@ export async function commitFounderUploadFile(
           ${latestSaleDate},
           ${validation.totalRows},
           ${validation.validRows},
-          ${validation.errorCount}
+          ${validation.errorCount},
+          ${storesFound}::text[],
+          ${categoriesFound}::text[],
+          ${netSales}::numeric
         )
       `,
-    ];
+		];
 
-    for (const [index, row] of validation.validData.entries()) {
-      queries.push(tx`
+		for (const [index, row] of validRows.entries()) {
+			queries.push(tx`
         INSERT INTO staging_upload_rows (batch_id, row_number, parsed, status, error_reason)
         VALUES (
           ${batchId},
@@ -118,31 +140,36 @@ export async function commitFounderUploadFile(
           NULL
         )
       `);
-    }
+		}
 
-    if (uploadType === "full_replace") {
-      queries.push(tx`TRUNCATE sales_fact`);
-    } else if (latestSaleDate) {
-      queries.push(tx`
+		if (uploadType === "full_replace") {
+			// Transaction-safe DELETE instead of truncate to avoid breaking UI during processing
+			queries.push(tx`DELETE FROM sales_fact`);
+		} else if (latestSaleDate) {
+			queries.push(tx`
         DELETE FROM sales_fact
         WHERE sale_date = ${latestSaleDate}::date
       `);
-    }
+		}
 
-    for (const chunk of chunks) {
-      queries.push(tx`
+		for (const chunk of chunks) {
+			queries.push(tx`
         INSERT INTO sales_fact (
           upload_id,
           sale_date,
           bill_no,
           billed_by,
+          product_key,
           category,
           brand,
           sku_code,
           item_name,
           quantity,
-          net_amount,
+          mrp_amount,
           discount_amount,
+          gross_amount,
+          tax_amount,
+          net_amount,
           payment_method,
           customer_mobile,
           customer_name
@@ -152,43 +179,51 @@ export async function commitFounderUploadFile(
           ${chunk.map((row) => row.sale_date)}::date[],
           ${chunk.map((row) => row.bill_no)}::text[],
           ${chunk.map((row) => row.billed_by)}::text[],
+          ${chunk.map((row) => row.product_key)}::text[],
           ${chunk.map((row) => row.category)}::text[],
           ${chunk.map((row) => row.brand)}::text[],
           ${chunk.map((row) => row.sku_code)}::text[],
           ${chunk.map((row) => row.item_name)}::text[],
           ${chunk.map((row) => row.quantity)}::integer[],
-          ${chunk.map((row) => row.net_amount)}::numeric[],
+          ${chunk.map((row) => row.mrp_amount)}::numeric[],
           ${chunk.map((row) => row.discount_amount)}::numeric[],
+          ${chunk.map((row) => row.gross_amount)}::numeric[],
+          ${chunk.map((row) => row.tax_amount)}::numeric[],
+          ${chunk.map((row) => row.net_amount)}::numeric[],
           ${chunk.map((row) => row.payment_method)}::text[],
           ${chunk.map((row) => row.customer_mobile)}::text[],
           ${chunk.map((row) => row.customer_name)}::text[]
         )
-        ON CONFLICT ON CONSTRAINT uq_sales_fact_key DO UPDATE SET
+        ON CONFLICT (sale_date, bill_no, billed_by, product_key) DO UPDATE SET
           upload_id = EXCLUDED.upload_id,
           category = EXCLUDED.category,
           brand = EXCLUDED.brand,
+          sku_code = EXCLUDED.sku_code,
           item_name = EXCLUDED.item_name,
           quantity = EXCLUDED.quantity,
-          net_amount = EXCLUDED.net_amount,
+          mrp_amount = EXCLUDED.mrp_amount,
           discount_amount = EXCLUDED.discount_amount,
+          gross_amount = EXCLUDED.gross_amount,
+          tax_amount = EXCLUDED.tax_amount,
+          net_amount = EXCLUDED.net_amount,
           payment_method = EXCLUDED.payment_method,
           customer_mobile = EXCLUDED.customer_mobile,
           customer_name = EXCLUDED.customer_name
       `);
-    }
+		}
 
-    queries.push(tx`
+		queries.push(tx`
       DELETE FROM staging_upload_rows
       WHERE batch_id = ${batchId}
     `);
 
-    return queries;
-  });
+		return queries;
+	});
 
-  return {
-    success: true,
-    batchId,
-    rowsInserted: validation.validRows,
-    validation,
-  };
+	return {
+		success: true,
+		batchId,
+		rowsInserted: validation.validRows,
+		validation,
+	};
 }

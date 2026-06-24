@@ -2,33 +2,23 @@
 
 import {
 	BarChart3,
+	Download,
 	IndianRupee,
+	Percent,
 	ShoppingCart,
 	Store,
 	TrendingDown,
 	TrendingUp,
 	Upload,
-	Download,
-	Percent,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 import { DataFreshnessSystem } from "@/components/dashboard/data-freshness-system";
-import { GlobalFilterBar } from "@/components/founder/global-filter-bar";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-	} from "@/components/ui/card";
-	import { Badge } from "@/components/ui/badge";
-	import { Skeleton } from "@/components/ui/skeleton";
-	import { formatSignedPercent, growthTextClass } from "@/lib/growth-ui";
-	import { formatCurrency } from "@/lib/utils";
-	import { STORE_OPTIONS } from "@/lib/business-logic/filter-sql";
+	formatStoreName,
+	GlobalFilterBar,
+} from "@/components/founder/global-filter-bar";
 import {
 	AovAnalysisTable,
 	BillCutAnalysisTable,
@@ -38,8 +28,26 @@ import {
 	PaymentAnalysisCard,
 	SkuPerformanceTable,
 } from "@/components/founder/sales-dashboard-sections";
-import { useFilterStore } from "@/stores/founder/filter-store";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import {
+	type ChartConfig,
+	ChartContainer,
+	ChartTooltip,
+} from "@/components/ui/chart";
+import { Skeleton } from "@/components/ui/skeleton";
 import { exportToExcel } from "@/lib/export-excel";
+import { formatSignedPercent, growthTextClass } from "@/lib/growth-ui";
+import { formatCurrency } from "@/lib/utils";
+import { useFilterStore } from "@/stores/founder/filter-store";
 
 /** Safely format a number to fixed decimal places; returns "0.0" on null/undefined/NaN. */
 function safeFixed(value: number | null | undefined, digits = 1): string {
@@ -47,10 +55,47 @@ function safeFixed(value: number | null | undefined, digits = 1): string {
 	return Number.isFinite(n) ? n.toFixed(digits) : "0.0";
 }
 
+const CustomTooltip = ({ active, payload }: any) => {
+	if (active && payload && payload.length) {
+		const data = payload[0].payload;
+		return (
+			<div className="bg-popover border border-border p-2 rounded-md shadow-sm text-xs">
+				<p className="font-semibold text-foreground">{data.name}</p>
+				<p className="text-muted-foreground mt-0.5">Value: {data.display}</p>
+			</div>
+		);
+	}
+	return null;
+};
+
 const STORE_DISPLAY_NAMES: Record<string, string> = {
 	"Klj store": "KLJ Store KPIs",
 	"SmartworksNoida Noida": "Smart Works Noida KPIs",
+	"Head office": "Head office",
 };
+
+const waterfallChartConfig = {
+	mrpValue: {
+		color: "var(--chart-1)",
+		label: "MRP Value",
+	},
+	discount: {
+		color: "var(--chart-5)",
+		label: "Discount",
+	},
+	collection: {
+		color: "var(--chart-3)",
+		label: "Collection",
+	},
+	gst: {
+		color: "var(--chart-2)",
+		label: "GST Liability",
+	},
+	revenue: {
+		color: "var(--chart-4)",
+		label: "Net Revenue",
+	},
+} satisfies ChartConfig;
 
 const EMPTY_STORE_KPI = {
 	revenue: 0,
@@ -73,7 +118,9 @@ function getStoreKpi(
 	}>,
 	billedBy: string,
 ) {
-	return storePerformance.find((s) => s.billedBy === billedBy) ?? EMPTY_STORE_KPI;
+	return (
+		storePerformance.find((s) => s.billedBy === billedBy) ?? EMPTY_STORE_KPI
+	);
 }
 
 function getMetricGrowth(
@@ -126,7 +173,11 @@ function getMainCause({
 		{ label: "AOV", value: aovGrowth },
 	]
 		.filter((item) => item.value != null)
-		.sort((a, b) => Math.abs(Math.min(Number(b.value), 0)) - Math.abs(Math.min(Number(a.value), 0)));
+		.sort(
+			(a, b) =>
+				Math.abs(Math.min(Number(b.value), 0)) -
+				Math.abs(Math.min(Number(a.value), 0)),
+		);
 
 	const cause = causes[0];
 	if (!cause || Number(cause.value) >= 0) return "No single negative driver";
@@ -211,13 +262,19 @@ function BusinessHealthInvestigation({ data }: { data: any }) {
 							{drivers.map((driver, index) => (
 								<div className="flex items-center gap-3" key={driver.label}>
 									<div className="min-w-0 flex-1 rounded-lg bg-muted/30 p-3">
-										<p className="text-muted-foreground text-xs">{driver.label}</p>
-										<p className={`mt-1 font-semibold ${growthTextClass(driver.value)}`}>
+										<p className="text-muted-foreground text-xs">
+											{driver.label}
+										</p>
+										<p
+											className={`mt-1 font-semibold ${growthTextClass(driver.value)}`}
+										>
 											{formatSignedPercent(driver.value)}
 										</p>
 									</div>
 									{index < drivers.length - 1 && (
-										<div className="hidden text-muted-foreground md:block">{">"}</div>
+										<div className="hidden text-muted-foreground md:block">
+											{">"}
+										</div>
 									)}
 								</div>
 							))}
@@ -244,8 +301,18 @@ export default function SalesDashboardPage() {
 	const [status, setStatus] = useState<any>(null);
 	const [isLoading, setIsLoading] = useState(true);
 
-	const { startDate, endDate, store, category, brand, sku, categoryScope, compareMode, compareStartDate, compareEndDate } =
-		useFilterStore();
+	const {
+		startDate,
+		endDate,
+		store,
+		category,
+		brand,
+		sku,
+		categoryScope,
+		compareMode,
+		compareStartDate,
+		compareEndDate,
+	} = useFilterStore();
 
 	useEffect(() => {
 		const fetchStatus = async () => {
@@ -270,7 +337,7 @@ export default function SalesDashboardPage() {
 			setIsLoading(true);
 			try {
 				const params = new URLSearchParams({ startDate, endDate });
-					if (store !== "ALL") params.set("store", store);
+				if (store !== "ALL") params.set("store", store);
 				if (category !== "All Categories") params.set("category", category);
 				if (brand !== "All Brands") params.set("brand", brand);
 				if (sku) params.set("sku", sku);
@@ -294,7 +361,19 @@ export default function SalesDashboardPage() {
 		};
 
 		fetchDashboardData();
-	}, [status, startDate, endDate, store, category, brand, sku, categoryScope, compareMode, compareStartDate, compareEndDate]);
+	}, [
+		status,
+		startDate,
+		endDate,
+		store,
+		category,
+		brand,
+		sku,
+		categoryScope,
+		compareMode,
+		compareStartDate,
+		compareEndDate,
+	]);
 
 	if (!status) {
 		return (
@@ -348,6 +427,7 @@ export default function SalesDashboardPage() {
 			</div>
 
 			<GlobalFilterBar
+				availableStores={status.availableStores || []}
 				availableCategories={status.availableCategories || []}
 				availableBrands={status.availableBrands || []}
 				categoryBrandMap={status.categoryBrandMap || {}}
@@ -355,10 +435,17 @@ export default function SalesDashboardPage() {
 			/>
 
 			{isLoading || !data ? (
-				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-					{["revenue", "bill-cuts", "units", "aov", "discount"].map((key) => (
-						<Skeleton key={key} className="h-32 rounded-xl" />
-					))}
+				<div className="space-y-4">
+					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+						{["revenue", "bill-cuts", "units", "aov", "discount"].map((key) => (
+							<Skeleton key={key} className="h-32 rounded-xl" />
+						))}
+					</div>
+					<div className="grid gap-4 md:grid-cols-3">
+						{[1, 2, 3].map((key) => (
+							<Skeleton key={key} className="h-44 rounded-xl" />
+						))}
+					</div>
 				</div>
 			) : (
 				<>
@@ -484,6 +571,176 @@ export default function SalesDashboardPage() {
 						</Card>
 					</div>
 
+					{/* 1.5 Financial Operations Analysis & Waterfall Chart */}
+					<div className="grid gap-4 md:grid-cols-3 mt-4">
+						{/* Collection vs Revenue Card */}
+						<Card className="flex flex-col">
+							<CardHeader className="pb-2">
+								<CardTitle className="text-sm font-semibold text-muted-foreground">
+									Collection vs Revenue
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="flex-1 flex flex-col justify-between">
+								<div>
+									<div className="text-3xl font-bold">
+										{formatCurrency(data.salesKpis.collection.current)}
+									</div>
+									<p className="text-xs text-muted-foreground mt-0.5">
+										Gross Collection (GST Inclusive)
+									</p>
+								</div>
+								<div className="mt-4 pt-4 border-t space-y-2 text-sm">
+									<div className="flex justify-between items-center">
+										<span className="text-muted-foreground text-xs">
+											Net Revenue (Taxable)
+										</span>
+										<span className="font-semibold">
+											{formatCurrency(data.salesKpis.revenue.current)}
+										</span>
+									</div>
+									<div className="flex justify-between items-center">
+										<span className="text-muted-foreground text-xs">
+											GST Liability
+										</span>
+										<span className="font-medium text-muted-foreground">
+											{formatCurrency(data.salesKpis.gst.current)}
+										</span>
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+
+						{/* Discount Impact Card */}
+						<Card className="flex flex-col">
+							<CardHeader className="pb-2">
+								<CardTitle className="text-sm font-semibold text-muted-foreground">
+									Discount Impact
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="flex-1 flex flex-col justify-between">
+								<div>
+									<div className="text-3xl font-bold">
+										{safeFixed(
+											data.salesKpis.mrp.current > 0
+												? (data.salesKpis.discount.current /
+														data.salesKpis.mrp.current) *
+														100
+												: 0,
+											1,
+										)}
+										%
+									</div>
+									<p className="text-xs text-muted-foreground mt-0.5">
+										Effective Discount Rate on MRP
+									</p>
+								</div>
+								<div className="mt-4 pt-4 border-t space-y-2 text-sm">
+									<div className="flex justify-between items-center">
+										<span className="text-muted-foreground text-xs">
+											Discount Value
+										</span>
+										<span className="font-semibold">
+											{formatCurrency(data.salesKpis.discount.current)}
+										</span>
+									</div>
+									<div className="flex justify-between items-center">
+										<span className="text-muted-foreground text-xs">
+											Total MRP Value
+										</span>
+										<span className="font-medium text-muted-foreground">
+											{formatCurrency(data.salesKpis.mrp.current)}
+										</span>
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+
+						{/* Deduction Waterfall Card */}
+						<Card className="flex flex-col">
+							<CardHeader className="pb-2">
+								<CardTitle className="text-sm font-semibold text-muted-foreground">
+									Deduction Waterfall
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="flex-1 min-h-[140px] pt-0">
+								<ChartContainer
+									config={waterfallChartConfig}
+									className="h-full w-full"
+								>
+									<BarChart
+										data={[
+											{
+												name: "MRP Value",
+												val: [0, data.salesKpis.mrp.current],
+												display: formatCurrency(data.salesKpis.mrp.current),
+												fill: "var(--color-mrpValue)",
+											},
+											{
+												name: "Discount",
+												val: [
+													data.salesKpis.mrp.current -
+														data.salesKpis.discount.current,
+													data.salesKpis.mrp.current,
+												],
+												display: `-${formatCurrency(data.salesKpis.discount.current)}`,
+												fill: "var(--color-discount)",
+											},
+											{
+												name: "Collection",
+												val: [0, data.salesKpis.collection.current],
+												display: formatCurrency(
+													data.salesKpis.collection.current,
+												),
+												fill: "var(--color-collection)",
+											},
+											{
+												name: "GST Liability",
+												val: [
+													data.salesKpis.collection.current -
+														data.salesKpis.gst.current,
+													data.salesKpis.collection.current,
+												],
+												display: `-${formatCurrency(data.salesKpis.gst.current)}`,
+												fill: "var(--color-gst)",
+											},
+											{
+												name: "Net Revenue",
+												val: [0, data.salesKpis.revenue.current],
+												display: formatCurrency(data.salesKpis.revenue.current),
+												fill: "var(--color-revenue)",
+											},
+										]}
+										margin={{ top: 15, right: 5, left: 5, bottom: 5 }}
+									>
+										<CartesianGrid
+											strokeDasharray="3 3"
+											vertical={false}
+											opacity={0.15}
+										/>
+										<XAxis
+											dataKey="name"
+											tick={{ fontSize: 9 }}
+											tickLine={false}
+											axisLine={false}
+										/>
+										<ChartTooltip content={<CustomTooltip />} />
+										<Bar dataKey="val">
+											{[
+												"var(--color-mrpValue)",
+												"var(--color-discount)",
+												"var(--color-collection)",
+												"var(--color-gst)",
+												"var(--color-revenue)",
+											].map((color) => (
+												<Cell key={color} fill={color} />
+											))}
+										</Bar>
+									</BarChart>
+								</ChartContainer>
+							</CardContent>
+						</Card>
+					</div>
+
 					{/* Revenue Driver Section */}
 					{data.revenueDriver && (
 						<div
@@ -514,15 +771,22 @@ export default function SalesDashboardPage() {
 										</span>
 									</h3>
 									<p className="text-sm opacity-90 font-medium mt-1">
-										{data.revenueDriver.explanation ?? data.revenueDriver.primaryDriver}
+										{data.revenueDriver.explanation ??
+											data.revenueDriver.primaryDriver}
 									</p>
 								</div>
 							</div>
 							{data.skuName && (
 								<div className="shrink-0 border-l pl-4 border-border flex flex-col justify-center min-h-[44px]">
-									<p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filtered SKU</p>
-									<p className="font-bold text-sm text-foreground mt-0.5 max-w-[200px] truncate">{data.skuName}</p>
-									<p className="font-mono text-xs text-muted-foreground">{sku}</p>
+									<p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+										Filtered SKU
+									</p>
+									<p className="font-bold text-sm text-foreground mt-0.5 max-w-[200px] truncate">
+										{data.skuName}
+									</p>
+									<p className="font-mono text-xs text-muted-foreground">
+										{sku}
+									</p>
 								</div>
 							)}
 						</div>
@@ -531,49 +795,72 @@ export default function SalesDashboardPage() {
 					{/* Store KPI Split cards */}
 					{data.storePerformance && (
 						<div className="grid gap-4 md:grid-cols-2 mt-4">
-							{STORE_OPTIONS.map((opt) => {
-								const storeKpi = getStoreKpi(data.storePerformance, opt.billedBy);
+							{data.storePerformance.map((storeKpi: any) => {
+								const storeName = storeKpi.billedBy;
+								const displayName =
+									STORE_DISPLAY_NAMES[storeName] ??
+									`${formatStoreName(storeName)} KPIs`;
 
 								return (
-									<Card key={opt.billedBy} className="border-border bg-card/40">
+									<Card key={storeName} className="border-border bg-card/40">
 										<CardHeader className="pb-3">
 											<CardTitle className="text-sm font-semibold flex items-center justify-between">
-												<span>{STORE_DISPLAY_NAMES[opt.billedBy] ?? opt.displayName}</span>
-												<span className="text-xs font-normal text-muted-foreground">Store Performance</span>
+												<span>{displayName}</span>
+												<span className="text-xs font-normal text-muted-foreground">
+													Store Performance
+												</span>
 											</CardTitle>
 										</CardHeader>
 										<CardContent className="grid grid-cols-2 gap-3">
 											<div className="bg-muted/30 p-3 rounded-lg border">
 												<p className="text-xs text-muted-foreground">Revenue</p>
-												<p className="text-lg font-bold mt-1">{formatCurrency(storeKpi.revenue)}</p>
-												<p className={`text-xs mt-0.5 flex items-center ${storeKpi.revenueGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
+												<p className="text-lg font-bold mt-1">
+													{formatCurrency(storeKpi.revenue)}
+												</p>
+												<p
+													className={`text-xs mt-0.5 flex items-center ${storeKpi.revenueGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}
+												>
 													{storeKpi.revenueGrowth >= 0 ? (
 														<TrendingUp className="mr-1 size-3" />
 													) : (
 														<TrendingDown className="mr-1 size-3" />
 													)}
-													{storeKpi.revenueGrowth > 0 ? "+" : ""}{safeFixed(storeKpi.revenueGrowth)}% vs prev
+													{storeKpi.revenueGrowth > 0 ? "+" : ""}
+													{safeFixed(storeKpi.revenueGrowth)}% vs prev
 												</p>
 											</div>
 											<div className="bg-muted/30 p-3 rounded-lg border">
-												<p className="text-xs text-muted-foreground">Bill Cuts</p>
-												<p className="text-lg font-bold mt-1">{storeKpi.billCuts.toLocaleString()}</p>
-												<p className={`text-xs mt-0.5 flex items-center ${storeKpi.billCutsGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}>
+												<p className="text-xs text-muted-foreground">
+													Bill Cuts
+												</p>
+												<p className="text-lg font-bold mt-1">
+													{storeKpi.billCuts.toLocaleString()}
+												</p>
+												<p
+													className={`text-xs mt-0.5 flex items-center ${storeKpi.billCutsGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}
+												>
 													{storeKpi.billCutsGrowth >= 0 ? (
 														<TrendingUp className="mr-1 size-3" />
 													) : (
 														<TrendingDown className="mr-1 size-3" />
 													)}
-													{storeKpi.billCutsGrowth > 0 ? "+" : ""}{safeFixed(storeKpi.billCutsGrowth)}% vs prev
+													{storeKpi.billCutsGrowth > 0 ? "+" : ""}
+													{safeFixed(storeKpi.billCutsGrowth)}% vs prev
 												</p>
 											</div>
 											<div className="bg-muted/30 p-3 rounded-lg border">
 												<p className="text-xs text-muted-foreground">AOV</p>
-												<p className="text-lg font-bold mt-1">{formatCurrency(storeKpi.aov)}</p>
+												<p className="text-lg font-bold mt-1">
+													{formatCurrency(storeKpi.aov)}
+												</p>
 											</div>
 											<div className="bg-muted/30 p-3 rounded-lg border">
-												<p className="text-xs text-muted-foreground">Units Sold</p>
-												<p className="text-lg font-bold mt-1">{storeKpi.units.toLocaleString()}</p>
+												<p className="text-xs text-muted-foreground">
+													Units Sold
+												</p>
+												<p className="text-lg font-bold mt-1">
+													{storeKpi.units.toLocaleString()}
+												</p>
 											</div>
 										</CardContent>
 									</Card>
@@ -590,7 +877,11 @@ export default function SalesDashboardPage() {
 									<CardTitle>Store Comparison</CardTitle>
 									<CardDescription>
 										<span>Which store is carrying the business?</span>
-										{data.periods?.label && <span className="block text-xs text-muted-foreground/80 mt-0.5">Compared: {data.periods.label}</span>}
+										{data.periods?.label && (
+											<span className="block text-xs text-muted-foreground/80 mt-0.5">
+												Compared: {data.periods.label}
+											</span>
+										)}
 									</CardDescription>
 								</div>
 								<div className="flex items-center gap-2">
@@ -599,14 +890,16 @@ export default function SalesDashboardPage() {
 										size="sm"
 										className="h-8 gap-1.5 text-xs shadow-sm hover:bg-accent"
 										onClick={() => {
-											const exportData = data.storePerformance.map((row: any) => ({
-												Store: row.storeDisplayName,
-												Revenue: row.revenue,
-												"Growth (%)": row.revenueGrowth,
-												"Contribution (%)": row.contributionPercent,
-												"Bill Cuts": row.billCuts,
-												AOV: row.aov,
-											}));
+											const exportData = data.storePerformance.map(
+												(row: any) => ({
+													Store: row.storeDisplayName,
+													Revenue: row.revenue,
+													"Growth (%)": row.revenueGrowth,
+													"Contribution (%)": row.contributionPercent,
+													"Bill Cuts": row.billCuts,
+													AOV: row.aov,
+												}),
+											);
 											exportToExcel(exportData, "Store_Comparison", "Stores");
 										}}
 									>
@@ -640,46 +933,56 @@ export default function SalesDashboardPage() {
 											</tr>
 										</thead>
 										<tbody>
-											{data.storePerformance.map((storeRow: { billedBy: string; storeDisplayName: string; revenue: number; revenueGrowth: number; contributionPercent: number; billCuts: number; aov: number }) => (
-												<tr
-													key={storeRow.billedBy}
-													className="border-b last:border-0 hover:bg-muted/20 transition-colors"
-												>
-													<td className="px-4 py-3 font-medium">
-														{storeRow.storeDisplayName}
-													</td>
-													<td className="px-4 py-3 text-right font-semibold">
-														{formatCurrency(storeRow.revenue)}
-													</td>
-													<td
-														className={`px-4 py-3 text-right ${storeRow.revenueGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}
+											{data.storePerformance.map(
+												(storeRow: {
+													billedBy: string;
+													storeDisplayName: string;
+													revenue: number;
+													revenueGrowth: number;
+													contributionPercent: number;
+													billCuts: number;
+													aov: number;
+												}) => (
+													<tr
+														key={storeRow.billedBy}
+														className="border-b last:border-0 hover:bg-muted/20 transition-colors"
 													>
-														{storeRow.revenueGrowth > 0 ? "+" : ""}
-														{safeFixed(storeRow.revenueGrowth)}%
-													</td>
-													<td className="px-4 py-3 text-right">
-														<div className="flex items-center justify-end gap-2">
-															<span>
-																{safeFixed(storeRow.contributionPercent)}%
-															</span>
-															<div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-																<div
-																	className="h-full bg-primary"
-																	style={{
-																		width: `${storeRow.contributionPercent}%`,
-																	}}
-																/>
+														<td className="px-4 py-3 font-medium">
+															{storeRow.storeDisplayName}
+														</td>
+														<td className="px-4 py-3 text-right font-semibold">
+															{formatCurrency(storeRow.revenue)}
+														</td>
+														<td
+															className={`px-4 py-3 text-right ${storeRow.revenueGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}
+														>
+															{storeRow.revenueGrowth > 0 ? "+" : ""}
+															{safeFixed(storeRow.revenueGrowth)}%
+														</td>
+														<td className="px-4 py-3 text-right">
+															<div className="flex items-center justify-end gap-2">
+																<span>
+																	{safeFixed(storeRow.contributionPercent)}%
+																</span>
+																<div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+																	<div
+																		className="h-full bg-primary"
+																		style={{
+																			width: `${storeRow.contributionPercent}%`,
+																		}}
+																	/>
+																</div>
 															</div>
-														</div>
-													</td>
-													<td className="px-4 py-3 text-right">
-														{storeRow.billCuts.toLocaleString()}
-													</td>
-													<td className="px-4 py-3 text-right">
-														{formatCurrency(storeRow.aov)}
-													</td>
-												</tr>
-											))}
+														</td>
+														<td className="px-4 py-3 text-right">
+															{storeRow.billCuts.toLocaleString()}
+														</td>
+														<td className="px-4 py-3 text-right">
+															{formatCurrency(storeRow.aov)}
+														</td>
+													</tr>
+												),
+											)}
 										</tbody>
 									</table>
 								</div>
@@ -688,12 +991,42 @@ export default function SalesDashboardPage() {
 					)}
 
 					<div className="grid gap-4 md:grid-cols-2">
-						{data.brandPerformance && <BrandPerformanceTable data={data.brandPerformance} comparisonLabel={data.periods?.label} />}
-						{data.skuPerformance && <SkuPerformanceTable data={data.skuPerformance} comparisonLabel={data.periods?.label} />}
-						{data.billCutAnalysis && <BillCutAnalysisTable data={data.billCutAnalysis} comparisonLabel={data.periods?.label} />}
-						{data.aovAnalysis && <AovAnalysisTable data={data.aovAnalysis} comparisonLabel={data.periods?.label} />}
-						{data.customerIntelligence && <CustomerIntelligenceCard data={data.customerIntelligence} comparisonLabel={data.periods?.label} />}
-						{data.paymentAnalysis && <PaymentAnalysisCard data={data.paymentAnalysis} comparisonLabel={data.periods?.label} />}
+						{data.brandPerformance && (
+							<BrandPerformanceTable
+								data={data.brandPerformance}
+								comparisonLabel={data.comparisonLabel}
+							/>
+						)}
+						{data.skuPerformance && (
+							<SkuPerformanceTable
+								data={data.skuPerformance}
+								comparisonLabel={data.comparisonLabel}
+							/>
+						)}
+						{data.billCutAnalysis && (
+							<BillCutAnalysisTable
+								data={data.billCutAnalysis}
+								comparisonLabel={data.comparisonLabel}
+							/>
+						)}
+						{data.aovAnalysis && (
+							<AovAnalysisTable
+								data={data.aovAnalysis}
+								comparisonLabel={data.comparisonLabel}
+							/>
+						)}
+						{data.customerIntelligence && (
+							<CustomerIntelligenceCard
+								data={data.customerIntelligence}
+								comparisonLabel={data.comparisonLabel}
+							/>
+						)}
+						{data.paymentAnalysis && (
+							<PaymentAnalysisCard
+								data={data.paymentAnalysis}
+								comparisonLabel={data.comparisonLabel}
+							/>
+						)}
 					</div>
 
 					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -725,7 +1058,12 @@ export default function SalesDashboardPage() {
 
 					<BusinessHealthInvestigation data={data} />
 
-					{data.dailyHealth && <DailyHealthTable metrics={data.dailyHealth} comparisonLabel={data.periods?.label} />}
+					{data.dailyHealth && (
+						<DailyHealthTable
+							metrics={data.dailyHealth}
+							comparisonLabel={data.comparisonLabel}
+						/>
+					)}
 				</>
 			)}
 		</div>

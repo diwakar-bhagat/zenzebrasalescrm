@@ -95,6 +95,8 @@ export interface ParsedSalesRow {
 	customer_mobile: string | null;
 	customer_name: string | null;
 	payment_method: string | null;
+	source_billed_by?: string;
+	store_id?: number;
 }
 
 /** Legacy CSV/header-alias upload shape */
@@ -133,6 +135,14 @@ export interface ValidationResult {
 	};
 	latestSaleDate?: string | null;
 	quarantineReasons?: string[];
+	normalizationReport?: Record<
+		string,
+		{
+			displayName: string;
+			rawSourcesCount: Record<string, number>;
+			totalRows: number;
+		}
+	>;
 }
 
 export interface LegacyValidationResult {

@@ -21,7 +21,13 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 
 export default function FounderUploadPage() {
 	const router = useRouter();
@@ -29,7 +35,9 @@ export default function FounderUploadPage() {
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [progress, setProgress] = useState(0);
 	const [validationResult, setValidationResult] = useState<any>(null);
-	const [uploadType, setUploadType] = useState<"full_replace" | "incremental">("full_replace");
+	const [uploadType, setUploadType] = useState<"full_replace" | "incremental">(
+		"full_replace",
+	);
 	const [preflight, setPreflight] = useState<{
 		hasExistingData: boolean;
 		existingRowCount: number;
@@ -155,11 +163,22 @@ export default function FounderUploadPage() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
-						<Select value={uploadType} onValueChange={(v) => setUploadType(v as "full_replace" | "incremental")}>
-							<SelectTrigger><SelectValue placeholder="Upload type" /></SelectTrigger>
+						<Select
+							value={uploadType}
+							onValueChange={(v) =>
+								setUploadType(v as "full_replace" | "incremental")
+							}
+						>
+							<SelectTrigger>
+								<SelectValue placeholder="Upload type" />
+							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="full_replace">Full replace (morning file)</SelectItem>
-								<SelectItem value="incremental">Incremental (today only)</SelectItem>
+								<SelectItem value="full_replace">
+									Full replace (morning file)
+								</SelectItem>
+								<SelectItem value="incremental">
+									Incremental (today only)
+								</SelectItem>
 							</SelectContent>
 						</Select>
 						<label
@@ -301,6 +320,52 @@ export default function FounderUploadPage() {
 													</li>
 												)}
 											</ul>
+										</div>
+									</div>
+								)}
+
+								{validationResult.normalizationReport && (
+									<div className="mt-4 border-t pt-4">
+										<h4 className="font-semibold text-sm mb-3">
+											Store Ingestion Mapping Report
+										</h4>
+										<div className="space-y-3">
+											{Object.entries(validationResult.normalizationReport).map(
+												([canonicalName, info]: [string, any]) => (
+													<div
+														key={canonicalName}
+														className="bg-muted/30 p-3 rounded-lg border border-border/50 text-sm"
+													>
+														<div className="flex justify-between items-center mb-1">
+															<span className="font-medium">
+																{info.displayName}
+															</span>
+															<Badge
+																variant="secondary"
+																className="font-semibold"
+															>
+																{info.totalRows.toLocaleString()} rows
+															</Badge>
+														</div>
+														<p className="text-xs text-muted-foreground mb-2">
+															Canonical Store: {canonicalName}
+														</p>
+														<div className="pl-2 border-l-2 border-border space-y-1">
+															{Object.entries(info.rawSourcesCount).map(
+																([rawSource, count]: [string, any]) => (
+																	<div
+																		key={rawSource}
+																		className="flex justify-between text-xs text-muted-foreground"
+																	>
+																		<span>&ldquo;{rawSource}&rdquo;</span>
+																		<span>{count.toLocaleString()} rows</span>
+																	</div>
+																),
+															)}
+														</div>
+													</div>
+												),
+											)}
 										</div>
 									</div>
 								)}

@@ -1,149 +1,257 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { BarChart3, Upload } from "lucide-react";
-
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { GlobalFilterBar } from "@/components/founder/global-filter-bar";
+import { AovBillCutsAnalysis } from "@/components/store-overview/AovBillCutsAnalysis";
+import { DiagnosisCard } from "@/components/store-overview/DiagnosisCard";
+import { ForecastCard } from "@/components/store-overview/ForecastCard";
+import { StorePerformanceTable } from "@/components/store-overview/StorePerformanceTable";
+import { TrendChart } from "@/components/store-overview/TrendChart";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFilterStore } from "@/stores/founder/filter-store";
-import { GlobalFilterBar } from "@/components/founder/global-filter-bar";
-
-import { CustomerReviews } from "./_components/customer-reviews";
-import { Inventory } from "./_components/inventory";
-import { KpiStrip } from "./_components/kpi-strip";
-import { RecentOrders } from "./_components/recent-orders";
-import { StoreTraffic } from "./_components/store-traffic";
-import { TopProducts } from "./_components/top-products";
-import { TrafficSources } from "./_components/traffic-sources";
 
 export default function Page() {
-  const router = useRouter();
-  const [data, setData] = useState<any>(null);
-  const [status, setStatus] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  
-  const { startDate, endDate, store, category, brand, sku, categoryScope } = useFilterStore();
+	const router = useRouter();
+	const [data, setData] = useState<any>(null);
+	const [status, setStatus] = useState<any>(null);
+	const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const res = await fetch("/api/sales/status");
-        const json = await res.json();
-        if (json.success) {
-          setStatus(json.data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch status", err);
-      }
-    };
+	const {
+		startDate,
+		endDate,
+		isDateFiltered,
+		store,
+		category,
+		brand,
+		sku,
+		categoryScope,
+		compareMode,
+		compareStartDate,
+		compareEndDate,
+	} = useFilterStore();
 
-    fetchStatus();
-  }, []);
+	useEffect(() => {
+		const fetchStatus = async () => {
+			try {
+				const res = await fetch("/api/sales/status");
+				const json = await res.json();
+				if (json.success) {
+					setStatus(json.data);
+				}
+			} catch (err) {
+				console.error("Failed to fetch status", err);
+			}
+		};
 
-  useEffect(() => {
-    if (!status?.hasData) return;
+		fetchStatus();
+	}, []);
 
-    const fetchDashboardData = async () => {
-      setIsLoading(true);
-      try {
-        const params = new URLSearchParams({ startDate, endDate });
-        if (store !== "ALL") params.set("store", store);
-        if (category !== "All Categories") params.set("category", category);
-        if (brand !== "All Brands") params.set("brand", brand);
-        if (sku) params.set("sku", sku);
-        if (categoryScope !== "all") params.set("categoryScope", categoryScope);
+	useEffect(() => {
+		if (!status?.hasData) return;
 
-        const res = await fetch(`/api/sales/dashboard-extended?${params.toString()}`);
-        const json = await res.json();
-        if (json.success) {
-          setData(json.data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch dashboard data", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+		const fetchDashboardData = async () => {
+			setIsLoading(true);
+			try {
+				const params = new URLSearchParams();
+				if (isDateFiltered) {
+					params.set("startDate", startDate);
+					params.set("endDate", endDate);
+					params.set("compareMode", compareMode);
+					if (compareMode === "custom") {
+						params.set("compareStartDate", compareStartDate);
+						params.set("compareEndDate", compareEndDate);
+					}
+				}
+				if (store !== "ALL") params.set("store", store);
+				if (category !== "All Categories") params.set("category", category);
+				if (brand !== "All Brands") params.set("brand", brand);
+				if (sku) params.set("sku", sku);
+				if (categoryScope !== "all") params.set("categoryScope", categoryScope);
 
-    fetchDashboardData();
-  }, [status, startDate, endDate, store, category, brand, sku, categoryScope]);
+				const res = await fetch(
+					`/api/sales/store-overview?${params.toString()}`,
+				);
+				const json = await res.json();
+				if (json.success) {
+					setData(json.data);
+				}
+			} catch (err) {
+				console.error("Failed to fetch dashboard data", err);
+			} finally {
+				setIsLoading(false);
+			}
+		};
 
-  if (!status) {
-    return <div className="p-8"><Skeleton className="h-[400px] w-full animate-pulse" /></div>;
-  }
+		fetchDashboardData();
+	}, [
+		status,
+		startDate,
+		endDate,
+		isDateFiltered,
+		store,
+		category,
+		brand,
+		sku,
+		categoryScope,
+		compareMode,
+		compareStartDate,
+		compareEndDate,
+	]);
 
-  if (!status.hasData) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 text-center space-y-6">
-        <div className="bg-muted/30 p-8 rounded-full">
-          <BarChart3 className="size-20 text-muted-foreground" />
-        </div>
-        <div className="max-w-md space-y-2">
-          <h2 className="text-2xl font-bold">Welcome to ZenZebra</h2>
-          <p className="text-muted-foreground">No data has been uploaded yet. Upload your first daily sales sheet to unlock insights.</p>
-        </div>
-        <Button size="lg" onClick={() => router.push("/dashboard/sales/upload")}>
-          <Upload className="mr-2 size-5" />
-          Upload Sales Data
-        </Button>
-      </div>
-    );
-  }
+	if (!status) {
+		return (
+			<div className="p-8">
+				<Skeleton className="h-[400px] w-full animate-pulse" />
+			</div>
+		);
+	}
 
-  const formattedDate = format(new Date(), "EEEE, do MMMM yyyy");
+	if (!status.hasData) {
+		return (
+			<div className="flex flex-col items-center justify-center min-h-[60vh] p-4 text-center space-y-6">
+				<div className="bg-muted/30 p-8 rounded-full">
+					<BarChart3 className="size-20 text-muted-foreground" />
+				</div>
+				<div className="max-w-md space-y-2">
+					<h2 className="text-2xl font-bold">Welcome to ZenZebra</h2>
+					<p className="text-muted-foreground">
+						No data has been uploaded yet. Upload your first daily sales sheet
+						to unlock insights.
+					</p>
+				</div>
+				<Button
+					size="lg"
+					onClick={() => router.push("/dashboard/sales/upload")}
+				>
+					<Upload className="mr-2 size-5" />
+					Upload Sales Data
+				</Button>
+			</div>
+		);
+	}
 
-  return (
-    <div className="flex flex-col gap-4 p-4 md:p-8 pt-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl leading-none tracking-tight font-bold">Store Overview</h1>
-          <p className="text-muted-foreground text-sm">{formattedDate}</p>
-        </div>
+	const formattedDate = format(new Date(), "EEEE, do MMMM yyyy");
 
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => router.push("/dashboard/sales/upload")}>
-            <Upload className="mr-2 size-4" />
-            Upload Data
-          </Button>
-        </div>
-      </div>
+	if (isLoading || !data) {
+		return (
+			<div className="flex flex-col gap-4 p-4 md:p-8 pt-4">
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+					<div className="flex flex-col gap-2">
+						<div className="flex flex-col gap-1">
+							<h1 className="text-3xl leading-none tracking-tight font-bold">
+								Store Command Center
+							</h1>
+							<p className="text-muted-foreground text-sm">{formattedDate}</p>
+						</div>
+						<Skeleton className="h-6 w-[280px] rounded-md" />
+					</div>
+					<div className="flex items-center gap-3">
+						<Button
+							variant="outline"
+							onClick={() => router.push("/dashboard/sales/upload")}
+						>
+							<Upload className="mr-2 size-4" />
+							Upload Data
+						</Button>
+					</div>
+				</div>
 
-      <GlobalFilterBar 
-        availableCategories={status.availableCategories || []}
-        availableBrands={status.availableBrands || []}
-      />
+				<GlobalFilterBar
+					availableCategories={status.availableCategories || []}
+					availableBrands={status.availableBrands || []}
+				/>
 
-      {isLoading || !data ? (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-12 mt-2">
-          <Skeleton className="h-[300px] xl:col-span-12 rounded-xl" />
-          <Skeleton className="h-[200px] xl:col-span-5 rounded-xl" />
-          <Skeleton className="h-[200px] xl:col-span-7 rounded-xl" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <KpiStrip data={data} />
-          <div className="xl:col-span-5">
-            <StoreTraffic data={data} />
-          </div>
-          <div className="xl:col-span-7">
-            <TrafficSources data={data} />
-          </div>
-          <div className="xl:col-span-4">
-            <TopProducts data={data} />
-          </div>
-          <div className="xl:col-span-4">
-            <Inventory data={data} />
-          </div>
-          <div className="xl:col-span-4">
-            <CustomerReviews data={data} />
-          </div>
-          <div className="xl:col-span-12">
-            <RecentOrders data={data} />
-          </div>
-        </div>
-      )}
-    </div>
-  );
+				<div className="grid gap-4 grid-cols-12 mt-2">
+					<Skeleton className="h-[380px] col-span-12 xl:col-span-8 rounded-xl" />
+					<Skeleton className="h-[380px] col-span-12 xl:col-span-4 rounded-xl" />
+					<Skeleton className="h-[320px] col-span-12 xl:col-span-8 rounded-xl" />
+					<Skeleton className="h-[320px] col-span-12 xl:col-span-4 rounded-xl" />
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="flex flex-col gap-4 p-4 md:p-8 pt-4">
+			<div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+				<div className="flex flex-col gap-2">
+					<div className="flex flex-col gap-1">
+						<h1 className="text-3xl leading-none tracking-tight font-bold">
+							Store Command Center
+						</h1>
+						<p className="text-muted-foreground text-sm">{formattedDate}</p>
+					</div>
+					{data?.context && (
+						<div className="inline-flex flex-wrap items-center gap-2 text-xs font-semibold px-2.5 py-1 rounded-md border border-border bg-muted/30 text-muted-foreground w-fit">
+							<span className="font-bold text-foreground">
+								{data.context.title.split(" vs ")[0]}
+							</span>
+							<span className="text-muted-foreground font-normal">
+								({data.context.current})
+							</span>
+							<span className="text-muted-foreground/60 font-normal px-0.5">
+								Compared with
+							</span>
+							<span className="font-semibold text-foreground">
+								{data.context.title.split(" vs ")[1]}
+							</span>
+							<span className="text-muted-foreground font-normal">
+								({data.context.previous})
+							</span>
+						</div>
+					)}
+				</div>
+
+				<div className="flex items-center gap-3">
+					<Button
+						variant="outline"
+						onClick={() => router.push("/dashboard/sales/upload")}
+					>
+						<Upload className="mr-2 size-4" />
+						Upload Data
+					</Button>
+				</div>
+			</div>
+
+			<GlobalFilterBar
+				availableCategories={status.availableCategories || []}
+				availableBrands={status.availableBrands || []}
+			/>
+
+			<div className="grid grid-cols-12 gap-4 mt-2">
+				{/* Section 1 — Store Performance Overview (8 cols) */}
+				<div className="col-span-12 xl:col-span-8">
+					<StorePerformanceTable
+						stores={data.stores}
+						comparisonLabel={data.comparisonLabel}
+					/>
+				</div>
+
+				{/* Section 2 — Expected Month End Closing Forecast (4 cols) */}
+				<div className="col-span-12 xl:col-span-4">
+					<ForecastCard stores={data.stores} />
+				</div>
+
+				{/* Section 3 — AOV & Bill Cuts Intelligence Console (12 cols) */}
+				<div className="col-span-12">
+					<AovBillCutsAnalysis stores={data.stores} />
+				</div>
+
+				{/* Section 4 — Revenue Momentum Trend (8 cols) */}
+				<div className="col-span-12 xl:col-span-8">
+					<TrendChart trends={data.trends} />
+				</div>
+
+				{/* Section 5 — Store Diagnosis Engine (4 cols) */}
+				<div className="col-span-12 xl:col-span-4">
+					<DiagnosisCard stores={data.stores} />
+				</div>
+			</div>
+		</div>
+	);
 }

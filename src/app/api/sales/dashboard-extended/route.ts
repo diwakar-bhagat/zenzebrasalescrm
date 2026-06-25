@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
         AND ($3::text IS NULL OR billed_by = $3)
         AND ($4::text IS NULL OR category = $4)
         AND ($5::text IS NULL OR brand = $5)
-        AND ($6::text IS NULL OR sku_code = $6)
+        AND ($6::text IS NULL OR (sku_code ILIKE '%' || $6 || '%' OR item_name ILIKE '%' || $6 || '%'))
         AND ($7::text[] IS NULL OR category <> ALL($7::text[]))
       GROUP BY sale_date ORDER BY sale_date ASC`;
 
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
         AND ($3::text IS NULL OR billed_by = $3)
         AND ($4::text IS NULL OR category = $4)
         AND ($5::text IS NULL OR brand = $5)
-        AND ($6::text IS NULL OR sku_code = $6)
+        AND ($6::text IS NULL OR (sku_code ILIKE '%' || $6 || '%' OR item_name ILIKE '%' || $6 || '%'))
         AND ($7::text[] IS NULL OR category <> ALL($7::text[]))
       ORDER BY sale_date DESC, id DESC LIMIT 20`;
 
@@ -94,6 +94,24 @@ export async function GET(req: NextRequest) {
 			]),
 		]);
 
+		const adaptedStorePerformance = storePerformance.map((row) => ({
+			storeDisplayName: row.name,
+			billedBy: row.billedBy,
+			revenue: row.performance.revenue.current,
+			revenueGrowth:
+				row.performance.revenue.growth === "NEW STORE"
+					? 0
+					: row.performance.revenue.growth,
+			billCuts: row.performance.billCuts.current,
+			billCutsGrowth:
+				row.performance.billCuts.growth === "NEW STORE"
+					? 0
+					: row.performance.billCuts.growth,
+			units: row.performance.units.current,
+			aov: row.performance.aov.current,
+			contributionPercent: row.contributionPercent,
+		}));
+
 		return NextResponse.json({
 			success: true,
 			data: {
@@ -102,7 +120,7 @@ export async function GET(req: NextRequest) {
 				comparisonLabel: periods.comparisonLabel,
 				salesKpis: health.salesKpis,
 				aovKpi: health.aovKpi,
-				storePerformance,
+				storePerformance: adaptedStorePerformance,
 				productPerformance: skuPerformance,
 				customers: {
 					current: customers.totalCustomers,

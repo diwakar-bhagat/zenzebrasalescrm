@@ -83,9 +83,9 @@ export const COLUMN_MAP: Record<
 		{ alias: "branch", confidence: 0.9 },
 	],
 	sku_code: [
-		{ alias: "sku", confidence: 1.0 },
-		{ alias: "code", confidence: 0.95 },
+		{ alias: "code", confidence: 1.0 },
 		{ alias: "sku_code", confidence: 1.0 },
+		{ alias: "sku", confidence: 0.5 },
 		{ alias: "barcode", confidence: 0.95 },
 		{ alias: "item_code", confidence: 0.9 },
 		{ alias: "product_id", confidence: 0.9 },

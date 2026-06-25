@@ -43,7 +43,7 @@ export async function getDailyHealthMetrics(
         AND ($3::text IS NULL OR billed_by = $3)
         AND ($4::text IS NULL OR category = $4)
         AND ($5::text IS NULL OR brand = $5)
-        AND ($6::text IS NULL OR sku_code = $6)
+        AND ($6::text IS NULL OR (sku_code ILIKE '%' || $6 || '%' OR item_name ILIKE '%' || $6 || '%'))
         AND ($7::text[] IS NULL OR category <> ALL($7::text[]))`,
 			[
 				periods.currentStart,
@@ -71,7 +71,7 @@ export async function getDailyHealthMetrics(
         AND ($3::text IS NULL OR billed_by = $3)
         AND ($4::text IS NULL OR category = $4)
         AND ($5::text IS NULL OR brand = $5)
-        AND ($6::text IS NULL OR sku_code = $6)
+        AND ($6::text IS NULL OR (sku_code ILIKE '%' || $6 || '%' OR item_name ILIKE '%' || $6 || '%'))
         AND ($7::text[] IS NULL OR category <> ALL($7::text[]))`,
 			[
 				periods.previousStart,
@@ -95,7 +95,7 @@ export async function getDailyHealthMetrics(
           AND ($3::text IS NULL OR billed_by = $3)
           AND ($4::text IS NULL OR category = $4)
           AND ($5::text IS NULL OR brand = $5)
-          AND ($6::text IS NULL OR sku_code = $6)
+          AND ($6::text IS NULL OR (sku_code ILIKE '%' || $6 || '%' OR item_name ILIKE '%' || $6 || '%'))
           AND ($7::text[] IS NULL OR category <> ALL($7::text[]))
         GROUP BY customer_mobile
         HAVING COUNT(DISTINCT bill_no) > 1

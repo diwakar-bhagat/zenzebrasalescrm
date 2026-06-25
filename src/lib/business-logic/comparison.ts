@@ -28,23 +28,48 @@ function parseISODate(value: string) {
 	return date;
 }
 
-export function getMirrorPeriod(
+export function getPreviousMonthSameRange(
 	startDate: string,
 	endDate: string,
 ): ComparisonPeriod {
 	const start = parseISODate(startDate);
 	const end = parseISODate(endDate);
-	const days = Math.ceil((end.getTime() - start.getTime()) / 86_400_000) + 1;
 
-	const prevEnd = new Date(start);
-	prevEnd.setUTCDate(prevEnd.getUTCDate() - 1);
-	const prevStart = new Date(prevEnd);
-	prevStart.setUTCDate(prevStart.getUTCDate() - (days - 1));
+	const getSameDayLastMonth = (date: Date): string => {
+		const year = date.getUTCFullYear();
+		const month = date.getUTCMonth();
+		const day = date.getUTCDate();
+
+		let prevMonth = month - 1;
+		let prevYear = year;
+		if (prevMonth < 0) {
+			prevMonth = 11;
+			prevYear--;
+		}
+
+		const lastDayOfPrevMonth = new Date(
+			Date.UTC(prevYear, prevMonth + 1, 0),
+		).getUTCDate();
+		const targetDay = Math.min(day, lastDayOfPrevMonth);
+
+		const prevDate = new Date(Date.UTC(prevYear, prevMonth, targetDay));
+		return fmt(prevDate);
+	};
 
 	return {
 		current: { startDate, endDate },
-		previous: { startDate: fmt(prevStart), endDate: fmt(prevEnd) },
+		previous: {
+			startDate: getSameDayLastMonth(start),
+			endDate: getSameDayLastMonth(end),
+		},
 	};
+}
+
+export function getMirrorPeriod(
+	startDate: string,
+	endDate: string,
+): ComparisonPeriod {
+	return getPreviousMonthSameRange(startDate, endDate);
 }
 
 export function getDefaultPeriod(): ComparisonPeriod {
@@ -55,7 +80,7 @@ export function getDefaultPeriod(): ComparisonPeriod {
 	return getMirrorPeriod(fmt(start), end);
 }
 
-function formatDateShort(dateStr: string): string {
+export function formatDateShort(dateStr: string): string {
 	try {
 		const months = [
 			"Jan",

@@ -56,7 +56,8 @@ export async function GET(req: NextRequest) {
 			const [skuRow] = await sql`
         SELECT COALESCE(MAX(item_name), ${filters.sku}) AS item_name
         FROM sales_fact_v
-        WHERE sku_code = ${filters.sku}
+        WHERE sku_code ILIKE ${"%" + filters.sku + "%"} OR item_name ILIKE ${"%" + filters.sku + "%"}
+        LIMIT 1
       `;
 			if (skuRow) {
 				skuName = skuRow.item_name;
@@ -90,6 +91,24 @@ export async function GET(req: NextRequest) {
 			dailyHealthResult.salesKpis.billCuts.previous,
 		);
 
+		const adaptedStorePerformance = storePerformance.map((row) => ({
+			storeDisplayName: row.name,
+			billedBy: row.billedBy,
+			revenue: row.performance.revenue.current,
+			revenueGrowth:
+				row.performance.revenue.growth === "NEW STORE"
+					? 0
+					: row.performance.revenue.growth,
+			billCuts: row.performance.billCuts.current,
+			billCutsGrowth:
+				row.performance.billCuts.growth === "NEW STORE"
+					? 0
+					: row.performance.billCuts.growth,
+			units: row.performance.units.current,
+			aov: row.performance.aov.current,
+			contributionPercent: row.contributionPercent,
+		}));
+
 		return NextResponse.json({
 			success: true,
 			data: {
@@ -100,7 +119,7 @@ export async function GET(req: NextRequest) {
 				dailyHealth: dailyHealthResult.metrics,
 				salesKpis: dailyHealthResult.salesKpis,
 				aovKpi: dailyHealthResult.aovKpi,
-				storePerformance,
+				storePerformance: adaptedStorePerformance,
 				brandPerformance,
 				skuPerformance,
 				billCutAnalysis,

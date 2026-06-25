@@ -260,10 +260,10 @@ export function GlobalFilterBar({
 
 					<div className="flex items-center gap-2 shrink-0">
 						<Input
-							placeholder="SKU code..."
+							placeholder="Search SKU or Name..."
 							value={sku}
 							onChange={(e) => setSku(e.target.value)}
-							className="h-9 w-[140px]"
+							className="h-9 w-[180px]"
 						/>
 						{sku && skuName && (
 							<span

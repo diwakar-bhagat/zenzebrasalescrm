@@ -3,6 +3,7 @@ import {
 	parseExcelBuffer,
 	parseResultToValidation,
 } from "@/lib/parser/excel-parser";
+import { createStoreNormalizer } from "@/lib/parser/store-normalizer";
 import type { ParsedSalesRow, ValidationResult } from "./types";
 
 type FounderSql = NeonQueryFunction<false, false>;
@@ -19,13 +20,58 @@ function chunkRows(rows: ParsedSalesRow[]) {
 }
 
 export async function validateFounderUploadFile(
+	db: FounderSql,
 	file: File,
 ): Promise<ValidationResult> {
 	const buffer = Buffer.from(await file.arrayBuffer());
 
 	try {
 		const parseResult = parseExcelBuffer(buffer);
-		return parseResultToValidation(parseResult);
+		const validationResult = parseResultToValidation(parseResult);
+
+		const normalizer = await createStoreNormalizer(db);
+
+		const normalizationReport: Record<
+			string,
+			{
+				displayName: string;
+				rawSourcesCount: Record<string, number>;
+				totalRows: number;
+			}
+		> = {};
+
+		const mappedRows: ParsedSalesRow[] = validationResult.validData.map(
+			(row) => {
+				const rawBilled = row.billed_by;
+				const mapping = normalizer.normalize(rawBilled);
+
+				if (!normalizationReport[mapping.canonicalStore]) {
+					normalizationReport[mapping.canonicalStore] = {
+						displayName: mapping.displayName,
+						rawSourcesCount: {},
+						totalRows: 0,
+					};
+				}
+
+				const storeReport = normalizationReport[mapping.canonicalStore]!;
+				storeReport.rawSourcesCount[rawBilled] =
+					(storeReport.rawSourcesCount[rawBilled] || 0) + 1;
+				storeReport.totalRows += 1;
+
+				return {
+					...row,
+					source_billed_by: rawBilled,
+					billed_by: mapping.canonicalStore,
+					store_id: mapping.storeId,
+				};
+			},
+		);
+
+		return {
+			...validationResult,
+			validData: mappedRows,
+			normalizationReport,
+		};
 	} catch (error) {
 		return {
 			isValid: false,
@@ -53,7 +99,7 @@ export async function commitFounderUploadFile(
 	file: File,
 	uploadType: UploadType = "full_replace",
 ) {
-	const validation = await validateFounderUploadFile(file);
+	const validation = await validateFounderUploadFile(db, file);
 
 	if (!validation.isValid || validation.validData.length === 0) {
 		return {
@@ -129,17 +175,29 @@ export async function commitFounderUploadFile(
       `,
 		];
 
-		for (const [index, row] of validRows.entries()) {
+		// Batch insert into staging_upload_rows in chunks of 1000
+		const stagingChunks = [];
+		for (let index = 0; index < validRows.length; index += 1000) {
+			stagingChunks.push(
+				validRows.slice(index, index + 1000).map((row, i) => ({
+					row_number: index + i + 1,
+					parsed: JSON.stringify(row),
+					status: "valid",
+				})),
+			);
+		}
+
+		for (const chunk of stagingChunks) {
 			queries.push(tx`
-        INSERT INTO staging_upload_rows (batch_id, row_number, parsed, status, error_reason)
-        VALUES (
-          ${batchId},
-          ${index + 1},
-          ${JSON.stringify(row)}::jsonb,
-          'valid',
-          NULL
-        )
-      `);
+				INSERT INTO staging_upload_rows (batch_id, row_number, parsed, status, error_reason)
+				SELECT * FROM UNNEST (
+					${chunk.map(() => batchId)}::integer[],
+					${chunk.map((r) => r.row_number)}::integer[],
+					${chunk.map((r) => r.parsed)}::jsonb[],
+					${chunk.map((r) => r.status)}::text[],
+					${chunk.map(() => null)}::text[]
+				)
+			`);
 		}
 
 		if (uploadType === "full_replace") {
@@ -172,7 +230,9 @@ export async function commitFounderUploadFile(
           net_amount,
           payment_method,
           customer_mobile,
-          customer_name
+          customer_name,
+          source_billed_by,
+          store_id
         )
         SELECT * FROM UNNEST (
           ${chunk.map(() => batchId)}::integer[],
@@ -192,7 +252,9 @@ export async function commitFounderUploadFile(
           ${chunk.map((row) => row.net_amount)}::numeric[],
           ${chunk.map((row) => row.payment_method)}::text[],
           ${chunk.map((row) => row.customer_mobile)}::text[],
-          ${chunk.map((row) => row.customer_name)}::text[]
+          ${chunk.map((row) => row.customer_name)}::text[],
+          ${chunk.map((row) => row.source_billed_by || row.billed_by)}::text[],
+          ${chunk.map((row) => row.store_id || null)}::integer[]
         )
         ON CONFLICT (sale_date, bill_no, billed_by, product_key) DO UPDATE SET
           upload_id = EXCLUDED.upload_id,
@@ -208,7 +270,9 @@ export async function commitFounderUploadFile(
           net_amount = EXCLUDED.net_amount,
           payment_method = EXCLUDED.payment_method,
           customer_mobile = EXCLUDED.customer_mobile,
-          customer_name = EXCLUDED.customer_name
+          customer_name = EXCLUDED.customer_name,
+          source_billed_by = EXCLUDED.source_billed_by,
+          store_id = EXCLUDED.store_id
       `);
 		}
 

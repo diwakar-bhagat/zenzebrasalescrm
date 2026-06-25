@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { BarChart3, Upload } from "lucide-react";
+import { AlertTriangle, BarChart3, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GlobalFilterBar } from "@/components/founder/global-filter-bar";
@@ -19,6 +19,7 @@ export default function Page() {
 	const router = useRouter();
 	const [data, setData] = useState<any>(null);
 	const [status, setStatus] = useState<any>(null);
+	const [health, setHealth] = useState<any>(null);
 	const [isLoading, setIsLoading] = useState(true);
 
 	const {
@@ -48,7 +49,20 @@ export default function Page() {
 			}
 		};
 
+		const fetchHealth = async () => {
+			try {
+				const res = await fetch("/api/data-health");
+				const json = await res.json();
+				if (json.success) {
+					setHealth(json.data);
+				}
+			} catch (err) {
+				console.error("Failed to fetch data health", err);
+			}
+		};
+
 		fetchStatus();
+		fetchHealth();
 	}, []);
 
 	useEffect(() => {
@@ -217,6 +231,38 @@ export default function Page() {
 					</Button>
 				</div>
 			</div>
+
+			{health && !health.isHealthy && (
+				<div className="flex flex-col gap-2 p-4 mb-2 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm">
+					<div className="flex items-center gap-2 font-bold">
+						<AlertTriangle className="size-4 shrink-0" />
+						Database Integrity Warnings Detected
+					</div>
+					<ul className="list-disc list-inside pl-1 space-y-1 text-xs">
+						{health.invalidStoresCount > 0 && (
+							<li>
+								<strong>Invalid Stores:</strong> Detected{" "}
+								{health.invalidStoresCount} rows from unauthorized stores (
+								{health.invalidStores.map((s: any) => s.name).join(", ")}).
+							</li>
+						)}
+						{health.duplicateBillsCount > 0 && (
+							<li>
+								<strong>Duplicate Bills:</strong> Detected{" "}
+								{health.duplicateBillsCount} duplicate invoice conflicts (same
+								bill number across different stores on the same date).
+							</li>
+						)}
+						{health.missingDatesCount > 0 && (
+							<li>
+								<strong>Data Gaps:</strong> Missing sales data for{" "}
+								{health.missingDatesCount} dates in active range (
+								{health.missingDates.slice(0, 5).join(", ")}...).
+							</li>
+						)}
+					</ul>
+				</div>
+			)}
 
 			<GlobalFilterBar
 				availableCategories={status.availableCategories || []}

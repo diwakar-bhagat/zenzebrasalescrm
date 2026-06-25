@@ -36,7 +36,7 @@ export default function FounderUploadPage() {
 	const [progress, setProgress] = useState(0);
 	const [validationResult, setValidationResult] = useState<any>(null);
 	const [uploadType, setUploadType] = useState<"full_replace" | "incremental">(
-		"full_replace",
+		"incremental",
 	);
 	const [preflight, setPreflight] = useState<{
 		hasExistingData: boolean;
@@ -107,6 +107,13 @@ export default function FounderUploadPage() {
 
 	const handleCommit = async () => {
 		if (!validationResult || !file) return;
+
+		if (uploadType === "full_replace") {
+			const confirmed = window.confirm(
+				"WARNING: You are about to perform a Full Replace Upload. This will backup and wipe all existing historical data in the sales_fact table. Are you sure you want to proceed?",
+			);
+			if (!confirmed) return;
+		}
 
 		setIsProcessing(true);
 

@@ -29,6 +29,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { resolveColumnMappings } from "@/lib/parser/excel-parser";
+import { resolvePurchaseColumnMappings } from "@/lib/parser/purchase-parser";
 
 export default function FounderUploadPage() {
 	const router = useRouter();
@@ -40,6 +41,7 @@ export default function FounderUploadPage() {
 	const [uploadType, setUploadType] = useState<"full_replace" | "incremental">(
 		"incremental",
 	);
+	const [dataType, setDataType] = useState<"sales" | "purchase">("sales");
 	const [preflight, setPreflight] = useState<{
 		hasExistingData: boolean;
 		existingRowCount: number;
@@ -73,13 +75,14 @@ export default function FounderUploadPage() {
 					try {
 						const data = new Uint8Array(e.target?.result as ArrayBuffer);
 						const workbook = XLSX.read(data, { type: "array" });
-						const worksheet = workbook.Sheets.main;
+						const sheetName = workbook.SheetNames.includes("main")
+							? "main"
+							: workbook.SheetNames[0];
+						const worksheet = sheetName
+							? workbook.Sheets[sheetName]
+							: undefined;
 						if (!worksheet) {
-							reject(
-								new Error(
-									"Sheet 'main' not found. Expected one sheet named 'main'.",
-								),
-							);
+							reject(new Error("No worksheet found in the workbook."));
 							return;
 						}
 						const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
@@ -106,8 +109,14 @@ export default function FounderUploadPage() {
 			}
 
 			// 2. Validate columns locally first
-			const firstRow = rawRows[0]!;
-			const mappingResult = resolveColumnMappings(firstRow);
+			const firstRow = rawRows[0];
+			if (!firstRow) {
+				throw new Error("No rows found in the sheet.");
+			}
+			const mappingResult =
+				dataType === "purchase"
+					? resolvePurchaseColumnMappings(firstRow)
+					: resolveColumnMappings(firstRow);
 			if (!mappingResult.isValid) {
 				throw new Error(
 					`Column mapping validation failed:\n- ${mappingResult.errors.join("\n- ")}`,
@@ -118,7 +127,7 @@ export default function FounderUploadPage() {
 			const startRes = await fetch("/api/sales/imports?mode=start_batch", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ filename: file.name }),
+				body: JSON.stringify({ filename: file.name, dataType }),
 			});
 			const startData = await startRes.json();
 			if (!startRes.ok || !startData.success) {
@@ -142,6 +151,7 @@ export default function FounderUploadPage() {
 						batchId: allocatedBatchId,
 						chunkIndex: i,
 						rows: chunkRows,
+						dataType,
 					}),
 				});
 				const chunkData = await chunkRes.json();
@@ -160,7 +170,7 @@ export default function FounderUploadPage() {
 			const valRes = await fetch("/api/sales/imports?mode=validate_batch", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ batchId: allocatedBatchId }),
+				body: JSON.stringify({ batchId: allocatedBatchId, dataType }),
 			});
 			const valData = await valRes.json();
 
@@ -168,8 +178,12 @@ export default function FounderUploadPage() {
 				setValidationResult(valData.data);
 				setProgress(95);
 
-				// Run preflight check if we have a valid date range
-				if (valData.data?.dateRange?.start && valData.data?.dateRange?.end) {
+				// Run preflight check only for sales data and if we have a valid date range
+				if (
+					dataType === "sales" &&
+					valData.data?.dateRange?.start &&
+					valData.data?.dateRange?.end
+				) {
 					try {
 						const pfRes = await fetch(
 							`/api/sales/imports/preflight?startDate=${valData.data.dateRange.start}&endDate=${valData.data.dateRange.end}`,
@@ -192,9 +206,10 @@ export default function FounderUploadPage() {
 					],
 				});
 			}
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error(err);
-			toast.error("Failed to process file: " + err.message);
+			const msg = err instanceof Error ? err.message : String(err);
+			toast.error("Failed to process file: " + msg);
 		} finally {
 			setProgress(100);
 			setIsProcessing(false);
@@ -206,7 +221,9 @@ export default function FounderUploadPage() {
 
 		if (uploadType === "full_replace") {
 			const confirmed = window.confirm(
-				"WARNING: You are about to perform a Full Replace Upload. This will backup and wipe all existing historical data in the sales_fact table. Are you sure you want to proceed?",
+				dataType === "purchase"
+					? "WARNING: You are about to perform a Full Replace Upload. This will backup and wipe all existing historical data in the purchase_fact table. Are you sure you want to proceed?"
+					: "WARNING: You are about to perform a Full Replace Upload. This will backup and wipe all existing historical data in the sales_fact table. Are you sure you want to proceed?",
 			);
 			if (!confirmed) return;
 		}
@@ -220,6 +237,7 @@ export default function FounderUploadPage() {
 				body: JSON.stringify({
 					batchId,
 					uploadType,
+					dataType,
 				}),
 			});
 
@@ -227,31 +245,43 @@ export default function FounderUploadPage() {
 
 			if (res.ok && data.success) {
 				toast.success(`Successfully imported ${data.data.rowsInserted} rows!`);
-				router.push("/dashboard/sales");
+				router.push(
+					dataType === "purchase" ? "/dashboard/ecommerce" : "/dashboard/sales",
+				);
 			} else {
 				toast.error(data.error || "Failed to commit data");
 			}
-		} catch (err: any) {
-			toast.error("Upload failed: " + err.message);
+		} catch (err: unknown) {
+			const msg = err instanceof Error ? err.message : String(err);
+			toast.error("Upload failed: " + msg);
 		} finally {
 			setIsProcessing(false);
 		}
 	};
-
 	return (
 		<div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-3xl font-bold tracking-tight">
-						Upload Sales Data
+						{dataType === "purchase"
+							? "Upload Purchase Data"
+							: "Upload Sales Data"}
 					</h2>
 					<p className="text-muted-foreground mt-1">
-						Upload your daily sales sheet to update the Sales Dashboard.
+						{dataType === "purchase"
+							? "Upload your daily purchase sheet to update the Store Overview."
+							: "Upload your daily sales sheet to update the Sales Dashboard."}
 					</p>
 				</div>
 				<Button
 					variant="outline"
-					onClick={() => router.push("/dashboard/sales")}
+					onClick={() =>
+						router.push(
+							dataType === "purchase"
+								? "/dashboard/ecommerce"
+								: "/dashboard/sales",
+						)
+					}
 				>
 					Back to Dashboard
 				</Button>
@@ -266,24 +296,53 @@ export default function FounderUploadPage() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
-						<Select
-							value={uploadType}
-							onValueChange={(v) =>
-								setUploadType(v as "full_replace" | "incremental")
-							}
-						>
-							<SelectTrigger>
-								<SelectValue placeholder="Upload type" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="full_replace">
-									Full replace (morning file)
-								</SelectItem>
-								<SelectItem value="incremental">
-									Incremental (today only)
-								</SelectItem>
-							</SelectContent>
-						</Select>
+						<div className="grid grid-cols-2 gap-4">
+							<div className="space-y-1.5">
+								<span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+									Data Type
+								</span>
+								<Select
+									value={dataType}
+									onValueChange={(v) => {
+										setDataType(v as "sales" | "purchase");
+										setValidationResult(null);
+										setPreflight(null);
+									}}
+								>
+									<SelectTrigger>
+										<SelectValue placeholder="Data type" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="sales">Sales Data</SelectItem>
+										<SelectItem value="purchase">Purchase Data</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="space-y-1.5">
+								<span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+									Upload Type
+								</span>
+								<Select
+									value={uploadType}
+									onValueChange={(v) =>
+										setUploadType(v as "full_replace" | "incremental")
+									}
+								>
+									<SelectTrigger>
+										<SelectValue placeholder="Upload type" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="full_replace">
+											Full replace (morning file)
+										</SelectItem>
+										<SelectItem value="incremental">
+											Incremental (today only)
+										</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+						</div>
+
 						<label
 							htmlFor="file-upload"
 							className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/20 p-10 text-center transition-colors hover:bg-muted/40"
@@ -407,15 +466,17 @@ export default function FounderUploadPage() {
 											<ul className="text-sm space-y-2">
 												{validationResult.errors
 													.slice(0, 10)
-													.map((err: any) => (
-														<li
-															key={`${err.rowNumber}-${err.errors?.join("|")}`}
-															className="text-amber-700"
-														>
-															<strong>Row {err.rowNumber}:</strong>{" "}
-															{err.errors?.join(", ")}
-														</li>
-													))}
+													.map(
+														(err: { rowNumber: number; errors: string[] }) => (
+															<li
+																key={`${err.rowNumber}-${err.errors?.join("|")}`}
+																className="text-amber-700"
+															>
+																<strong>Row {err.rowNumber}:</strong>{" "}
+																{err.errors?.join(", ")}
+															</li>
+														),
+													)}
 												{validationResult.errors.length > 10 && (
 													<li className="text-muted-foreground text-xs pt-2">
 														...and {validationResult.errors.length - 10} more

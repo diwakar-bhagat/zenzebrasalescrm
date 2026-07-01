@@ -412,9 +412,7 @@ export default function SalesDashboardPage() {
 		<div className="flex flex-col space-y-2 p-4 md:p-8 pt-4">
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
 				<div>
-					<h2 className="text-3xl font-bold tracking-tight">
-						Retail Profit Intelligence
-					</h2>
+					<h2 className="text-3xl font-bold tracking-tight">Sales Dashboard</h2>
 					<p className="text-muted-foreground mt-1">
 						Sales, inventory cost, and the profit you actually made
 					</p>

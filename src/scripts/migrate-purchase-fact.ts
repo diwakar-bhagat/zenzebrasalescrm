@@ -102,6 +102,18 @@ async function migrate() {
     );
   `;
 
+	console.log("Creating staging_purchase_rows table...");
+	await sql`
+    CREATE TABLE IF NOT EXISTS staging_purchase_rows (
+      id BIGSERIAL PRIMARY KEY,
+      batch_id INTEGER REFERENCES purchase_batches(id) ON DELETE CASCADE,
+      row_number INTEGER,
+      parsed JSONB NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('valid', 'quarantined')),
+      error_reason TEXT
+    );
+  `;
+
 	console.log("✅ purchase_fact schema migration completed successfully.");
 }
 

@@ -21,6 +21,7 @@ import { formatCurrency } from "@/lib/utils";
 export interface TrendStore {
 	name: string;
 	revenue: number;
+	purchase?: number;
 }
 
 export interface TrendRow {
@@ -86,10 +87,13 @@ export function TrendChart({ trends }: TrendChartProps) {
 	// 5. Construct Recharts data shape
 	const chartData = React.useMemo(() => {
 		return trends.map((row) => {
-			const obj: any = { date: row.date };
+			const obj: Record<string, string | number> = { date: row.date };
 			for (const store of row.stores) {
 				if (selectedStores.includes(store.name)) {
 					obj[store.name] = store.revenue;
+					if (store.purchase !== undefined) {
+						obj[store.name + " (Purchase)"] = store.purchase;
+					}
 				}
 			}
 			return obj;
@@ -236,16 +240,28 @@ export function TrendChart({ trends }: TrendChartProps) {
 								}
 							/>
 							{selectedStores.map((name) => (
-								<Line
-									key={name}
-									connectNulls
-									dataKey={name}
-									stroke={storeColors[name]}
-									strokeWidth={2}
-									dot={false}
-									activeDot={{ r: 4 }}
-									name={name}
-								/>
+								<React.Fragment key={name}>
+									<Line
+										connectNulls
+										dataKey={name}
+										stroke={storeColors[name]}
+										strokeWidth={2}
+										dot={false}
+										activeDot={{ r: 4 }}
+										name={name + " (Sales)"}
+									/>
+									<Line
+										connectNulls
+										dataKey={name + " (Purchase)"}
+										stroke={storeColors[name]}
+										strokeOpacity={0.6}
+										strokeWidth={2}
+										strokeDasharray="5 5"
+										dot={false}
+										activeDot={{ r: 4 }}
+										name={name + " (Purchase)"}
+									/>
+								</React.Fragment>
 							))}
 						</LineChart>
 					</ChartContainer>

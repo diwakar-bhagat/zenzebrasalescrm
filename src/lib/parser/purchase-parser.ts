@@ -209,7 +209,6 @@ export function resolvePurchaseColumnMappings(
 
 export function parsePurchaseExcelBuffer(buffer: Buffer): PurchaseParseResult {
 	const workbook = XLSX.read(buffer, { type: "buffer" });
-	// Prefer a sheet named "main"; otherwise fall back to the first sheet.
 	const sheetName = workbook.SheetNames.includes("main")
 		? "main"
 		: workbook.SheetNames[0];
@@ -224,6 +223,12 @@ export function parsePurchaseExcelBuffer(buffer: Buffer): PurchaseParseResult {
 		defval: null,
 	});
 
+	return parsePurchaseRawRows(rawRows);
+}
+
+export function parsePurchaseRawRows(
+	rawRows: Record<string, unknown>[],
+): PurchaseParseResult {
 	if (rawRows.length === 0) {
 		return {
 			rows: [],
@@ -234,7 +239,10 @@ export function parsePurchaseExcelBuffer(buffer: Buffer): PurchaseParseResult {
 		};
 	}
 
-	const firstRow = rawRows[0]!;
+	const firstRow = rawRows[0];
+	if (!firstRow) {
+		throw new Error("No rows found in the sheet.");
+	}
 	const mappingResult = resolvePurchaseColumnMappings(firstRow);
 	if (!mappingResult.isValid) {
 		throw new Error(
@@ -243,23 +251,25 @@ export function parsePurchaseExcelBuffer(buffer: Buffer): PurchaseParseResult {
 	}
 
 	const resolved = mappingResult.mappings;
+	const purchaseDateCol = resolved.purchase_date?.matchedColumn;
+	const itemNameCol = resolved.item_name?.matchedColumn;
+	const quantityCol = resolved.quantity?.matchedColumn;
+	const netPurchaseCol = resolved.net_purchase_amount?.matchedColumn;
+
+	if (!purchaseDateCol || !itemNameCol || !quantityCol || !netPurchaseCol) {
+		throw new Error("Required purchase columns mapping definition is missing.");
+	}
+
 	const rows: ParsedPurchaseRow[] = [];
 	const quarantine_reasons: string[] = [];
 	let quarantined = 0;
 	const dates: string[] = [];
 
 	for (const raw of rawRows) {
-		const dateRaw = String(
-			raw[resolved.purchase_date!.matchedColumn] ?? "",
-		).trim();
-		const itemName = String(
-			raw[resolved.item_name!.matchedColumn] ?? "",
-		).trim();
-		const quantity = Number(raw[resolved.quantity!.matchedColumn]);
-
-		const netPurchase = Number(
-			raw[resolved.net_purchase_amount!.matchedColumn],
-		);
+		const dateRaw = String(raw[purchaseDateCol] ?? "").trim();
+		const itemName = String(raw[itemNameCol] ?? "").trim();
+		const quantity = Number(raw[quantityCol]);
+		const netPurchase = Number(raw[netPurchaseCol]);
 
 		// Tax with fallback (derive from gross - net when possible).
 		let taxAmount = resolved.tax_amount

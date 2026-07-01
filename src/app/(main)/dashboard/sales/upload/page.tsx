@@ -28,10 +28,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { resolveColumnMappings } from "@/lib/parser/excel-parser";
 
 export default function FounderUploadPage() {
 	const router = useRouter();
 	const [file, setFile] = useState<File | null>(null);
+	const [batchId, setBatchId] = useState<number | null>(null);
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [progress, setProgress] = useState(0);
 	const [validationResult, setValidationResult] = useState<any>(null);
@@ -57,30 +59,120 @@ export default function FounderUploadPage() {
 		if (!file) return;
 
 		setIsProcessing(true);
-		setProgress(10);
+		setProgress(5);
 		setValidationResult(null);
+		setPreflight(null);
 
 		try {
-			const formData = new FormData();
-			formData.append("file", file);
-			setProgress(40);
+			// 1. Read file in browser using SheetJS
+			const XLSX = await import("xlsx");
+			const reader = new FileReader();
 
-			const res = await fetch("/api/sales/imports?mode=validate", {
-				method: "POST",
-				body: formData,
+			const parsePromise = new Promise<any[]>((resolve, reject) => {
+				reader.onload = (e) => {
+					try {
+						const data = new Uint8Array(e.target?.result as ArrayBuffer);
+						const workbook = XLSX.read(data, { type: "array" });
+						const worksheet = workbook.Sheets.main;
+						if (!worksheet) {
+							reject(
+								new Error(
+									"Sheet 'main' not found. Expected one sheet named 'main'.",
+								),
+							);
+							return;
+						}
+						const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+							worksheet,
+							{
+								raw: true,
+								defval: null,
+							},
+						);
+						resolve(rawRows);
+					} catch (err) {
+						reject(err);
+					}
+				};
+				reader.onerror = () => reject(new Error("File reading failed."));
+				reader.readAsArrayBuffer(file);
 			});
 
-			setProgress(80);
-			const data = await res.json();
+			const rawRows = await parsePromise;
+			setProgress(15);
 
-			if (res.ok && data.success) {
-				setValidationResult(data.data);
+			if (rawRows.length === 0) {
+				throw new Error("Excel sheet is empty.");
+			}
+
+			// 2. Validate columns locally first
+			const firstRow = rawRows[0]!;
+			const mappingResult = resolveColumnMappings(firstRow);
+			if (!mappingResult.isValid) {
+				throw new Error(
+					`Column mapping validation failed:\n- ${mappingResult.errors.join("\n- ")}`,
+				);
+			}
+
+			// 3. Start batch on server
+			const startRes = await fetch("/api/sales/imports?mode=start_batch", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ filename: file.name }),
+			});
+			const startData = await startRes.json();
+			if (!startRes.ok || !startData.success) {
+				throw new Error(startData.error || "Failed to start upload batch.");
+			}
+
+			const allocatedBatchId = startData.data.batchId;
+			setBatchId(allocatedBatchId);
+			setProgress(20);
+
+			// 4. Upload in chunks
+			const CHUNK_SIZE = 2000;
+			const totalChunks = Math.ceil(rawRows.length / CHUNK_SIZE);
+
+			for (let i = 0; i < totalChunks; i++) {
+				const chunkRows = rawRows.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+				const chunkRes = await fetch("/api/sales/imports?mode=upload_chunk", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						batchId: allocatedBatchId,
+						chunkIndex: i,
+						rows: chunkRows,
+					}),
+				});
+				const chunkData = await chunkRes.json();
+				if (!chunkRes.ok || !chunkData.success) {
+					throw new Error(
+						chunkData.error || `Failed to upload chunk ${i + 1}.`,
+					);
+				}
+
+				const chunkProgress = 20 + Math.round(((i + 1) / totalChunks) * 60);
+				setProgress(chunkProgress);
+			}
+
+			// 5. Run validation on staged batch
+			setProgress(85);
+			const valRes = await fetch("/api/sales/imports?mode=validate_batch", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ batchId: allocatedBatchId }),
+			});
+			const valData = await valRes.json();
+
+			if (valRes.ok && valData.success) {
+				setValidationResult(valData.data);
+				setProgress(95);
 
 				// Run preflight check if we have a valid date range
-				if (data.data?.dateRange?.start && data.data?.dateRange?.end) {
+				if (valData.data?.dateRange?.start && valData.data?.dateRange?.end) {
 					try {
 						const pfRes = await fetch(
-							`/api/sales/imports/preflight?startDate=${data.data.dateRange.start}&endDate=${data.data.dateRange.end}`,
+							`/api/sales/imports/preflight?startDate=${valData.data.dateRange.start}&endDate=${valData.data.dateRange.end}`,
 						);
 						const pfData = await pfRes.json();
 						if (pfData.success) setPreflight(pfData.data);
@@ -89,16 +181,20 @@ export default function FounderUploadPage() {
 					}
 				}
 			} else {
-				toast.error(data.error || "Validation failed");
+				toast.error(valData.error || "Validation failed");
 				setValidationResult({
 					errors: [
-						{ row: 0, field: "system", error: data.error || "Unknown error" },
+						{
+							row: 0,
+							field: "system",
+							error: valData.error || "Unknown error",
+						},
 					],
 				});
 			}
 		} catch (err: any) {
 			console.error(err);
-			toast.error("Failed to parse file: " + err.message);
+			toast.error("Failed to process file: " + err.message);
 		} finally {
 			setProgress(100);
 			setIsProcessing(false);
@@ -106,7 +202,7 @@ export default function FounderUploadPage() {
 	};
 
 	const handleCommit = async () => {
-		if (!validationResult || !file) return;
+		if (!validationResult || !batchId) return;
 
 		if (uploadType === "full_replace") {
 			const confirmed = window.confirm(
@@ -118,13 +214,13 @@ export default function FounderUploadPage() {
 		setIsProcessing(true);
 
 		try {
-			const formData = new FormData();
-			formData.append("file", file);
-			formData.append("uploadType", uploadType);
-
-			const res = await fetch("/api/sales/imports?mode=commit", {
+			const res = await fetch("/api/sales/imports?mode=commit_batch", {
 				method: "POST",
-				body: formData,
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					batchId,
+					uploadType,
+				}),
 			});
 
 			const data = await res.json();

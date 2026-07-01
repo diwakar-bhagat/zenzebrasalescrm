@@ -2,7 +2,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import {
 	commitFounderUploadFile,
+	commitStagedFounderUpload,
+	stageFounderUploadChunk,
+	startFounderUploadBatch,
 	validateFounderUploadFile,
+	validateStagedFounderUpload,
 } from "@/lib/founder/import-service";
 
 export const runtime = "nodejs";
@@ -38,6 +42,78 @@ export async function GET() {
 export async function POST(req: NextRequest) {
 	try {
 		const mode = req.nextUrl.searchParams.get("mode") ?? "validate";
+
+		if (mode === "start_batch") {
+			const body = await req.json();
+			const filename = body.filename ?? "upload.xlsx";
+			const batchId = await startFounderUploadBatch(sql, filename);
+			return NextResponse.json({ success: true, data: { batchId } });
+		}
+
+		if (mode === "upload_chunk") {
+			const body = await req.json();
+			const { batchId, chunkIndex, rows } = body;
+			if (!batchId || chunkIndex === undefined || !rows) {
+				return NextResponse.json(
+					{ success: false, error: "Missing required parameters" },
+					{ status: 400 },
+				);
+			}
+			await stageFounderUploadChunk(
+				sql,
+				Number(batchId),
+				Number(chunkIndex),
+				rows,
+			);
+			return NextResponse.json({ success: true });
+		}
+
+		if (mode === "validate_batch") {
+			const body = await req.json();
+			const { batchId } = body;
+			if (!batchId) {
+				return NextResponse.json(
+					{ success: false, error: "Missing batchId" },
+					{ status: 400 },
+				);
+			}
+			const validation = await validateStagedFounderUpload(
+				sql,
+				Number(batchId),
+			);
+			return NextResponse.json({ success: true, data: validation });
+		}
+
+		if (mode === "commit_batch") {
+			const body = await req.json();
+			const { batchId, uploadType } = body;
+			if (!batchId) {
+				return NextResponse.json(
+					{ success: false, error: "Missing batchId" },
+					{ status: 400 },
+				);
+			}
+			const result = await commitStagedFounderUpload(
+				sql,
+				Number(batchId),
+				uploadType === "incremental" ? "incremental" : "full_replace",
+			);
+			if (!result.success) {
+				return NextResponse.json(
+					{ success: false, error: result.error, data: result.validation },
+					{ status: 400 },
+				);
+			}
+			return NextResponse.json({
+				success: true,
+				data: {
+					batchId: result.batchId,
+					rowsInserted: result.rowsInserted,
+					...result.validation,
+				},
+			});
+		}
+
 		const formData = await req.formData();
 		const file = formData.get("file");
 

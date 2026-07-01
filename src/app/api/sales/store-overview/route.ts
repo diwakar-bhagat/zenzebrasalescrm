@@ -6,6 +6,7 @@ import {
 	getComparisonPeriods,
 	getDefaultPeriod,
 } from "@/lib/business-logic/comparison";
+import { getStoreProfitability } from "@/lib/business-logic/profitability";
 import { getStoreCommandDefaultPeriod } from "@/lib/business-logic/store-command-period";
 import { diagnoseStore } from "@/lib/business-logic/store-diagnosis";
 import { getStoreForecast } from "@/lib/business-logic/store-forecast";
@@ -115,6 +116,16 @@ export async function GET(req: NextRequest) {
 		// 1. Get store performance comparison
 		const performances = await getStorePerformance(sql, periods, filters);
 
+		// 1.1 Profit Intelligence — net sales, net purchase, gross profit, margin %
+		const storeProfitability = await getStoreProfitability(
+			sql,
+			periods,
+			filters,
+		);
+		const profitByBilledBy = new Map(
+			storeProfitability.map((s) => [s.billedBy, s]),
+		);
+
 		// 1.5 Get store AOV/Bills history
 		const aovBillsHistory = await getStoreAovBillsHistory(
 			sql,
@@ -146,9 +157,17 @@ export async function GET(req: NextRequest) {
 					revenueDriver: "",
 				};
 
+				const profit = profitByBilledBy.get(perf.billedBy);
+
 				return {
 					name: perf.name,
 					billedBy: perf.billedBy,
+					// Profit Intelligence — net sales / net purchase / gross profit / margin %
+					netSales: profit?.netSales ?? perf.performance.revenue.current,
+					netPurchase: profit?.netPurchase ?? 0,
+					grossProfit: profit?.grossProfit ?? perf.performance.revenue.current,
+					marginPercent: profit?.marginPercent ?? null,
+					hasPurchase: profit?.hasPurchase ?? false,
 					// Flattened metrics for the final production schema
 					currentRevenue: perf.performance.revenue.current,
 					previousRevenue: perf.performance.revenue.previous,
@@ -283,6 +302,7 @@ export async function GET(req: NextRequest) {
 					},
 				},
 				comparisonLabel: periods.comparisonLabel,
+				hasPurchaseData: storeProfitability.some((s) => s.hasPurchase),
 				stores: storesData,
 				trends,
 			},

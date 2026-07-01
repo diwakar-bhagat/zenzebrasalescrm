@@ -22,11 +22,12 @@ import {
 import {
 	AovAnalysisTable,
 	BillCutAnalysisTable,
-	BrandPerformanceTable,
+	BrandProfitabilityTable,
+	CategoryProfitabilityTable,
 	CustomerIntelligenceCard,
 	DailyHealthTable,
 	PaymentAnalysisCard,
-	SkuPerformanceTable,
+	SkuProfitabilityTable,
 } from "@/components/founder/sales-dashboard-sections";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -411,8 +412,12 @@ export default function SalesDashboardPage() {
 		<div className="flex flex-col space-y-2 p-4 md:p-8 pt-4">
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
 				<div>
-					<h2 className="text-3xl font-bold tracking-tight">Sales Dashboard</h2>
-					<p className="text-muted-foreground mt-1">System of Attention</p>
+					<h2 className="text-3xl font-bold tracking-tight">
+						Retail Profit Intelligence
+					</h2>
+					<p className="text-muted-foreground mt-1">
+						Sales, inventory cost, and the profit you actually made
+					</p>
 				</div>
 				<div className="flex items-center gap-3">
 					<DataFreshnessSystem />
@@ -570,6 +575,88 @@ export default function SalesDashboardPage() {
 							</CardContent>
 						</Card>
 					</div>
+
+					{/* 1.2 Profit Intelligence — the core question: what did we actually make? */}
+					{data.profitability && (
+						<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4">
+							<Card>
+								<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+									<CardTitle className="text-sm font-medium">
+										Net Sales
+									</CardTitle>
+									<IndianRupee className="size-4 text-muted-foreground" />
+								</CardHeader>
+								<CardContent>
+									<div className="text-2xl font-bold">
+										{formatCurrency(data.profitability.netSales)}
+									</div>
+									<p className="text-xs text-muted-foreground mt-1">
+										Taxable revenue (GST removed)
+									</p>
+								</CardContent>
+							</Card>
+							<Card>
+								<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+									<CardTitle className="text-sm font-medium">
+										Net Purchase
+									</CardTitle>
+									<ShoppingCart className="size-4 text-muted-foreground" />
+								</CardHeader>
+								<CardContent>
+									<div className="text-2xl font-bold">
+										{data.hasPurchaseData
+											? formatCurrency(data.profitability.netPurchase)
+											: "N/A"}
+									</div>
+									<p className="text-xs text-muted-foreground mt-1">
+										{data.hasPurchaseData
+											? "Inventory cost of goods"
+											: "Purchase data unavailable"}
+									</p>
+								</CardContent>
+							</Card>
+							<Card>
+								<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+									<CardTitle className="text-sm font-medium">
+										Gross Profit
+									</CardTitle>
+									<TrendingUp className="size-4 text-muted-foreground" />
+								</CardHeader>
+								<CardContent>
+									<div
+										className={`text-2xl font-bold ${data.hasPurchaseData && data.profitability.grossProfit < 0 ? "text-status-delayed" : ""}`}
+									>
+										{data.hasPurchaseData
+											? formatCurrency(data.profitability.grossProfit)
+											: "N/A"}
+									</div>
+									<p className="text-xs text-muted-foreground mt-1">
+										Net Sales − Net Purchase
+									</p>
+								</CardContent>
+							</Card>
+							<Card>
+								<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+									<CardTitle className="text-sm font-medium">
+										Margin %
+									</CardTitle>
+									<Percent className="size-4 text-muted-foreground" />
+								</CardHeader>
+								<CardContent>
+									<div className="text-2xl font-bold">
+										{data.profitability.marginPercent == null
+											? "N/A"
+											: `${safeFixed(data.profitability.marginPercent)}%`}
+									</div>
+									<p className="text-xs text-muted-foreground mt-1">
+										{data.profitability.profitPerBill == null
+											? "Gross Profit / Net Sales"
+											: `${formatCurrency(data.profitability.profitPerBill)} profit / bill`}
+									</p>
+								</CardContent>
+							</Card>
+						</div>
+					)}
 
 					{/* 1.5 Financial Operations Analysis & Waterfall Chart */}
 					<div className="grid gap-4 md:grid-cols-3 mt-4">
@@ -862,6 +949,36 @@ export default function SalesDashboardPage() {
 													{storeKpi.units.toLocaleString()}
 												</p>
 											</div>
+											<div className="bg-muted/30 p-3 rounded-lg border">
+												<p className="text-xs text-muted-foreground">
+													Net Purchase
+												</p>
+												<p className="text-lg font-bold mt-1">
+													{storeKpi.hasPurchase
+														? formatCurrency(storeKpi.netPurchase)
+														: "N/A"}
+												</p>
+											</div>
+											<div className="bg-muted/30 p-3 rounded-lg border">
+												<p className="text-xs text-muted-foreground">
+													Gross Profit
+												</p>
+												<p
+													className={`text-lg font-bold mt-1 ${storeKpi.hasPurchase && storeKpi.grossProfit < 0 ? "text-status-delayed" : ""}`}
+												>
+													{storeKpi.hasPurchase
+														? formatCurrency(storeKpi.grossProfit)
+														: "N/A"}
+												</p>
+											</div>
+											<div className="bg-muted/30 p-3 rounded-lg border">
+												<p className="text-xs text-muted-foreground">Margin</p>
+												<p className="text-lg font-bold mt-1">
+													{storeKpi.marginPercent == null
+														? "N/A"
+														: `${safeFixed(storeKpi.marginPercent)}%`}
+												</p>
+											</div>
 										</CardContent>
 									</Card>
 								);
@@ -893,7 +1010,10 @@ export default function SalesDashboardPage() {
 											const exportData = data.storePerformance.map(
 												(row: any) => ({
 													Store: row.storeDisplayName,
-													Revenue: row.revenue,
+													"Net Sales": row.netSales ?? row.revenue,
+													"Net Purchase": row.netPurchase,
+													"Gross Profit": row.grossProfit,
+													"Margin (%)": row.marginPercent,
 													"Growth (%)": row.revenueGrowth,
 													"Contribution (%)": row.contributionPercent,
 													"Bill Cuts": row.billCuts,
@@ -916,7 +1036,16 @@ export default function SalesDashboardPage() {
 											<tr>
 												<th className="px-4 py-3 font-medium">Store</th>
 												<th className="px-4 py-3 font-medium text-right">
-													Revenue
+													Net Sales
+												</th>
+												<th className="px-4 py-3 font-medium text-right">
+													Net Purchase
+												</th>
+												<th className="px-4 py-3 font-medium text-right">
+													Gross Profit
+												</th>
+												<th className="px-4 py-3 font-medium text-right">
+													Margin
 												</th>
 												<th className="px-4 py-3 font-medium text-right">
 													Growth
@@ -938,6 +1067,11 @@ export default function SalesDashboardPage() {
 													billedBy: string;
 													storeDisplayName: string;
 													revenue: number;
+													netSales: number;
+													netPurchase: number;
+													grossProfit: number;
+													marginPercent: number | null;
+													hasPurchase: boolean;
 													revenueGrowth: number;
 													contributionPercent: number;
 													billCuts: number;
@@ -951,7 +1085,26 @@ export default function SalesDashboardPage() {
 															{storeRow.storeDisplayName}
 														</td>
 														<td className="px-4 py-3 text-right font-semibold">
-															{formatCurrency(storeRow.revenue)}
+															{formatCurrency(
+																storeRow.netSales ?? storeRow.revenue,
+															)}
+														</td>
+														<td className="px-4 py-3 text-right">
+															{storeRow.hasPurchase
+																? formatCurrency(storeRow.netPurchase)
+																: "N/A"}
+														</td>
+														<td
+															className={`px-4 py-3 text-right font-semibold ${storeRow.hasPurchase && storeRow.grossProfit < 0 ? "text-status-delayed" : ""}`}
+														>
+															{storeRow.hasPurchase
+																? formatCurrency(storeRow.grossProfit)
+																: "N/A"}
+														</td>
+														<td className="px-4 py-3 text-right">
+															{storeRow.marginPercent == null
+																? "N/A"
+																: `${safeFixed(storeRow.marginPercent)}%`}
 														</td>
 														<td
 															className={`px-4 py-3 text-right ${storeRow.revenueGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}
@@ -990,17 +1143,27 @@ export default function SalesDashboardPage() {
 						</Card>
 					)}
 
+					{data.categoryProfitability && (
+						<CategoryProfitabilityTable
+							data={data.categoryProfitability}
+							comparisonLabel={data.comparisonLabel}
+							hasPurchaseData={data.hasPurchaseData}
+						/>
+					)}
+
 					<div className="grid gap-4 md:grid-cols-2">
-						{data.brandPerformance && (
-							<BrandPerformanceTable
-								data={data.brandPerformance}
+						{data.brandProfitability && (
+							<BrandProfitabilityTable
+								data={data.brandProfitability}
 								comparisonLabel={data.comparisonLabel}
+								hasPurchaseData={data.hasPurchaseData}
 							/>
 						)}
-						{data.skuPerformance && (
-							<SkuPerformanceTable
-								data={data.skuPerformance}
+						{data.skuProfitability && (
+							<SkuProfitabilityTable
+								data={data.skuProfitability}
 								comparisonLabel={data.comparisonLabel}
+								hasPurchaseData={data.hasPurchaseData}
 							/>
 						)}
 						{data.billCutAnalysis && (

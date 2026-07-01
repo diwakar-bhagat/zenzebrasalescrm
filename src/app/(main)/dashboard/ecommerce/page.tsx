@@ -275,6 +275,7 @@ export default function Page() {
 					<StorePerformanceTable
 						stores={data.stores}
 						comparisonLabel={data.comparisonLabel}
+						hasPurchaseData={data.hasPurchaseData}
 					/>
 				</div>
 

@@ -515,17 +515,18 @@ export default function FounderUploadPage() {
 															Canonical Store: {canonicalName}
 														</p>
 														<div className="pl-2 border-l-2 border-border space-y-1">
-															{Object.entries(info.rawSourcesCount).map(
-																([rawSource, count]: [string, any]) => (
-																	<div
-																		key={rawSource}
-																		className="flex justify-between text-xs text-muted-foreground"
-																	>
-																		<span>&ldquo;{rawSource}&rdquo;</span>
-																		<span>{count.toLocaleString()} rows</span>
-																	</div>
-																),
-															)}
+															{info.rawSourcesCount &&
+																Object.entries(info.rawSourcesCount).map(
+																	([rawSource, count]: [string, any]) => (
+																		<div
+																			key={rawSource}
+																			className="flex justify-between text-xs text-muted-foreground"
+																		>
+																			<span>&ldquo;{rawSource}&rdquo;</span>
+																			<span>{count.toLocaleString()} rows</span>
+																		</div>
+																	),
+																)}
 														</div>
 													</div>
 												),

@@ -22,7 +22,11 @@ export interface PurchaseImportResult {
 	netPurchase?: number;
 	normalizationReport?: Record<
 		string,
-		{ displayName: string; totalRows: number }
+		{
+			displayName: string;
+			rawSourcesCount: Record<string, number>;
+			totalRows: number;
+		}
 	>;
 	_validatedRows?: ParsedPurchaseRow[];
 }
@@ -74,7 +78,11 @@ export async function commitPurchaseUploadFile(
 	const normalizer = await createStoreNormalizer(db);
 	const normalizationReport: Record<
 		string,
-		{ displayName: string; totalRows: number }
+		{
+			displayName: string;
+			rawSourcesCount: Record<string, number>;
+			totalRows: number;
+		}
 	> = {};
 
 	const mappedRows: ParsedPurchaseRow[] = parsed.rows.map((row) => {
@@ -83,11 +91,14 @@ export async function commitPurchaseUploadFile(
 		if (!normalizationReport[mapping.canonicalStore]) {
 			normalizationReport[mapping.canonicalStore] = {
 				displayName: mapping.displayName,
+				rawSourcesCount: {},
 				totalRows: 0,
 			};
 		}
 		const reportItem = normalizationReport[mapping.canonicalStore];
 		if (reportItem) {
+			reportItem.rawSourcesCount[rawBilled] =
+				(reportItem.rawSourcesCount[rawBilled] || 0) + 1;
 			reportItem.totalRows += 1;
 		}
 		return {
@@ -262,7 +273,11 @@ export async function validateStagedPurchaseUpload(
 		const normalizer = await createStoreNormalizer(db);
 		const normalizationReport: Record<
 			string,
-			{ displayName: string; totalRows: number }
+			{
+				displayName: string;
+				rawSourcesCount: Record<string, number>;
+				totalRows: number;
+			}
 		> = {};
 
 		const mappedRows: ParsedPurchaseRow[] = parsed.rows.map((row) => {
@@ -271,11 +286,14 @@ export async function validateStagedPurchaseUpload(
 			if (!normalizationReport[mapping.canonicalStore]) {
 				normalizationReport[mapping.canonicalStore] = {
 					displayName: mapping.displayName,
+					rawSourcesCount: {},
 					totalRows: 0,
 				};
 			}
 			const reportItem = normalizationReport[mapping.canonicalStore];
 			if (reportItem) {
+				reportItem.rawSourcesCount[rawBilled] =
+					(reportItem.rawSourcesCount[rawBilled] || 0) + 1;
 				reportItem.totalRows += 1;
 			}
 			return {

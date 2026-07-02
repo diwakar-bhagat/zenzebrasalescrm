@@ -9,6 +9,12 @@ import {
 	validateStagedFounderUpload,
 } from "@/lib/founder/import-service";
 import {
+	commitStagedInventoryUpload,
+	stageInventoryUploadChunk,
+	startInventoryUploadBatch,
+	validateStagedInventoryUpload,
+} from "@/lib/founder/inventory-import-service";
+import {
 	commitPurchaseUploadFile,
 	commitStagedPurchaseUpload,
 	stagePurchaseUploadChunk,
@@ -56,9 +62,11 @@ export async function POST(req: NextRequest) {
 			const dataType = body.dataType ?? "sales";
 
 			const batchId =
-				dataType === "purchase"
-					? await startPurchaseUploadBatch(sql, filename)
-					: await startFounderUploadBatch(sql, filename);
+				dataType === "inventory"
+					? (await startInventoryUploadBatch(sql, filename)).data.batchId
+					: dataType === "purchase"
+						? await startPurchaseUploadBatch(sql, filename)
+						: await startFounderUploadBatch(sql, filename);
 
 			return NextResponse.json({ success: true, data: { batchId } });
 		}
@@ -73,7 +81,14 @@ export async function POST(req: NextRequest) {
 				);
 			}
 
-			if (dataType === "purchase") {
+			if (dataType === "inventory") {
+				await stageInventoryUploadChunk(
+					sql,
+					Number(batchId),
+					Number(chunkIndex),
+					rows,
+				);
+			} else if (dataType === "purchase") {
 				await stagePurchaseUploadChunk(
 					sql,
 					Number(batchId),
@@ -102,9 +117,11 @@ export async function POST(req: NextRequest) {
 			}
 
 			const validation =
-				dataType === "purchase"
-					? await validateStagedPurchaseUpload(sql, Number(batchId))
-					: await validateStagedFounderUpload(sql, Number(batchId));
+				dataType === "inventory"
+					? await validateStagedInventoryUpload(sql, Number(batchId))
+					: dataType === "purchase"
+						? await validateStagedPurchaseUpload(sql, Number(batchId))
+						: await validateStagedFounderUpload(sql, Number(batchId));
 
 			return NextResponse.json({ success: true, data: validation });
 		}
@@ -123,9 +140,11 @@ export async function POST(req: NextRequest) {
 				uploadType === "incremental" ? "incremental" : "full_replace";
 
 			const result =
-				dataType === "purchase"
-					? await commitStagedPurchaseUpload(sql, Number(batchId), typeParam)
-					: await commitStagedFounderUpload(sql, Number(batchId), typeParam);
+				dataType === "inventory"
+					? await commitStagedInventoryUpload(sql, Number(batchId), typeParam)
+					: dataType === "purchase"
+						? await commitStagedPurchaseUpload(sql, Number(batchId), typeParam)
+						: await commitStagedFounderUpload(sql, Number(batchId), typeParam);
 
 			if (!result.success) {
 				return NextResponse.json(

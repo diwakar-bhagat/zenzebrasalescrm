@@ -13,24 +13,25 @@ export function toNumber(value: unknown): number {
 	return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function grossProfit(netSales: number, netPurchase: number): number {
-	return toNumber(netSales) - toNumber(netPurchase);
+export function grossProfit(netSales: number, cogs: number): number {
+	return toNumber(netSales) - toNumber(cogs);
 }
 
 /**
  * Margin percent. Returns null when it cannot be meaningfully computed:
  *  - net sales is zero (division by zero)
- *  - there is no purchase data at all (netPurchase === 0 && !hasPurchase)
+ *  - there is no purchase/cost data at all (cost === 0 && !hasPurchase)
  */
 export function marginPercent(
 	netSales: number,
-	netPurchase: number,
+	cogs: number,
 	hasPurchase = true,
 ): number | null {
 	const sales = toNumber(netSales);
 	if (sales <= 0) return null;
-	if (!hasPurchase) return null;
-	const profit = grossProfit(sales, netPurchase);
+	const cost = toNumber(cogs);
+	if (!hasPurchase && cost <= 0) return null;
+	const profit = grossProfit(sales, cost);
 	return Math.round((profit / sales) * 1000) / 10;
 }
 
@@ -45,6 +46,7 @@ export function profitPerBill(profit: number, billCuts: number): number | null {
 export interface ProfitabilityBlock {
 	netSales: number;
 	netPurchase: number;
+	estimatedCogs: number;
 	grossProfit: number;
 	marginPercent: number | null;
 	hasPurchase: boolean;
@@ -52,17 +54,20 @@ export interface ProfitabilityBlock {
 
 export function buildProfitability(
 	netSales: unknown,
+	cogs: unknown,
 	netPurchase: unknown,
 	hasPurchase = true,
 ): ProfitabilityBlock {
 	const sales = toNumber(netSales);
+	const cost = toNumber(cogs);
 	const purchase = toNumber(netPurchase);
-	const has = hasPurchase && purchase > 0;
+	const has = hasPurchase || cost > 0;
 	return {
 		netSales: sales,
 		netPurchase: purchase,
-		grossProfit: grossProfit(sales, purchase),
-		marginPercent: marginPercent(sales, purchase, has),
+		estimatedCogs: cost,
+		grossProfit: grossProfit(sales, cost),
+		marginPercent: marginPercent(sales, cost, has),
 		hasPurchase: has,
 	};
 }

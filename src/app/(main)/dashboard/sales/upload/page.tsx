@@ -29,6 +29,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { resolveColumnMappings } from "@/lib/parser/excel-parser";
+import { resolveInventoryColumnMappings } from "@/lib/parser/inventory-parser";
 import { resolvePurchaseColumnMappings } from "@/lib/parser/purchase-parser";
 
 export default function FounderUploadPage() {
@@ -41,7 +42,9 @@ export default function FounderUploadPage() {
 	const [uploadType, setUploadType] = useState<"full_replace" | "incremental">(
 		"incremental",
 	);
-	const [dataType, setDataType] = useState<"sales" | "purchase">("sales");
+	const [dataType, setDataType] = useState<"sales" | "purchase" | "inventory">(
+		"sales",
+	);
 	const [preflight, setPreflight] = useState<{
 		hasExistingData: boolean;
 		existingRowCount: number;
@@ -114,9 +117,11 @@ export default function FounderUploadPage() {
 				throw new Error("No rows found in the sheet.");
 			}
 			const mappingResult =
-				dataType === "purchase"
-					? resolvePurchaseColumnMappings(firstRow)
-					: resolveColumnMappings(firstRow);
+				dataType === "inventory"
+					? resolveInventoryColumnMappings(firstRow)
+					: dataType === "purchase"
+						? resolvePurchaseColumnMappings(firstRow)
+						: resolveColumnMappings(firstRow);
 			if (!mappingResult.isValid) {
 				throw new Error(
 					`Column mapping validation failed:\n- ${mappingResult.errors.join("\n- ")}`,
@@ -304,7 +309,7 @@ export default function FounderUploadPage() {
 								<Select
 									value={dataType}
 									onValueChange={(v) => {
-										setDataType(v as "sales" | "purchase");
+										setDataType(v as "sales" | "purchase" | "inventory");
 										setValidationResult(null);
 										setPreflight(null);
 									}}
@@ -315,6 +320,9 @@ export default function FounderUploadPage() {
 									<SelectContent>
 										<SelectItem value="sales">Sales Data</SelectItem>
 										<SelectItem value="purchase">Purchase Data</SelectItem>
+										<SelectItem value="inventory">
+											Inventory Pricing & Stock
+										</SelectItem>
 									</SelectContent>
 								</Select>
 							</div>

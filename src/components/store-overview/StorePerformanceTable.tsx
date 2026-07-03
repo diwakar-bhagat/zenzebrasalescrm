@@ -44,24 +44,13 @@ export interface StorePerformanceTableProps {
 			};
 		};
 		contributionPercent: number;
-		netSales?: number;
-		netPurchase?: number;
-		grossProfit?: number;
-		marginPercent?: number | null;
-		hasPurchase?: boolean;
 	}>;
 	comparisonLabel: string;
-	hasPurchaseData?: boolean;
-}
-
-function formatInr(value: number) {
-	return `₹${Math.round(value).toLocaleString("en-IN")}`;
 }
 
 export function StorePerformanceTable({
 	stores,
 	comparisonLabel,
-	hasPurchaseData,
 }: StorePerformanceTableProps) {
 	const getStoreStatus = (
 		growth: number | "NEW STORE",
@@ -108,15 +97,6 @@ export function StorePerformanceTable({
 								<TableHead className="py-2.5 font-semibold text-xs">
 									Units
 								</TableHead>
-								<TableHead className="py-2.5 font-semibold text-xs text-right">
-									Net Purchase
-								</TableHead>
-								<TableHead className="py-2.5 font-semibold text-xs text-right">
-									Gross Profit
-								</TableHead>
-								<TableHead className="py-2.5 font-semibold text-xs text-right">
-									Margin
-								</TableHead>
 								<TableHead className="py-2.5 font-semibold text-xs">
 									Status
 								</TableHead>
@@ -126,7 +106,7 @@ export function StorePerformanceTable({
 							{stores.length === 0 ? (
 								<TableRow>
 									<TableCell
-										colSpan={10}
+										colSpan={7}
 										className="h-24 text-center text-muted-foreground text-xs"
 									>
 										No sales data available.
@@ -182,23 +162,6 @@ export function StorePerformanceTable({
 													previous={store.performance.units.previous}
 													growth={store.performance.units.growth}
 												/>
-											</TableCell>
-											<TableCell className="py-3 text-right text-xs tabular-nums">
-												{store.hasPurchase && store.netPurchase != null
-													? formatInr(store.netPurchase)
-													: "N/A"}
-											</TableCell>
-											<TableCell
-												className={`py-3 text-right text-xs font-semibold tabular-nums ${store.hasPurchase && (store.grossProfit ?? 0) < 0 ? "text-destructive" : ""}`}
-											>
-												{store.hasPurchase && store.grossProfit != null
-													? formatInr(store.grossProfit)
-													: "N/A"}
-											</TableCell>
-											<TableCell className="py-3 text-right text-xs tabular-nums">
-												{store.marginPercent == null
-													? "N/A"
-													: `${store.marginPercent.toFixed(1)}%`}
 											</TableCell>
 											<TableCell className="py-3">
 												<StatusBadge status={status} />

@@ -8,13 +8,6 @@ import {
 } from "@/lib/business-logic/comparison";
 import { getCustomerIntelligence } from "@/lib/business-logic/customer-intelligence";
 import { getPaymentAnalysis } from "@/lib/business-logic/payment-analysis";
-import {
-	getBrandProfitability,
-	getCategoryProfitability,
-	getProfitability,
-	getSkuProfitability,
-	getStoreProfitability,
-} from "@/lib/business-logic/profitability";
 import { computeRevenueDriver } from "@/lib/business-logic/revenue-driver";
 import {
 	getBrandPerformance,
@@ -80,11 +73,6 @@ export async function GET(req: NextRequest) {
 			aovAnalysis,
 			customerIntelligence,
 			paymentAnalysis,
-			profitability,
-			storeProfitability,
-			brandProfitability,
-			skuProfitability,
-			categoryProfitability,
 		] = await Promise.all([
 			getDailyHealthMetrics(sql, periods, filters),
 			getStorePerformance(sql, periods, filters),
@@ -94,39 +82,7 @@ export async function GET(req: NextRequest) {
 			getCategoryAov(sql, periods, filters),
 			getCustomerIntelligence(sql, periods, filters),
 			getPaymentAnalysis(sql, periods, filters),
-			getProfitability(sql, periods, filters),
-			getStoreProfitability(sql, periods, filters),
-			getBrandProfitability(sql, periods, filters),
-			getSkuProfitability(sql, periods, filters),
-			getCategoryProfitability(sql, periods, filters),
 		]);
-
-		// Purchase availability drives graceful "Purchase data unavailable" states.
-		const hasPurchaseData = profitability.hasPurchase;
-
-		// Estimated profit contribution by payment channel. COGS cannot be tied to a
-		// payment method, so profit is allocated proportionally to each channel's
-		// revenue share (only when purchase data exists).
-		const overallMargin = profitability.marginPercent;
-		const paymentAnalysisWithProfit = {
-			...paymentAnalysis,
-			hasPurchaseData,
-			methods: paymentAnalysis.methods.map(
-				(m: (typeof paymentAnalysis.methods)[number]) => ({
-					...m,
-					estimatedProfit:
-						hasPurchaseData && overallMargin != null
-							? Math.round((m.revenue * overallMargin) / 100)
-							: null,
-					profitSharePct: hasPurchaseData ? m.revenueSharePct : null,
-				}),
-			),
-		};
-
-		// Merge profit metrics into the store-performance rows the UI already renders.
-		const storeProfitByBilledBy = new Map(
-			storeProfitability.map((s) => [s.billedBy, s]),
-		);
 
 		const revenueDriver = computeRevenueDriver(
 			dailyHealthResult.salesKpis.revenue.current,
@@ -135,32 +91,23 @@ export async function GET(req: NextRequest) {
 			dailyHealthResult.salesKpis.billCuts.previous,
 		);
 
-		const adaptedStorePerformance = storePerformance.map((row) => {
-			const profit = storeProfitByBilledBy.get(row.billedBy);
-			return {
-				storeDisplayName: row.name,
-				billedBy: row.billedBy,
-				revenue: row.performance.revenue.current,
-				revenueGrowth:
-					row.performance.revenue.growth === "NEW STORE"
-						? 0
-						: row.performance.revenue.growth,
-				billCuts: row.performance.billCuts.current,
-				billCutsGrowth:
-					row.performance.billCuts.growth === "NEW STORE"
-						? 0
-						: row.performance.billCuts.growth,
-				units: row.performance.units.current,
-				aov: row.performance.aov.current,
-				contributionPercent: row.contributionPercent,
-				// Profit Intelligence — net sales, net purchase, gross profit, margin %.
-				netSales: profit?.netSales ?? row.performance.revenue.current,
-				netPurchase: profit?.netPurchase ?? 0,
-				grossProfit: profit?.grossProfit ?? row.performance.revenue.current,
-				marginPercent: profit?.marginPercent ?? null,
-				hasPurchase: profit?.hasPurchase ?? false,
-			};
-		});
+		const adaptedStorePerformance = storePerformance.map((row) => ({
+			storeDisplayName: row.name,
+			billedBy: row.billedBy,
+			revenue: row.performance.revenue.current,
+			revenueGrowth:
+				row.performance.revenue.growth === "NEW STORE"
+					? 0
+					: row.performance.revenue.growth,
+			billCuts: row.performance.billCuts.current,
+			billCutsGrowth:
+				row.performance.billCuts.growth === "NEW STORE"
+					? 0
+					: row.performance.billCuts.growth,
+			units: row.performance.units.current,
+			aov: row.performance.aov.current,
+			contributionPercent: row.contributionPercent,
+		}));
 
 		return NextResponse.json({
 			success: true,
@@ -178,15 +125,8 @@ export async function GET(req: NextRequest) {
 				billCutAnalysis,
 				aovAnalysis,
 				customerIntelligence,
-				paymentAnalysis: paymentAnalysisWithProfit,
+				paymentAnalysis,
 				revenueDriver,
-				// Profit Intelligence layer
-				hasPurchaseData,
-				profitability,
-				storeProfitability,
-				brandProfitability,
-				skuProfitability,
-				categoryProfitability,
 			},
 		});
 	} catch (error) {

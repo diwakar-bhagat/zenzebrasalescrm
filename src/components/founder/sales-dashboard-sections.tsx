@@ -25,39 +25,6 @@ function GrowthText({ value }: { value: number | null }) {
 	return <span className={colorClass}>{formatted}</span>;
 }
 
-/** Margin display: "N/A" when it cannot be computed (no purchase data / zero sales). */
-function formatMargin(value: number | null | undefined) {
-	if (value == null) return <span className="text-muted-foreground">N/A</span>;
-	const colorClass =
-		value >= 40
-			? "text-status-on-track font-semibold"
-			: value < 20
-				? "text-status-delayed font-semibold"
-				: "text-foreground";
-	return <span className={colorClass}>{value.toFixed(1)}%</span>;
-}
-
-/** Signed currency for profit (destructive when negative). */
-function ProfitText({ value }: { value: number }) {
-	const colorClass =
-		value > 0
-			? "text-status-on-track font-semibold"
-			: value < 0
-				? "text-status-delayed font-semibold"
-				: "";
-	return <span className={colorClass}>{formatCurrency(value)}</span>;
-}
-
-/** Shown in place of profit tables when no purchase file has been ingested yet. */
-function PurchaseUnavailableNote() {
-	return (
-		<p className="text-xs text-muted-foreground mt-3">
-			Purchase data unavailable — profit and margin show once a purchase file is
-			uploaded.
-		</p>
-	);
-}
-
 function ExportButton({
 	data,
 	filename,
@@ -564,30 +531,20 @@ export function PaymentAnalysisCard({
 	comparisonLabel,
 }: {
 	data: {
-		hasPurchaseData?: boolean;
 		methods: Array<{
 			paymentMethod: string;
 			revenue: number;
 			billCuts: number;
 			revenueSharePct: number;
-			estimatedProfit?: number | null;
-			profitSharePct?: number | null;
 		}>;
 	};
 	comparisonLabel?: string;
 }) {
-	const showProfit = Boolean(data.hasPurchaseData);
 	const exportData = data.methods.map((row) => ({
 		"Payment Method": row.paymentMethod,
 		Revenue: row.revenue,
 		"Bill Cuts": row.billCuts,
 		"Share (%)": row.revenueSharePct,
-		...(showProfit
-			? {
-					"Est. Profit": row.estimatedProfit ?? 0,
-					"Profit Share (%)": row.profitSharePct ?? 0,
-				}
-			: {}),
 	}));
 
 	return (
@@ -596,9 +553,7 @@ export function PaymentAnalysisCard({
 				<div>
 					<CardTitle>Payment Analysis</CardTitle>
 					<CardDescription>
-						<span>
-							Sales and estimated profit contribution by payment channel
-						</span>
+						<span>Revenue and transaction count by payment channel</span>
 						{comparisonLabel && (
 							<span className="block text-xs text-muted-foreground/80 mt-0.5">
 								Compared: {comparisonLabel}
@@ -619,11 +574,7 @@ export function PaymentAnalysisCard({
 							<th className="px-3 py-2 text-left">Method</th>
 							<th className="px-3 py-2 text-right">Revenue</th>
 							<th className="px-3 py-2 text-right">Bills</th>
-							<th className="px-3 py-2 text-right">Sales %</th>
-							{showProfit && (
-								<th className="px-3 py-2 text-right">Est. Profit</th>
-							)}
-							{showProfit && <th className="px-3 py-2 text-right">Profit %</th>}
+							<th className="px-3 py-2 text-right">Share</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -640,317 +591,10 @@ export function PaymentAnalysisCard({
 									{row.billCuts.toLocaleString()}
 								</td>
 								<td className="px-3 py-2 text-right">{row.revenueSharePct}%</td>
-								{showProfit && (
-									<td className="px-3 py-2 text-right">
-										{row.estimatedProfit == null
-											? "—"
-											: formatCurrency(row.estimatedProfit)}
-									</td>
-								)}
-								{showProfit && (
-									<td className="px-3 py-2 text-right">
-										{row.profitSharePct == null
-											? "—"
-											: `${row.profitSharePct}%`}
-									</td>
-								)}
 							</tr>
 						))}
 					</tbody>
 				</table>
-				{!showProfit && <PurchaseUnavailableNote />}
-			</CardContent>
-		</Card>
-	);
-}
-
-export function BrandProfitabilityTable({
-	data,
-	comparisonLabel,
-	hasPurchaseData,
-}: {
-	data: Array<{
-		brand: string;
-		netSales: number;
-		netPurchase: number;
-		grossProfit: number;
-		marginPercent: number | null;
-		units: number;
-	}>;
-	comparisonLabel?: string;
-	hasPurchaseData?: boolean;
-}) {
-	const exportData = data.map((row) => ({
-		Brand: row.brand,
-		"Net Sales": row.netSales,
-		"Net Purchase": row.netPurchase,
-		"Gross Profit": row.grossProfit,
-		"Margin (%)": row.marginPercent,
-		Units: row.units,
-	}));
-
-	return (
-		<Card>
-			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-				<div>
-					<CardTitle>Brand Profitability</CardTitle>
-					<CardDescription>
-						<span>Ranked by gross profit — not revenue</span>
-						{comparisonLabel && (
-							<span className="block text-xs text-muted-foreground/80 mt-0.5">
-								Compared: {comparisonLabel}
-							</span>
-						)}
-					</CardDescription>
-				</div>
-				<ExportButton
-					data={exportData}
-					filename="Brand_Profitability"
-					sheetName="Brand Profit"
-				/>
-			</CardHeader>
-			<CardContent className="overflow-x-auto">
-				<table className="w-full text-sm">
-					<thead className="text-xs text-muted-foreground uppercase border-b">
-						<tr>
-							<th className="px-3 py-2 text-left">Brand</th>
-							<th className="px-3 py-2 text-right">Net Sales</th>
-							<th className="px-3 py-2 text-right">Net Purchase</th>
-							<th className="px-3 py-2 text-right">Gross Profit</th>
-							<th className="px-3 py-2 text-right">Margin</th>
-							<th className="px-3 py-2 text-right">Units</th>
-						</tr>
-					</thead>
-					<tbody>
-						{data.slice(0, 10).map((row) => (
-							<tr
-								key={row.brand}
-								className="border-b hover:bg-muted/10 transition-colors"
-							>
-								<td className="px-3 py-2 font-medium">{row.brand}</td>
-								<td className="px-3 py-2 text-right">
-									{formatCurrency(row.netSales)}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{hasPurchaseData ? formatCurrency(row.netPurchase) : "—"}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{hasPurchaseData ? (
-										<ProfitText value={row.grossProfit} />
-									) : (
-										"—"
-									)}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{formatMargin(row.marginPercent)}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{row.units.toLocaleString()}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-				{!hasPurchaseData && <PurchaseUnavailableNote />}
-			</CardContent>
-		</Card>
-	);
-}
-
-export function SkuProfitabilityTable({
-	data,
-	comparisonLabel,
-	hasPurchaseData,
-}: {
-	data: Array<{
-		skuCode: string | null;
-		itemName: string;
-		netSales: number;
-		cogs: number;
-		grossProfit: number;
-		marginPercent: number | null;
-	}>;
-	comparisonLabel?: string;
-	hasPurchaseData?: boolean;
-}) {
-	const exportData = data.map((row) => ({
-		SKU: row.skuCode ?? "—",
-		Product: row.itemName,
-		Revenue: row.netSales,
-		COGS: row.cogs,
-		Profit: row.grossProfit,
-		"Margin (%)": row.marginPercent,
-	}));
-
-	return (
-		<Card>
-			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-				<div>
-					<CardTitle>Product Profitability</CardTitle>
-					<CardDescription>
-						<span>
-							Ranked by profit — a small high-margin SKU can outrank a big
-							thin-margin one
-						</span>
-						{comparisonLabel && (
-							<span className="block text-xs text-muted-foreground/80 mt-0.5">
-								Compared: {comparisonLabel}
-							</span>
-						)}
-					</CardDescription>
-				</div>
-				<ExportButton
-					data={exportData}
-					filename="Product_Profitability"
-					sheetName="SKU Profit"
-				/>
-			</CardHeader>
-			<CardContent className="overflow-x-auto">
-				<table className="w-full text-sm">
-					<thead className="text-xs text-muted-foreground uppercase border-b">
-						<tr>
-							<th className="px-3 py-2 text-left">Product</th>
-							<th className="px-3 py-2 text-right">Revenue</th>
-							<th className="px-3 py-2 text-right">COGS</th>
-							<th className="px-3 py-2 text-right">Profit</th>
-							<th className="px-3 py-2 text-right">Margin</th>
-						</tr>
-					</thead>
-					<tbody>
-						{data.slice(0, 10).map((row) => (
-							<tr
-								key={`${row.skuCode ?? "missing-sku"}-${row.itemName}`}
-								className="border-b hover:bg-muted/10 transition-colors"
-							>
-								<td className="px-3 py-2 font-medium">{row.itemName}</td>
-								<td className="px-3 py-2 text-right">
-									{formatCurrency(row.netSales)}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{hasPurchaseData ? formatCurrency(row.cogs) : "—"}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{hasPurchaseData ? (
-										<ProfitText value={row.grossProfit} />
-									) : (
-										"—"
-									)}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{formatMargin(row.marginPercent)}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-				{!hasPurchaseData && <PurchaseUnavailableNote />}
-			</CardContent>
-		</Card>
-	);
-}
-
-export function CategoryProfitabilityTable({
-	data,
-	comparisonLabel,
-	hasPurchaseData,
-}: {
-	data: Array<{
-		category: string;
-		netSales: number;
-		netPurchase: number;
-		grossProfit: number;
-		marginPercent: number | null;
-		billCuts: number;
-		aov: number;
-		profitPerBill: number | null;
-	}>;
-	comparisonLabel?: string;
-	hasPurchaseData?: boolean;
-}) {
-	const exportData = data.map((row) => ({
-		Category: row.category,
-		Revenue: row.netSales,
-		Purchase: row.netPurchase,
-		Profit: row.grossProfit,
-		"Margin (%)": row.marginPercent,
-		"Bill Cuts": row.billCuts,
-		AOV: row.aov,
-		"Profit / Bill": row.profitPerBill,
-	}));
-
-	return (
-		<Card>
-			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-				<div>
-					<CardTitle>Category Profitability</CardTitle>
-					<CardDescription>
-						<span>Spot high-revenue low-margin vs high-profit categories</span>
-						{comparisonLabel && (
-							<span className="block text-xs text-muted-foreground/80 mt-0.5">
-								Compared: {comparisonLabel}
-							</span>
-						)}
-					</CardDescription>
-				</div>
-				<ExportButton
-					data={exportData}
-					filename="Category_Profitability"
-					sheetName="Category Profit"
-				/>
-			</CardHeader>
-			<CardContent className="overflow-x-auto">
-				<table className="w-full text-sm">
-					<thead className="text-xs text-muted-foreground uppercase border-b">
-						<tr>
-							<th className="px-3 py-2 text-left">Category</th>
-							<th className="px-3 py-2 text-right">Revenue</th>
-							<th className="px-3 py-2 text-right">Purchase</th>
-							<th className="px-3 py-2 text-right">Profit</th>
-							<th className="px-3 py-2 text-right">Margin</th>
-							<th className="px-3 py-2 text-right">Bill Cuts</th>
-							<th className="px-3 py-2 text-right">AOV</th>
-							<th className="px-3 py-2 text-right">Profit/Bill</th>
-						</tr>
-					</thead>
-					<tbody>
-						{data.slice(0, 15).map((row) => (
-							<tr
-								key={row.category}
-								className="border-b hover:bg-muted/10 transition-colors"
-							>
-								<td className="px-3 py-2 font-medium">{row.category}</td>
-								<td className="px-3 py-2 text-right">
-									{formatCurrency(row.netSales)}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{hasPurchaseData ? formatCurrency(row.netPurchase) : "—"}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{hasPurchaseData ? (
-										<ProfitText value={row.grossProfit} />
-									) : (
-										"—"
-									)}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{formatMargin(row.marginPercent)}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{row.billCuts.toLocaleString()}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{formatCurrency(row.aov)}
-								</td>
-								<td className="px-3 py-2 text-right">
-									{row.profitPerBill == null
-										? "N/A"
-										: formatCurrency(row.profitPerBill)}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-				{!hasPurchaseData && <PurchaseUnavailableNote />}
 			</CardContent>
 		</Card>
 	);

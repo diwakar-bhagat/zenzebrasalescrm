@@ -89,18 +89,18 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 	const getTrendBadgeColor = (trend: string) => {
 		switch (trend) {
 			case "improving":
-				return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
+				return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20";
 			case "recovering":
-				return "bg-teal-500/10 text-teal-700 border-teal-500/20";
+				return "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20";
 			case "declining":
 			case "weakening":
-				return "bg-rose-500/10 text-rose-700 border-rose-500/20";
+				return "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20";
 			case "softening":
-				return "bg-amber-500/10 text-amber-700 border-amber-500/20";
+				return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20";
 			case "stable":
-				return "bg-slate-500/10 text-slate-700 border-slate-500/20";
+				return "bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20";
 			default:
-				return "bg-slate-500/10 text-slate-700 border-slate-500/20";
+				return "bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20";
 		}
 	};
 
@@ -109,7 +109,7 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 			return (
 				<Badge
 					variant="outline"
-					className="bg-blue-500/10 text-blue-700 border-blue-500/20 font-semibold uppercase text-[10px] tracking-wider"
+					className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 font-semibold uppercase text-[10px] tracking-wider"
 				>
 					Ramp-up (Store Ops)
 				</Badge>
@@ -119,7 +119,7 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 			return (
 				<Badge
 					variant="outline"
-					className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20 font-semibold uppercase text-[10px] tracking-wider"
+					className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-semibold uppercase text-[10px] tracking-wider"
 				>
 					Healthy (Store Ops)
 				</Badge>
@@ -129,7 +129,7 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 			return (
 				<Badge
 					variant="outline"
-					className="bg-amber-500/10 text-amber-700 border-amber-500/20 font-semibold uppercase text-[10px] tracking-wider"
+					className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold uppercase text-[10px] tracking-wider"
 				>
 					Footfall Alert ({owner})
 				</Badge>
@@ -139,7 +139,7 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 			return (
 				<Badge
 					variant="outline"
-					className="bg-indigo-500/10 text-indigo-700 border-indigo-500/20 font-semibold uppercase text-[10px] tracking-wider"
+					className="bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20 font-semibold uppercase text-[10px] tracking-wider"
 				>
 					Curation Alert ({owner})
 				</Badge>
@@ -149,7 +149,7 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 			return (
 				<Badge
 					variant="outline"
-					className="bg-purple-500/10 text-purple-700 border-purple-500/20 font-semibold uppercase text-[10px] tracking-wider"
+					className="bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20 font-semibold uppercase text-[10px] tracking-wider"
 				>
 					Mix Shift ({owner})
 				</Badge>
@@ -158,7 +158,7 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 		return (
 			<Badge
 				variant="outline"
-				className="bg-slate-500/10 text-slate-700 border-slate-500/20 font-semibold uppercase text-[10px] tracking-wider"
+				className="bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20 font-semibold uppercase text-[10px] tracking-wider"
 			>
 				Stable
 			</Badge>
@@ -351,9 +351,12 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 											>
 												<div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
 													<div className="flex items-center gap-1.5 text-muted-foreground">
-														<span className="font-bold text-[10px] text-muted-foreground/80 tracking-wider uppercase border border-muted-foreground/30 px-1.5 py-0.5 rounded shrink-0">
+														<Badge
+															variant="outline"
+															className="text-muted-foreground/80 font-bold text-[10px] tracking-wider uppercase rounded shrink-0"
+														>
 															Revenue Decomposition
-														</span>
+														</Badge>
 														<span className="text-foreground font-medium italic">
 															&ldquo;{aovBills.revenueDriver}&rdquo;
 														</span>
@@ -362,7 +365,10 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 														aovBills.diagnosis.affectedCategories &&
 														aovBills.diagnosis.affectedCategories.length >
 															0 && (
-															<div className="flex items-center gap-1 text-[11px] text-indigo-600 bg-indigo-50/50 px-2 py-0.5 border border-indigo-100 rounded">
+															<Badge
+																variant="outline"
+																className="bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20 gap-1 text-[11px] font-normal normal-case"
+															>
 																<span className="font-semibold shrink-0">
 																	Category focus:
 																</span>
@@ -371,7 +377,7 @@ export function AovBillCutsAnalysis({ stores }: AovBillCutsAnalysisProps) {
 																		", ",
 																	)}
 																</span>
-															</div>
+															</Badge>
 														)}
 												</div>
 											</TableCell>

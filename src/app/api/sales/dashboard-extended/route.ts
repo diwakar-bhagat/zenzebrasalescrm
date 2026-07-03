@@ -51,16 +51,19 @@ export async function GET(req: NextRequest) {
 			]);
 
 		const trendsQueryString = `
-      SELECT sale_date::text AS date, COALESCE(${METRICS.revenue},0)::numeric AS revenue,
+      SELECT gs.d::text AS date, COALESCE(${METRICS.revenue},0)::numeric AS revenue,
         ${METRICS.bills}::integer AS orders, COALESCE(SUM(quantity),0)::integer AS units
-      FROM sales_fact_v
-      WHERE sale_date >= $1::date AND sale_date <= $2::date
+      FROM (
+        SELECT generate_series($1::date, $2::date, interval '1 day')::date AS d
+      ) gs
+      LEFT JOIN sales_fact_v
+        ON sales_fact_v.sale_date = gs.d
         AND ($3::text IS NULL OR billed_by = $3)
         AND ($4::text IS NULL OR category = $4)
         AND ($5::text IS NULL OR brand = $5)
         AND ($6::text IS NULL OR (sku_code ILIKE '%' || $6 || '%' OR item_name ILIKE '%' || $6 || '%'))
         AND ($7::text[] IS NULL OR category <> ALL($7::text[]))
-      GROUP BY sale_date ORDER BY sale_date ASC`;
+      GROUP BY gs.d ORDER BY gs.d ASC`;
 
 		const recentOrdersQueryString = `
       SELECT id, bill_no, store_display_name, item_name, quantity, net_amount, customer_mobile, sale_date::text AS sale_date

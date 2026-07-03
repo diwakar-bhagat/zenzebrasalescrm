@@ -231,10 +231,6 @@ export function parseExcelBuffer(buffer: Buffer): ParseResult {
 		defval: null,
 	});
 
-	return parseRawRows(rawRows);
-}
-
-export function parseRawRows(rawRows: Record<string, unknown>[]): ParseResult {
 	if (rawRows.length === 0) {
 		return {
 			rows: [],

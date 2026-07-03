@@ -28,20 +28,16 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { resolveColumnMappings } from "@/lib/parser/excel-parser";
-import { resolvePurchaseColumnMappings } from "@/lib/parser/purchase-parser";
 
 export default function FounderUploadPage() {
 	const router = useRouter();
 	const [file, setFile] = useState<File | null>(null);
-	const [batchId, setBatchId] = useState<number | null>(null);
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [progress, setProgress] = useState(0);
 	const [validationResult, setValidationResult] = useState<any>(null);
 	const [uploadType, setUploadType] = useState<"full_replace" | "incremental">(
 		"incremental",
 	);
-	const [dataType, setDataType] = useState<"sales" | "purchase">("sales");
 	const [preflight, setPreflight] = useState<{
 		hasExistingData: boolean;
 		existingRowCount: number;
@@ -61,132 +57,30 @@ export default function FounderUploadPage() {
 		if (!file) return;
 
 		setIsProcessing(true);
-		setProgress(5);
+		setProgress(10);
 		setValidationResult(null);
-		setPreflight(null);
 
 		try {
-			// 1. Read file in browser using SheetJS
-			const XLSX = await import("xlsx");
-			const reader = new FileReader();
+			const formData = new FormData();
+			formData.append("file", file);
+			setProgress(40);
 
-			const parsePromise = new Promise<any[]>((resolve, reject) => {
-				reader.onload = (e) => {
-					try {
-						const data = new Uint8Array(e.target?.result as ArrayBuffer);
-						const workbook = XLSX.read(data, { type: "array" });
-						const sheetName = workbook.SheetNames.includes("main")
-							? "main"
-							: workbook.SheetNames[0];
-						const worksheet = sheetName
-							? workbook.Sheets[sheetName]
-							: undefined;
-						if (!worksheet) {
-							reject(new Error("No worksheet found in the workbook."));
-							return;
-						}
-						const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-							worksheet,
-							{
-								raw: true,
-								defval: null,
-							},
-						);
-						resolve(rawRows);
-					} catch (err) {
-						reject(err);
-					}
-				};
-				reader.onerror = () => reject(new Error("File reading failed."));
-				reader.readAsArrayBuffer(file);
-			});
-
-			const rawRows = await parsePromise;
-			setProgress(15);
-
-			if (rawRows.length === 0) {
-				throw new Error("Excel sheet is empty.");
-			}
-
-			// 2. Validate columns locally first
-			const firstRow = rawRows[0];
-			if (!firstRow) {
-				throw new Error("No rows found in the sheet.");
-			}
-			const mappingResult =
-				dataType === "purchase"
-					? resolvePurchaseColumnMappings(firstRow)
-					: resolveColumnMappings(firstRow);
-			if (!mappingResult.isValid) {
-				throw new Error(
-					`Column mapping validation failed:\n- ${mappingResult.errors.join("\n- ")}`,
-				);
-			}
-
-			// 3. Start batch on server
-			const startRes = await fetch("/api/sales/imports?mode=start_batch", {
+			const res = await fetch("/api/sales/imports?mode=validate", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ filename: file.name, dataType }),
+				body: formData,
 			});
-			const startData = await startRes.json();
-			if (!startRes.ok || !startData.success) {
-				throw new Error(startData.error || "Failed to start upload batch.");
-			}
 
-			const allocatedBatchId = startData.data.batchId;
-			setBatchId(allocatedBatchId);
-			setProgress(20);
+			setProgress(80);
+			const data = await res.json();
 
-			// 4. Upload in chunks
-			const CHUNK_SIZE = 2000;
-			const totalChunks = Math.ceil(rawRows.length / CHUNK_SIZE);
+			if (res.ok && data.success) {
+				setValidationResult(data.data);
 
-			for (let i = 0; i < totalChunks; i++) {
-				const chunkRows = rawRows.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-				const chunkRes = await fetch("/api/sales/imports?mode=upload_chunk", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						batchId: allocatedBatchId,
-						chunkIndex: i,
-						rows: chunkRows,
-						dataType,
-					}),
-				});
-				const chunkData = await chunkRes.json();
-				if (!chunkRes.ok || !chunkData.success) {
-					throw new Error(
-						chunkData.error || `Failed to upload chunk ${i + 1}.`,
-					);
-				}
-
-				const chunkProgress = 20 + Math.round(((i + 1) / totalChunks) * 60);
-				setProgress(chunkProgress);
-			}
-
-			// 5. Run validation on staged batch
-			setProgress(85);
-			const valRes = await fetch("/api/sales/imports?mode=validate_batch", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ batchId: allocatedBatchId, dataType }),
-			});
-			const valData = await valRes.json();
-
-			if (valRes.ok && valData.success) {
-				setValidationResult(valData.data);
-				setProgress(95);
-
-				// Run preflight check only for sales data and if we have a valid date range
-				if (
-					dataType === "sales" &&
-					valData.data?.dateRange?.start &&
-					valData.data?.dateRange?.end
-				) {
+				// Run preflight check if we have a valid date range
+				if (data.data?.dateRange?.start && data.data?.dateRange?.end) {
 					try {
 						const pfRes = await fetch(
-							`/api/sales/imports/preflight?startDate=${valData.data.dateRange.start}&endDate=${valData.data.dateRange.end}`,
+							`/api/sales/imports/preflight?startDate=${data.data.dateRange.start}&endDate=${data.data.dateRange.end}`,
 						);
 						const pfData = await pfRes.json();
 						if (pfData.success) setPreflight(pfData.data);
@@ -195,21 +89,16 @@ export default function FounderUploadPage() {
 					}
 				}
 			} else {
-				toast.error(valData.error || "Validation failed");
+				toast.error(data.error || "Validation failed");
 				setValidationResult({
 					errors: [
-						{
-							row: 0,
-							field: "system",
-							error: valData.error || "Unknown error",
-						},
+						{ row: 0, field: "system", error: data.error || "Unknown error" },
 					],
 				});
 			}
-		} catch (err: unknown) {
+		} catch (err: any) {
 			console.error(err);
-			const msg = err instanceof Error ? err.message : String(err);
-			toast.error("Failed to process file: " + msg);
+			toast.error("Failed to parse file: " + err.message);
 		} finally {
 			setProgress(100);
 			setIsProcessing(false);
@@ -217,13 +106,11 @@ export default function FounderUploadPage() {
 	};
 
 	const handleCommit = async () => {
-		if (!validationResult || !batchId) return;
+		if (!validationResult || !file) return;
 
 		if (uploadType === "full_replace") {
 			const confirmed = window.confirm(
-				dataType === "purchase"
-					? "WARNING: You are about to perform a Full Replace Upload. This will backup and wipe all existing historical data in the purchase_fact table. Are you sure you want to proceed?"
-					: "WARNING: You are about to perform a Full Replace Upload. This will backup and wipe all existing historical data in the sales_fact table. Are you sure you want to proceed?",
+				"WARNING: You are about to perform a Full Replace Upload. This will backup and wipe all existing historical data in the sales_fact table. Are you sure you want to proceed?",
 			);
 			if (!confirmed) return;
 		}
@@ -231,57 +118,44 @@ export default function FounderUploadPage() {
 		setIsProcessing(true);
 
 		try {
-			const res = await fetch("/api/sales/imports?mode=commit_batch", {
+			const formData = new FormData();
+			formData.append("file", file);
+			formData.append("uploadType", uploadType);
+
+			const res = await fetch("/api/sales/imports?mode=commit", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					batchId,
-					uploadType,
-					dataType,
-				}),
+				body: formData,
 			});
 
 			const data = await res.json();
 
 			if (res.ok && data.success) {
 				toast.success(`Successfully imported ${data.data.rowsInserted} rows!`);
-				router.push(
-					dataType === "purchase" ? "/dashboard/ecommerce" : "/dashboard/sales",
-				);
+				router.push("/dashboard/sales");
 			} else {
 				toast.error(data.error || "Failed to commit data");
 			}
-		} catch (err: unknown) {
-			const msg = err instanceof Error ? err.message : String(err);
-			toast.error("Upload failed: " + msg);
+		} catch (err: any) {
+			toast.error("Upload failed: " + err.message);
 		} finally {
 			setIsProcessing(false);
 		}
 	};
+
 	return (
 		<div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-3xl font-bold tracking-tight">
-						{dataType === "purchase"
-							? "Upload Purchase Data"
-							: "Upload Sales Data"}
+						Upload Sales Data
 					</h2>
 					<p className="text-muted-foreground mt-1">
-						{dataType === "purchase"
-							? "Upload your daily purchase sheet to update the Store Overview."
-							: "Upload your daily sales sheet to update the Sales Dashboard."}
+						Upload your daily sales sheet to update the Sales Dashboard.
 					</p>
 				</div>
 				<Button
 					variant="outline"
-					onClick={() =>
-						router.push(
-							dataType === "purchase"
-								? "/dashboard/ecommerce"
-								: "/dashboard/sales",
-						)
-					}
+					onClick={() => router.push("/dashboard/sales")}
 				>
 					Back to Dashboard
 				</Button>
@@ -296,53 +170,24 @@ export default function FounderUploadPage() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
-						<div className="grid grid-cols-2 gap-4">
-							<div className="space-y-1.5">
-								<span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-									Data Type
-								</span>
-								<Select
-									value={dataType}
-									onValueChange={(v) => {
-										setDataType(v as "sales" | "purchase");
-										setValidationResult(null);
-										setPreflight(null);
-									}}
-								>
-									<SelectTrigger>
-										<SelectValue placeholder="Data type" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="sales">Sales Data</SelectItem>
-										<SelectItem value="purchase">Purchase Data</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-							<div className="space-y-1.5">
-								<span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-									Upload Type
-								</span>
-								<Select
-									value={uploadType}
-									onValueChange={(v) =>
-										setUploadType(v as "full_replace" | "incremental")
-									}
-								>
-									<SelectTrigger>
-										<SelectValue placeholder="Upload type" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="full_replace">
-											Full replace (morning file)
-										</SelectItem>
-										<SelectItem value="incremental">
-											Incremental (today only)
-										</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-						</div>
-
+						<Select
+							value={uploadType}
+							onValueChange={(v) =>
+								setUploadType(v as "full_replace" | "incremental")
+							}
+						>
+							<SelectTrigger>
+								<SelectValue placeholder="Upload type" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="full_replace">
+									Full replace (morning file)
+								</SelectItem>
+								<SelectItem value="incremental">
+									Incremental (today only)
+								</SelectItem>
+							</SelectContent>
+						</Select>
 						<label
 							htmlFor="file-upload"
 							className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/20 p-10 text-center transition-colors hover:bg-muted/40"
@@ -466,17 +311,15 @@ export default function FounderUploadPage() {
 											<ul className="text-sm space-y-2">
 												{validationResult.errors
 													.slice(0, 10)
-													.map(
-														(err: { rowNumber: number; errors: string[] }) => (
-															<li
-																key={`${err.rowNumber}-${err.errors?.join("|")}`}
-																className="text-amber-700"
-															>
-																<strong>Row {err.rowNumber}:</strong>{" "}
-																{err.errors?.join(", ")}
-															</li>
-														),
-													)}
+													.map((err: any) => (
+														<li
+															key={`${err.rowNumber}-${err.errors?.join("|")}`}
+															className="text-amber-700"
+														>
+															<strong>Row {err.rowNumber}:</strong>{" "}
+															{err.errors?.join(", ")}
+														</li>
+													))}
 												{validationResult.errors.length > 10 && (
 													<li className="text-muted-foreground text-xs pt-2">
 														...and {validationResult.errors.length - 10} more

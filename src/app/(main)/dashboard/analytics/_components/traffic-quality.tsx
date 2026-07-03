@@ -1,133 +1,157 @@
 "use client";
 
+import { format } from "date-fns";
 import { useMemo } from "react";
 import { CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
-import { format } from "date-fns";
 
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	type ChartConfig,
+	ChartContainer,
+	ChartTooltip,
+	ChartTooltipContent,
+} from "@/components/ui/chart";
 
 const chartConfig = {
-  actualQuality: {
-    color: "var(--chart-3)",
-    label: "Daily Transactions",
-  },
-  baselineQuality: {
-    color: "var(--muted-foreground)",
-    label: "Period Average",
-  },
+	actualQuality: {
+		color: "var(--chart-3)",
+		label: "Daily Transactions",
+	},
+	baselineQuality: {
+		color: "var(--muted-foreground)",
+		label: "Period Average",
+	},
 } satisfies ChartConfig;
 
-export function TrafficQuality({ data }: { data: any }) {
-  const trends = data?.dailyTrends || [];
+interface DailyTrend {
+	date: string;
+	orders: number;
+}
 
-  const { chartData, avgOrders } = useMemo(() => {
-    if (trends.length === 0) {
-      return { chartData: [], avgOrders: 0 };
-    }
-    const totalOrders = trends.reduce((acc: number, curr: any) => acc + (curr.orders || 0), 0);
-    const average = Math.round(totalOrders / trends.length);
+export function TrafficQuality({
+	data,
+}: {
+	data: { dailyTrends?: DailyTrend[] } | null | undefined;
+}) {
+	const trends = data?.dailyTrends || [];
 
-    const mapped = trends.map((item: any) => ({
-      date: item.date,
-      actualQuality: item.orders,
-      baselineQuality: average,
-    }));
+	const { chartData } = useMemo(() => {
+		if (trends.length === 0) {
+			return { chartData: [] };
+		}
+		const totalOrders = trends.reduce(
+			(acc: number, curr) => acc + (curr.orders || 0),
+			0,
+		);
+		const average = Math.round(totalOrders / trends.length);
 
-    return { chartData: mapped, avgOrders: average };
-  }, [trends]);
+		const mapped = trends.map((item) => ({
+			date: item.date,
+			actualQuality: item.orders,
+			baselineQuality: average,
+		}));
 
-  function formatTick(value: string) {
-    try {
-      const date = new Date(value);
-      if (isNaN(date.getTime())) return value;
-      return format(date, "d MMM");
-    } catch {
-      return value;
-    }
-  }
+		return { chartData: mapped };
+	}, [trends]);
 
-  function formatTooltipLabel(value: string) {
-    try {
-      const date = new Date(value);
-      if (isNaN(date.getTime())) return value;
-      return format(date, "PPPP");
-    } catch {
-      return value;
-    }
-  }
+	function formatTick(value: string) {
+		try {
+			const date = new Date(value);
+			if (Number.isNaN(date.getTime())) return value;
+			return format(date, "d MMM");
+		} catch {
+			return value;
+		}
+	}
 
-  return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="font-normal text-muted-foreground text-sm">Traffic Volume vs Baseline</CardTitle>
-      </CardHeader>
+	function formatTooltipLabel(value: string) {
+		try {
+			const date = new Date(value);
+			if (Number.isNaN(date.getTime())) return value;
+			return format(date, "PPPP");
+		} catch {
+			return value;
+		}
+	}
 
-      <CardContent>
-        <ChartContainer config={chartConfig} className="h-68 w-full">
-          <ComposedChart data={chartData} margin={{ bottom: 0, left: 0, right: 0, top: 8 }}>
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="date"
-              axisLine={false}
-              tickFormatter={formatTick}
-              tickLine={false}
-              tickMargin={14}
-              tick={{ fontSize: 10 }}
-              interval="preserveEnd"
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tickMargin={10}
-              width={34}
-              tick={{ fontSize: 10 }}
-            />
-            <ChartTooltip
-              cursor={false}
-              content={
-                <ChartTooltipContent 
-                  className="w-44" 
-                  labelFormatter={(value) => formatTooltipLabel(String(value))} 
-                  formatter={(value, name, item) => (
-                    <>
-                      <div
-                        className="size-2.5 shrink-0 rounded-[2px]"
-                        style={{
-                          backgroundColor: item.color,
-                        }}
-                      />
-                      <div className="flex flex-1 items-center justify-between leading-none gap-2">
-                        <span className="text-muted-foreground text-xs">{String(name ?? "")}</span>
-                        <span className="font-medium font-mono text-foreground tabular-nums">
-                          {Number(value).toLocaleString()}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                />
-              }
-            />
-            <Line
-              dataKey="baselineQuality"
-              dot={false}
-              stroke="var(--color-baselineQuality)"
-              strokeOpacity={0.65}
-              strokeDasharray="4 4"
-              strokeWidth={1.5}
-              type="monotone"
-            />
-            <Line
-              dataKey="actualQuality"
-              dot={false}
-              activeDot={{ r: 4 }}
-              stroke="var(--color-actualQuality)"
-              strokeWidth={2.5}
-              type="monotone"
-            />
-          </ComposedChart>
-        </ChartContainer>
-      </CardContent>
-    </Card>
-  );
+	return (
+		<Card className="h-full">
+			<CardHeader>
+				<CardTitle className="font-normal text-muted-foreground text-sm">
+					Traffic Volume vs Baseline
+				</CardTitle>
+			</CardHeader>
+
+			<CardContent>
+				<ChartContainer config={chartConfig} className="h-68 w-full">
+					<ComposedChart
+						data={chartData}
+						margin={{ bottom: 0, left: 0, right: 0, top: 8 }}
+					>
+						<CartesianGrid vertical={false} />
+						<XAxis
+							dataKey="date"
+							axisLine={false}
+							tickFormatter={formatTick}
+							tickLine={false}
+							tickMargin={14}
+							tick={{ fontSize: 10 }}
+							interval="preserveEnd"
+						/>
+						<YAxis
+							axisLine={false}
+							tickLine={false}
+							tickMargin={10}
+							width={34}
+							tick={{ fontSize: 10 }}
+						/>
+						<ChartTooltip
+							cursor={false}
+							content={
+								<ChartTooltipContent
+									className="w-44"
+									labelFormatter={(value) => formatTooltipLabel(String(value))}
+									formatter={(value, name, item) => (
+										<>
+											<div
+												className="size-2.5 shrink-0 rounded-[2px]"
+												style={{
+													backgroundColor: item.color,
+												}}
+											/>
+											<div className="flex flex-1 items-center justify-between leading-none gap-2">
+												<span className="text-muted-foreground text-xs">
+													{String(name ?? "")}
+												</span>
+												<span className="font-medium font-mono text-foreground tabular-nums">
+													{Number(value).toLocaleString()}
+												</span>
+											</div>
+										</>
+									)}
+								/>
+							}
+						/>
+						<Line
+							dataKey="baselineQuality"
+							dot={false}
+							stroke="var(--color-baselineQuality)"
+							strokeOpacity={0.65}
+							strokeDasharray="4 4"
+							strokeWidth={1.5}
+							type="monotone"
+						/>
+						<Line
+							dataKey="actualQuality"
+							dot={false}
+							activeDot={{ r: 4 }}
+							stroke="var(--color-actualQuality)"
+							strokeWidth={2.5}
+							type="monotone"
+						/>
+					</ComposedChart>
+				</ChartContainer>
+			</CardContent>
+		</Card>
+	);
 }

@@ -1,15 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-
+import { type NextRequest, NextResponse } from "next/server";
+import { isDevSessionValid } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
-  const { token } = await req.json();
+	const { token } = await req.json();
 
-  if (!token || typeof token !== "string") {
-    return NextResponse.json({ ok: false }, { status: 401 });
-  }
+	if (!token || typeof token !== "string") {
+		return NextResponse.json({ ok: false }, { status: 401 });
+	}
 
-  const sessions = await sql`
+	if (!process.env.DATABASE_URL) {
+		if (isDevSessionValid(token)) {
+			return NextResponse.json({ ok: true });
+		}
+		return NextResponse.json({ ok: false }, { status: 401 });
+	}
+
+	const sessions = await sql`
     SELECT s.id
     FROM sessions s
     JOIN users u ON u.id = s.user_id
@@ -19,9 +26,9 @@ export async function POST(req: NextRequest) {
     LIMIT 1
   `;
 
-  if (sessions.length === 0) {
-    return NextResponse.json({ ok: false }, { status: 401 });
-  }
+	if (sessions.length === 0) {
+		return NextResponse.json({ ok: false }, { status: 401 });
+	}
 
-  return NextResponse.json({ ok: true });
+	return NextResponse.json({ ok: true });
 }

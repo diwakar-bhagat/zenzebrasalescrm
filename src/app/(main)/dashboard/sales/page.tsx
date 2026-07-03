@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
+import { PolarAngleAxis, RadialBar, RadialBarChart } from "recharts";
 import { DataFreshnessSystem } from "@/components/dashboard/data-freshness-system";
 import {
 	formatStoreName,
@@ -22,12 +22,11 @@ import {
 import {
 	AovAnalysisTable,
 	BillCutAnalysisTable,
-	BrandProfitabilityTable,
-	CategoryProfitabilityTable,
+	BrandPerformanceTable,
 	CustomerIntelligenceCard,
 	DailyHealthTable,
 	PaymentAnalysisCard,
-	SkuProfitabilityTable,
+	SkuPerformanceTable,
 } from "@/components/founder/sales-dashboard-sections";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -313,6 +312,7 @@ export default function SalesDashboardPage() {
 		compareMode,
 		compareStartDate,
 		compareEndDate,
+		setDataBounds,
 	} = useFilterStore();
 
 	useEffect(() => {
@@ -322,6 +322,9 @@ export default function SalesDashboardPage() {
 				const json = await res.json();
 				if (json.success) {
 					setStatus(json.data);
+					if (json.data?.minDate && json.data?.maxDate) {
+						setDataBounds(json.data.minDate, json.data.maxDate);
+					}
 				}
 			} catch (err) {
 				console.error("Failed to fetch status", err);
@@ -329,7 +332,7 @@ export default function SalesDashboardPage() {
 		};
 
 		fetchStatus();
-	}, []);
+	}, [setDataBounds]);
 
 	useEffect(() => {
 		if (!status?.hasData) return;
@@ -413,17 +416,16 @@ export default function SalesDashboardPage() {
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
 				<div>
 					<h2 className="text-3xl font-bold tracking-tight">Sales Dashboard</h2>
-					<p className="text-muted-foreground mt-1">
-						Sales, inventory cost, and the profit you actually made
-					</p>
+					<p className="text-muted-foreground mt-1">System of Attention</p>
 				</div>
 				<div className="flex items-center gap-3">
 					<DataFreshnessSystem />
 					<Button
-						variant="outline"
+						size="lg"
+						className="shadow-sm"
 						onClick={() => router.push("/dashboard/sales/upload")}
 					>
-						<Upload className="mr-2 size-4" />
+						<Upload data-icon="inline-start" />
 						Upload Data
 					</Button>
 				</div>
@@ -574,88 +576,6 @@ export default function SalesDashboardPage() {
 						</Card>
 					</div>
 
-					{/* 1.2 Profit Intelligence — the core question: what did we actually make? */}
-					{data.profitability && (
-						<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4">
-							<Card>
-								<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-									<CardTitle className="text-sm font-medium">
-										Net Sales
-									</CardTitle>
-									<IndianRupee className="size-4 text-muted-foreground" />
-								</CardHeader>
-								<CardContent>
-									<div className="text-2xl font-bold">
-										{formatCurrency(data.profitability.netSales)}
-									</div>
-									<p className="text-xs text-muted-foreground mt-1">
-										Taxable revenue (GST removed)
-									</p>
-								</CardContent>
-							</Card>
-							<Card>
-								<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-									<CardTitle className="text-sm font-medium">
-										Net Purchase
-									</CardTitle>
-									<ShoppingCart className="size-4 text-muted-foreground" />
-								</CardHeader>
-								<CardContent>
-									<div className="text-2xl font-bold">
-										{data.hasPurchaseData
-											? formatCurrency(data.profitability.netPurchase)
-											: "N/A"}
-									</div>
-									<p className="text-xs text-muted-foreground mt-1">
-										{data.hasPurchaseData
-											? "Inventory cost of goods"
-											: "Purchase data unavailable"}
-									</p>
-								</CardContent>
-							</Card>
-							<Card>
-								<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-									<CardTitle className="text-sm font-medium">
-										Gross Profit
-									</CardTitle>
-									<TrendingUp className="size-4 text-muted-foreground" />
-								</CardHeader>
-								<CardContent>
-									<div
-										className={`text-2xl font-bold ${data.hasPurchaseData && data.profitability.grossProfit < 0 ? "text-status-delayed" : ""}`}
-									>
-										{data.hasPurchaseData
-											? formatCurrency(data.profitability.grossProfit)
-											: "N/A"}
-									</div>
-									<p className="text-xs text-muted-foreground mt-1">
-										Net Sales − Net Purchase
-									</p>
-								</CardContent>
-							</Card>
-							<Card>
-								<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-									<CardTitle className="text-sm font-medium">
-										Margin %
-									</CardTitle>
-									<Percent className="size-4 text-muted-foreground" />
-								</CardHeader>
-								<CardContent>
-									<div className="text-2xl font-bold">
-										{data.profitability.marginPercent == null
-											? "N/A"
-											: `${safeFixed(data.profitability.marginPercent)}%`}
-									</div>
-									<p className="text-xs text-muted-foreground mt-1">
-										{data.profitability.profitPerBill == null
-											? "Gross Profit / Net Sales"
-											: `${formatCurrency(data.profitability.profitPerBill)} profit / bill`}
-									</p>
-								</CardContent>
-							</Card>
-						</div>
-					)}
-
 					{/* 1.5 Financial Operations Analysis & Waterfall Chart */}
 					<div className="grid gap-4 md:grid-cols-3 mt-4">
 						{/* Collection vs Revenue Card */}
@@ -746,82 +666,115 @@ export default function SalesDashboardPage() {
 								<CardTitle className="text-sm font-semibold text-muted-foreground">
 									Deduction Waterfall
 								</CardTitle>
+								<CardDescription className="text-xs">
+									Share of MRP Value retained at each stage
+								</CardDescription>
 							</CardHeader>
 							<CardContent className="flex-1 min-h-[140px] pt-0">
-								<ChartContainer
-									config={waterfallChartConfig}
-									className="h-full w-full"
-								>
-									<BarChart
-										data={[
-											{
-												name: "MRP Value",
-												val: [0, data.salesKpis.mrp.current],
-												display: formatCurrency(data.salesKpis.mrp.current),
-												fill: "var(--color-mrpValue)",
-											},
-											{
-												name: "Discount",
-												val: [
-													data.salesKpis.mrp.current -
-														data.salesKpis.discount.current,
-													data.salesKpis.mrp.current,
-												],
-												display: `-${formatCurrency(data.salesKpis.discount.current)}`,
-												fill: "var(--color-discount)",
-											},
-											{
-												name: "Collection",
-												val: [0, data.salesKpis.collection.current],
-												display: formatCurrency(
-													data.salesKpis.collection.current,
-												),
-												fill: "var(--color-collection)",
-											},
-											{
-												name: "GST Liability",
-												val: [
-													data.salesKpis.collection.current -
-														data.salesKpis.gst.current,
-													data.salesKpis.collection.current,
-												],
-												display: `-${formatCurrency(data.salesKpis.gst.current)}`,
-												fill: "var(--color-gst)",
-											},
-											{
-												name: "Net Revenue",
-												val: [0, data.salesKpis.revenue.current],
-												display: formatCurrency(data.salesKpis.revenue.current),
-												fill: "var(--color-revenue)",
-											},
-										]}
-										margin={{ top: 15, right: 5, left: 5, bottom: 5 }}
-									>
-										<CartesianGrid
-											strokeDasharray="3 3"
-											vertical={false}
-											opacity={0.15}
-										/>
-										<XAxis
-											dataKey="name"
-											tick={{ fontSize: 9 }}
-											tickLine={false}
-											axisLine={false}
-										/>
-										<ChartTooltip content={<CustomTooltip />} />
-										<Bar dataKey="val">
-											{[
-												"var(--color-mrpValue)",
-												"var(--color-discount)",
-												"var(--color-collection)",
-												"var(--color-gst)",
-												"var(--color-revenue)",
-											].map((color) => (
-												<Cell key={color} fill={color} />
-											))}
-										</Bar>
-									</BarChart>
-								</ChartContainer>
+								{(() => {
+									const mrp = data.salesKpis.mrp.current || 0;
+									const pctOfMrp = (value: number) =>
+										mrp > 0 ? (value / mrp) * 100 : 0;
+									const rings = [
+										{
+											name: "Collection",
+											amount: data.salesKpis.collection.current,
+											value: pctOfMrp(data.salesKpis.collection.current),
+											fill: "oklch(0.93 0 0)", // near-white
+										},
+										{
+											name: "Net Revenue",
+											amount: data.salesKpis.revenue.current,
+											value: pctOfMrp(data.salesKpis.revenue.current),
+											fill: "oklch(0.72 0 0)", // light grey
+										},
+										{
+											name: "GST Liability",
+											amount: data.salesKpis.gst.current,
+											value: pctOfMrp(data.salesKpis.gst.current),
+											fill: "oklch(0.5 0 0)", // mid grey
+										},
+										{
+											name: "Discount",
+											amount: data.salesKpis.discount.current,
+											value: pctOfMrp(data.salesKpis.discount.current),
+											fill: "oklch(0.32 0 0)", // dark grey
+										},
+									].map((ring) => ({
+										...ring,
+										display: formatCurrency(ring.amount),
+									}));
+
+									return (
+										<div className="flex h-full items-center gap-4">
+											<ChartContainer
+												config={waterfallChartConfig}
+												className="aspect-square h-[140px] w-[140px] shrink-0"
+											>
+												<RadialBarChart
+													data={rings}
+													innerRadius="30%"
+													outerRadius="100%"
+													startAngle={90}
+													endAngle={-270}
+												>
+													<PolarAngleAxis
+														type="number"
+														domain={[0, 100]}
+														angleAxisId={0}
+														tick={false}
+													/>
+													<ChartTooltip content={<CustomTooltip />} />
+													<RadialBar
+														dataKey="value"
+														background={{ fill: "var(--muted)" }}
+														cornerRadius={6}
+													/>
+												</RadialBarChart>
+											</ChartContainer>
+											<div className="flex-1 space-y-2">
+												<div className="flex items-center justify-between gap-2 text-xs">
+													<div className="flex min-w-0 items-center gap-2">
+														<span className="size-2.5 shrink-0 rounded-full bg-muted-foreground/40" />
+														<span className="truncate text-muted-foreground">
+															MRP Value
+														</span>
+													</div>
+													<div className="flex shrink-0 items-center gap-2">
+														<span className="font-semibold">
+															{formatCurrency(mrp)}
+														</span>
+														<span className="text-muted-foreground">100%</span>
+													</div>
+												</div>
+												{rings.map((ring) => (
+													<div
+														key={ring.name}
+														className="flex items-center justify-between gap-2 text-xs"
+													>
+														<div className="flex min-w-0 items-center gap-2">
+															<span
+																className="size-2.5 shrink-0 rounded-full"
+																style={{ backgroundColor: ring.fill }}
+															/>
+															<span className="truncate text-muted-foreground">
+																{ring.name}
+															</span>
+														</div>
+														<div className="flex shrink-0 items-center gap-2">
+															<span className="font-semibold">
+																{ring.display}
+															</span>
+															<span className="text-muted-foreground">
+																{safeFixed(ring.value, 0)}%
+															</span>
+														</div>
+													</div>
+												))}
+											</div>
+										</div>
+									);
+								})()}
 							</CardContent>
 						</Card>
 					</div>
@@ -947,36 +900,6 @@ export default function SalesDashboardPage() {
 													{storeKpi.units.toLocaleString()}
 												</p>
 											</div>
-											<div className="bg-muted/30 p-3 rounded-lg border">
-												<p className="text-xs text-muted-foreground">
-													Net Purchase
-												</p>
-												<p className="text-lg font-bold mt-1">
-													{storeKpi.hasPurchase
-														? formatCurrency(storeKpi.netPurchase)
-														: "N/A"}
-												</p>
-											</div>
-											<div className="bg-muted/30 p-3 rounded-lg border">
-												<p className="text-xs text-muted-foreground">
-													Gross Profit
-												</p>
-												<p
-													className={`text-lg font-bold mt-1 ${storeKpi.hasPurchase && storeKpi.grossProfit < 0 ? "text-status-delayed" : ""}`}
-												>
-													{storeKpi.hasPurchase
-														? formatCurrency(storeKpi.grossProfit)
-														: "N/A"}
-												</p>
-											</div>
-											<div className="bg-muted/30 p-3 rounded-lg border">
-												<p className="text-xs text-muted-foreground">Margin</p>
-												<p className="text-lg font-bold mt-1">
-													{storeKpi.marginPercent == null
-														? "N/A"
-														: `${safeFixed(storeKpi.marginPercent)}%`}
-												</p>
-											</div>
 										</CardContent>
 									</Card>
 								);
@@ -1008,10 +931,7 @@ export default function SalesDashboardPage() {
 											const exportData = data.storePerformance.map(
 												(row: any) => ({
 													Store: row.storeDisplayName,
-													"Net Sales": row.netSales ?? row.revenue,
-													"Net Purchase": row.netPurchase,
-													"Gross Profit": row.grossProfit,
-													"Margin (%)": row.marginPercent,
+													Revenue: row.revenue,
 													"Growth (%)": row.revenueGrowth,
 													"Contribution (%)": row.contributionPercent,
 													"Bill Cuts": row.billCuts,
@@ -1034,16 +954,7 @@ export default function SalesDashboardPage() {
 											<tr>
 												<th className="px-4 py-3 font-medium">Store</th>
 												<th className="px-4 py-3 font-medium text-right">
-													Net Sales
-												</th>
-												<th className="px-4 py-3 font-medium text-right">
-													Net Purchase
-												</th>
-												<th className="px-4 py-3 font-medium text-right">
-													Gross Profit
-												</th>
-												<th className="px-4 py-3 font-medium text-right">
-													Margin
+													Revenue
 												</th>
 												<th className="px-4 py-3 font-medium text-right">
 													Growth
@@ -1065,11 +976,6 @@ export default function SalesDashboardPage() {
 													billedBy: string;
 													storeDisplayName: string;
 													revenue: number;
-													netSales: number;
-													netPurchase: number;
-													grossProfit: number;
-													marginPercent: number | null;
-													hasPurchase: boolean;
 													revenueGrowth: number;
 													contributionPercent: number;
 													billCuts: number;
@@ -1083,26 +989,7 @@ export default function SalesDashboardPage() {
 															{storeRow.storeDisplayName}
 														</td>
 														<td className="px-4 py-3 text-right font-semibold">
-															{formatCurrency(
-																storeRow.netSales ?? storeRow.revenue,
-															)}
-														</td>
-														<td className="px-4 py-3 text-right">
-															{storeRow.hasPurchase
-																? formatCurrency(storeRow.netPurchase)
-																: "N/A"}
-														</td>
-														<td
-															className={`px-4 py-3 text-right font-semibold ${storeRow.hasPurchase && storeRow.grossProfit < 0 ? "text-status-delayed" : ""}`}
-														>
-															{storeRow.hasPurchase
-																? formatCurrency(storeRow.grossProfit)
-																: "N/A"}
-														</td>
-														<td className="px-4 py-3 text-right">
-															{storeRow.marginPercent == null
-																? "N/A"
-																: `${safeFixed(storeRow.marginPercent)}%`}
+															{formatCurrency(storeRow.revenue)}
 														</td>
 														<td
 															className={`px-4 py-3 text-right ${storeRow.revenueGrowth >= 0 ? "text-status-on-track" : "text-status-delayed"}`}
@@ -1141,27 +1028,17 @@ export default function SalesDashboardPage() {
 						</Card>
 					)}
 
-					{data.categoryProfitability && (
-						<CategoryProfitabilityTable
-							data={data.categoryProfitability}
-							comparisonLabel={data.comparisonLabel}
-							hasPurchaseData={data.hasPurchaseData}
-						/>
-					)}
-
 					<div className="grid gap-4 md:grid-cols-2">
-						{data.brandProfitability && (
-							<BrandProfitabilityTable
-								data={data.brandProfitability}
+						{data.brandPerformance && (
+							<BrandPerformanceTable
+								data={data.brandPerformance}
 								comparisonLabel={data.comparisonLabel}
-								hasPurchaseData={data.hasPurchaseData}
 							/>
 						)}
-						{data.skuProfitability && (
-							<SkuProfitabilityTable
-								data={data.skuProfitability}
+						{data.skuPerformance && (
+							<SkuPerformanceTable
+								data={data.skuPerformance}
 								comparisonLabel={data.comparisonLabel}
-								hasPurchaseData={data.hasPurchaseData}
 							/>
 						)}
 						{data.billCutAnalysis && (

@@ -1,10 +1,15 @@
 import { create } from "zustand";
-import { getDefaultPeriod } from "@/lib/business-logic/comparison";
+import {
+	getDefaultPeriod,
+	getMirrorPeriod,
+} from "@/lib/business-logic/comparison";
 
 interface FilterState {
 	startDate: string;
 	endDate: string;
 	isDateFiltered: boolean;
+	dataMinDate: string | null;
+	dataMaxDate: string | null;
 	store: "ALL" | string;
 	category: string;
 	brand: string;
@@ -28,16 +33,22 @@ interface FilterState {
 		compareStartDate: string,
 		compareEndDate: string,
 	) => void;
+	setDataBounds: (
+		dataMinDate: string | null,
+		dataMaxDate: string | null,
+	) => void;
 	reset: () => void;
 }
 
-export const useFilterStore = create<FilterState>((set) => {
+export const useFilterStore = create<FilterState>((set, get) => {
 	const range = getDefaultPeriod();
 
 	return {
 		startDate: range.current.startDate,
 		endDate: range.current.endDate,
 		isDateFiltered: false,
+		dataMinDate: null,
+		dataMaxDate: null,
 		store: "ALL",
 		category: "All Categories",
 		brand: "All Brands",
@@ -60,7 +71,39 @@ export const useFilterStore = create<FilterState>((set) => {
 		setCompareEndDate: (compareEndDate) => set({ compareEndDate }),
 		setCompareDateRange: (compareStartDate, compareEndDate) =>
 			set({ compareStartDate, compareEndDate }),
+		setDataBounds: (dataMinDate, dataMaxDate) => {
+			set({ dataMinDate, dataMaxDate });
+			// Only auto-correct the period if the user hasn't manually picked dates yet —
+			// otherwise this would clobber an in-progress filter every time status refreshes.
+			if (!dataMinDate || !dataMaxDate || get().isDateFiltered) return;
+			const mirror = getMirrorPeriod(dataMinDate, dataMaxDate);
+			set({
+				startDate: dataMinDate,
+				endDate: dataMaxDate,
+				compareStartDate: mirror.previous.startDate,
+				compareEndDate: mirror.previous.endDate,
+			});
+		},
 		reset: () => {
+			const { dataMinDate, dataMaxDate } = get();
+			if (dataMinDate && dataMaxDate) {
+				const mirror = getMirrorPeriod(dataMinDate, dataMaxDate);
+				set({
+					startDate: dataMinDate,
+					endDate: dataMaxDate,
+					isDateFiltered: false,
+					store: "ALL",
+					category: "All Categories",
+					brand: "All Brands",
+					sku: "",
+					categoryScope: "all",
+					compareMode: "mirror",
+					compareStartDate: mirror.previous.startDate,
+					compareEndDate: mirror.previous.endDate,
+				});
+				return;
+			}
+
 			const nextRange = getDefaultPeriod();
 			set({
 				startDate: nextRange.current.startDate,

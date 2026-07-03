@@ -2,19 +2,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import {
 	commitFounderUploadFile,
-	commitStagedFounderUpload,
-	stageFounderUploadChunk,
-	startFounderUploadBatch,
 	validateFounderUploadFile,
-	validateStagedFounderUpload,
 } from "@/lib/founder/import-service";
-import {
-	commitPurchaseUploadFile,
-	commitStagedPurchaseUpload,
-	stagePurchaseUploadChunk,
-	startPurchaseUploadBatch,
-	validateStagedPurchaseUpload,
-} from "@/lib/founder/purchase-import-service";
 
 export const runtime = "nodejs";
 
@@ -49,103 +38,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
 	try {
 		const mode = req.nextUrl.searchParams.get("mode") ?? "validate";
-
-		if (mode === "start_batch") {
-			const body = await req.json();
-			const filename = body.filename ?? "upload.xlsx";
-			const dataType = body.dataType ?? "sales";
-
-			const batchId =
-				dataType === "purchase"
-					? await startPurchaseUploadBatch(sql, filename)
-					: await startFounderUploadBatch(sql, filename);
-
-			return NextResponse.json({ success: true, data: { batchId } });
-		}
-
-		if (mode === "upload_chunk") {
-			const body = await req.json();
-			const { batchId, chunkIndex, rows, dataType = "sales" } = body;
-			if (!batchId || chunkIndex === undefined || !rows) {
-				return NextResponse.json(
-					{ success: false, error: "Missing required parameters" },
-					{ status: 400 },
-				);
-			}
-
-			if (dataType === "purchase") {
-				await stagePurchaseUploadChunk(
-					sql,
-					Number(batchId),
-					Number(chunkIndex),
-					rows,
-				);
-			} else {
-				await stageFounderUploadChunk(
-					sql,
-					Number(batchId),
-					Number(chunkIndex),
-					rows,
-				);
-			}
-			return NextResponse.json({ success: true });
-		}
-
-		if (mode === "validate_batch") {
-			const body = await req.json();
-			const { batchId, dataType = "sales" } = body;
-			if (!batchId) {
-				return NextResponse.json(
-					{ success: false, error: "Missing batchId" },
-					{ status: 400 },
-				);
-			}
-
-			const validation =
-				dataType === "purchase"
-					? await validateStagedPurchaseUpload(sql, Number(batchId))
-					: await validateStagedFounderUpload(sql, Number(batchId));
-
-			return NextResponse.json({ success: true, data: validation });
-		}
-
-		if (mode === "commit_batch") {
-			const body = await req.json();
-			const { batchId, uploadType, dataType = "sales" } = body;
-			if (!batchId) {
-				return NextResponse.json(
-					{ success: false, error: "Missing batchId" },
-					{ status: 400 },
-				);
-			}
-
-			const typeParam =
-				uploadType === "incremental" ? "incremental" : "full_replace";
-
-			const result =
-				dataType === "purchase"
-					? await commitStagedPurchaseUpload(sql, Number(batchId), typeParam)
-					: await commitStagedFounderUpload(sql, Number(batchId), typeParam);
-
-			if (!result.success) {
-				return NextResponse.json(
-					{ success: false, error: result.error, data: result.validation },
-					{ status: 400 },
-				);
-			}
-			return NextResponse.json({
-				success: true,
-				data: {
-					batchId: result.batchId,
-					rowsInserted: result.rowsInserted,
-					...result.validation,
-				},
-			});
-		}
-
 		const formData = await req.formData();
 		const file = formData.get("file");
-		const dataType = (formData.get("dataType") as string) ?? "sales";
 
 		if (!(file instanceof File)) {
 			return NextResponse.json(
@@ -155,10 +49,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		if (mode === "validate") {
-			const validation =
-				dataType === "purchase"
-					? await validateStagedPurchaseUpload(sql, 1) // not used directly in normal flow
-					: await validateFounderUploadFile(sql, file);
+			const validation = await validateFounderUploadFile(sql, file);
 			return NextResponse.json({ success: true, data: validation });
 		}
 
@@ -167,44 +58,21 @@ export async function POST(req: NextRequest) {
 				(formData.get("uploadType") as string) === "incremental"
 					? "incremental"
 					: "full_replace";
-
-			const result =
-				dataType === "purchase"
-					? await commitPurchaseUploadFile(sql, file, uploadType)
-					: await commitFounderUploadFile(sql, file, uploadType);
+			const result = await commitFounderUploadFile(sql, file, uploadType);
 
 			if (!result.success) {
-				const errorData =
-					"validation" in result
-						? ((result as Record<string, unknown>).validation as Record<
-								string,
-								unknown
-							>)
-						: (result as unknown as Record<string, unknown>);
 				return NextResponse.json(
-					{
-						success: false,
-						error: result.error,
-						data: errorData,
-					},
+					{ success: false, error: result.error, data: result.validation },
 					{ status: 400 },
 				);
 			}
-
-			const successData =
-				"validation" in result
-					? ((result as Record<string, unknown>).validation as Record<
-							string,
-							unknown
-						>)
-					: (result as unknown as Record<string, unknown>);
 
 			return NextResponse.json({
 				success: true,
 				data: {
 					batchId: result.batchId,
 					rowsInserted: result.rowsInserted,
-					...successData,
+					...result.validation,
 				},
 			});
 		}

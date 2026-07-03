@@ -72,10 +72,10 @@ export function getMirrorPeriod(
 	return getPreviousMonthSameRange(startDate, endDate);
 }
 
-export function getDefaultPeriod(): ComparisonPeriod {
-	const today = new Date();
-	const end = fmt(today);
-	const start = new Date(today);
+export function getDefaultPeriod(referenceDate?: string): ComparisonPeriod {
+	const endDate = referenceDate ? parseISODate(referenceDate) : new Date();
+	const end = referenceDate ?? fmt(endDate);
+	const start = new Date(endDate);
 	start.setUTCDate(start.getUTCDate() - 29);
 	return getMirrorPeriod(fmt(start), end);
 }

@@ -10,6 +10,7 @@ import { DiagnosisCard } from "@/components/store-overview/DiagnosisCard";
 import { ForecastCard } from "@/components/store-overview/ForecastCard";
 import { StorePerformanceTable } from "@/components/store-overview/StorePerformanceTable";
 import { TrendChart } from "@/components/store-overview/TrendChart";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -201,7 +202,10 @@ export default function Page() {
 						<p className="text-muted-foreground text-sm">{formattedDate}</p>
 					</div>
 					{data?.context && (
-						<div className="inline-flex flex-wrap items-center gap-2 text-xs font-semibold px-2.5 py-1 rounded-md border border-border bg-muted/30 text-muted-foreground w-fit">
+						<Badge
+							variant="outline"
+							className="h-auto w-fit flex-wrap gap-2 px-2.5 py-1 text-xs font-semibold text-muted-foreground"
+						>
 							<span className="font-bold text-foreground">
 								{data.context.title.split(" vs ")[0]}
 							</span>
@@ -217,7 +221,7 @@ export default function Page() {
 							<span className="text-muted-foreground font-normal">
 								({data.context.previous})
 							</span>
-						</div>
+						</Badge>
 					)}
 				</div>
 
@@ -233,35 +237,37 @@ export default function Page() {
 			</div>
 
 			{health && !health.isHealthy && (
-				<div className="flex flex-col gap-2 p-4 mb-2 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm">
-					<div className="flex items-center gap-2 font-bold">
-						<AlertTriangle className="size-4 shrink-0" />
+				<Alert className="mb-2 border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+					<AlertTriangle className="size-4 shrink-0" />
+					<AlertTitle className="font-bold">
 						Database Integrity Warnings Detected
-					</div>
-					<ul className="list-disc list-inside pl-1 space-y-1 text-xs">
-						{health.invalidStoresCount > 0 && (
-							<li>
-								<strong>Invalid Stores:</strong> Detected{" "}
-								{health.invalidStoresCount} rows from unauthorized stores (
-								{health.invalidStores.map((s: any) => s.name).join(", ")}).
-							</li>
-						)}
-						{health.duplicateBillsCount > 0 && (
-							<li>
-								<strong>Duplicate Bills:</strong> Detected{" "}
-								{health.duplicateBillsCount} duplicate invoice conflicts (same
-								bill number across different stores on the same date).
-							</li>
-						)}
-						{health.missingDatesCount > 0 && (
-							<li>
-								<strong>Data Gaps:</strong> Missing sales data for{" "}
-								{health.missingDatesCount} dates in active range (
-								{health.missingDates.slice(0, 5).join(", ")}...).
-							</li>
-						)}
-					</ul>
-				</div>
+					</AlertTitle>
+					<AlertDescription className="text-amber-600 dark:text-amber-400">
+						<ul className="list-disc list-inside pl-1 space-y-1 text-xs">
+							{health.invalidStoresCount > 0 && (
+								<li>
+									<strong>Invalid Stores:</strong> Detected{" "}
+									{health.invalidStoresCount} rows from unauthorized stores (
+									{health.invalidStores.map((s: any) => s.name).join(", ")}).
+								</li>
+							)}
+							{health.duplicateBillsCount > 0 && (
+								<li>
+									<strong>Duplicate Bills:</strong> Detected{" "}
+									{health.duplicateBillsCount} duplicate invoice conflicts (same
+									bill number across different stores on the same date).
+								</li>
+							)}
+							{health.missingDatesCount > 0 && (
+								<li>
+									<strong>Data Gaps:</strong> Missing sales data for{" "}
+									{health.missingDatesCount} dates in active range (
+									{health.missingDates.slice(0, 5).join(", ")}...).
+								</li>
+							)}
+						</ul>
+					</AlertDescription>
+				</Alert>
 			)}
 
 			<GlobalFilterBar
@@ -275,7 +281,6 @@ export default function Page() {
 					<StorePerformanceTable
 						stores={data.stores}
 						comparisonLabel={data.comparisonLabel}
-						hasPurchaseData={data.hasPurchaseData}
 					/>
 				</div>
 

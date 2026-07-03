@@ -22,7 +22,9 @@ import "@/styles/flag-icons/flags.css";
 
 export default function Page() {
 	const router = useRouter();
+	// biome-ignore lint/suspicious/noExplicitAny: Dashboard data from API has dynamic shape
 	const [data, setData] = useState<any>(null);
+	// biome-ignore lint/suspicious/noExplicitAny: Status data from API has dynamic shape
 	const [status, setStatus] = useState<any>(null);
 	const [isLoading, setIsLoading] = useState(true);
 

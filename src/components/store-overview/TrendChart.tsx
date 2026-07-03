@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import * as React from "react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
 	Card,
 	CardContent,
@@ -21,7 +21,6 @@ import { formatCurrency } from "@/lib/utils";
 export interface TrendStore {
 	name: string;
 	revenue: number;
-	purchase?: number;
 }
 
 export interface TrendRow {
@@ -87,13 +86,10 @@ export function TrendChart({ trends }: TrendChartProps) {
 	// 5. Construct Recharts data shape
 	const chartData = React.useMemo(() => {
 		return trends.map((row) => {
-			const obj: Record<string, string | number> = { date: row.date };
+			const obj: any = { date: row.date };
 			for (const store of row.stores) {
 				if (selectedStores.includes(store.name)) {
 					obj[store.name] = store.revenue;
-					if (store.purchase !== undefined) {
-						obj[store.name + " (Purchase)"] = store.purchase;
-					}
 				}
 			}
 			return obj;
@@ -130,6 +126,10 @@ export function TrendChart({ trends }: TrendChartProps) {
 		} catch {
 			return value;
 		}
+	}
+
+	function gradientId(name: string) {
+		return `revenue-momentum-${name.replace(/[^a-zA-Z0-9]/g, "-")}`;
 	}
 
 	const toggleStore = (name: string) => {
@@ -184,11 +184,34 @@ export function TrendChart({ trends }: TrendChartProps) {
 					</div>
 				) : (
 					<ChartContainer config={chartConfig} className="h-60 w-full">
-						<LineChart
+						<AreaChart
 							accessibilityLayer
 							data={chartData}
 							margin={{ bottom: 0, left: 0, right: 0, top: 8 }}
 						>
+							<defs>
+								{selectedStores.map((name) => (
+									<linearGradient
+										key={name}
+										id={gradientId(name)}
+										x1="0"
+										y1="0"
+										x2="0"
+										y2="1"
+									>
+										<stop
+											offset="5%"
+											stopColor={storeColors[name]}
+											stopOpacity={0.35}
+										/>
+										<stop
+											offset="95%"
+											stopColor={storeColors[name]}
+											stopOpacity={0}
+										/>
+									</linearGradient>
+								))}
+							</defs>
 							<CartesianGrid
 								vertical={false}
 								strokeDasharray="3 3"
@@ -240,30 +263,21 @@ export function TrendChart({ trends }: TrendChartProps) {
 								}
 							/>
 							{selectedStores.map((name) => (
-								<React.Fragment key={name}>
-									<Line
-										connectNulls
-										dataKey={name}
-										stroke={storeColors[name]}
-										strokeWidth={2}
-										dot={false}
-										activeDot={{ r: 4 }}
-										name={name + " (Sales)"}
-									/>
-									<Line
-										connectNulls
-										dataKey={name + " (Purchase)"}
-										stroke={storeColors[name]}
-										strokeOpacity={0.6}
-										strokeWidth={2}
-										strokeDasharray="5 5"
-										dot={false}
-										activeDot={{ r: 4 }}
-										name={name + " (Purchase)"}
-									/>
-								</React.Fragment>
+								<Area
+									key={name}
+									type="monotone"
+									connectNulls
+									dataKey={name}
+									stroke={storeColors[name]}
+									strokeWidth={2}
+									fill={`url(#${gradientId(name)})`}
+									fillOpacity={1}
+									dot={false}
+									activeDot={{ r: 4 }}
+									name={name}
+								/>
 							))}
-						</LineChart>
+						</AreaChart>
 					</ChartContainer>
 				)}
 			</CardContent>

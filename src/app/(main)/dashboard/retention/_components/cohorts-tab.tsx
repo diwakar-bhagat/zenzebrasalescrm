@@ -1,7 +1,7 @@
 "use client";
 
-import { HelpCircle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Filter, HelpCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	Card,
 	CardContent,
@@ -9,6 +9,13 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -25,15 +32,65 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useCohorts } from "@/hooks/useCohorts";
 import { formatCurrency } from "@/lib/utils";
+import { useFilterStore } from "@/stores/founder/filter-store";
 
 type CohortMetricType = "retention" | "revenue" | "aov" | "billCuts";
 
 export function CohortsTab({ hasData }: { hasData: boolean }) {
 	const [selectedMetric, setSelectedMetric] =
 		useState<CohortMetricType>("retention");
-	const { data, isLoading } = useCohorts(hasData);
+
+	// Local cohort filters
+	const [customerType, setCustomerType] = useState<string>("all");
+	const [billRangeFilter, setBillRangeFilter] = useState<string>("all");
+
+	const { startDate, endDate, store, categoryScope } = useFilterStore();
+	const [dataPayload, setDataPayload] = useState<any>(null);
+	const [isLoading, setIsLoading] = useState(true);
+
+	useEffect(() => {
+		if (!hasData) return;
+
+		const fetchData = async () => {
+			setIsLoading(true);
+			try {
+				const params = new URLSearchParams({
+					startDate,
+					endDate,
+					customerType,
+					billRange: billRangeFilter,
+				});
+				if (store !== "ALL") params.set("store", store);
+				if (categoryScope !== "all") params.set("categoryScope", categoryScope);
+
+				const res = await fetch(
+					`/api/customer-retention/cohorts?${params.toString()}`,
+				);
+				const json = await res.json();
+				if (json.success) {
+					setDataPayload(json.data);
+				}
+			} catch (err) {
+				console.error("Failed to fetch cohorts data", err);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+
+		fetchData();
+	}, [
+		hasData,
+		startDate,
+		endDate,
+		store,
+		categoryScope,
+		customerType,
+		billRangeFilter,
+	]);
+
+	const data = dataPayload?.cohorts || [];
+	const billCuts = dataPayload?.billCuts || [];
 
 	const limits = useMemo(() => {
 		if (!data || data.length === 0)
@@ -54,11 +111,64 @@ export function CohortsTab({ hasData }: { hasData: boolean }) {
 		return { maxRevenue, maxAov, maxBillCuts };
 	}, [data]);
 
-	if (isLoading || !data) {
+	// Header summary stats (derived from already-fetched cohort data, M1 = first retention checkpoint)
+	const summaryStats = useMemo(() => {
+		if (!data || data.length === 0) {
+			return {
+				totalCustomers: 0,
+				avgM1Retention: 0,
+				strongestLabel: "—",
+				weakestLabel: "—",
+			};
+		}
+
+		const totalCustomers = data.reduce(
+			(sum: number, c: any) => sum + (c.cohortCustomers || 0),
+			0,
+		);
+
+		const withM1 = data
+			.map((c: any) => ({
+				label: c.cohortLabel,
+				m1: c.months.find((m: any) => m.monthIndex === 1),
+			}))
+			.filter((c: any) => c.m1 && c.m1.activeCustomers > 0);
+
+		const avgM1Retention =
+			withM1.length > 0
+				? Math.round(
+						(withM1.reduce(
+							(sum: number, c: any) => sum + c.m1.retentionPct,
+							0,
+						) /
+							withM1.length) *
+							10,
+					) / 10
+				: 0;
+
+		let strongest = withM1[0] ?? null;
+		let weakest = withM1[0] ?? null;
+		for (const c of withM1) {
+			if (c.m1.retentionPct > (strongest?.m1.retentionPct ?? -Infinity))
+				strongest = c;
+			if (c.m1.retentionPct < (weakest?.m1.retentionPct ?? Infinity))
+				weakest = c;
+		}
+
+		return {
+			totalCustomers,
+			avgM1Retention,
+			strongestLabel: strongest?.label ?? "—",
+			weakestLabel: weakest?.label ?? "—",
+		};
+	}, [data]);
+
+	if (isLoading || !dataPayload) {
 		return (
 			<div className="flex flex-col gap-6 mt-2">
-				<Skeleton className="h-[40px] w-[350px] rounded-lg" />
+				<Skeleton className="h-[40px] w-full rounded-lg" />
 				<Skeleton className="h-[350px] w-full rounded-2xl" />
+				<Skeleton className="h-[200px] w-full rounded-2xl" />
 			</div>
 		);
 	}
@@ -68,7 +178,7 @@ export function CohortsTab({ hasData }: { hasData: boolean }) {
 			return (
 				<TableCell
 					key={m?.monthIndex ?? Math.random()}
-					className="text-center text-muted-foreground/30 font-mono text-[11px] p-2 md:p-3 border-r border-border bg-muted/10"
+					className="text-center text-zinc-700 font-mono text-[11px] p-2 md:p-3 border-r border-zinc-900 bg-zinc-900/20"
 				>
 					-
 				</TableCell>
@@ -77,44 +187,62 @@ export function CohortsTab({ hasData }: { hasData: boolean }) {
 
 		let valueText = "";
 		let textStyle = {};
+		let pillClass = "";
 
 		if (selectedMetric === "retention") {
 			const pct = m.retentionPct;
 			valueText = `${pct}%`;
-			const opacity = Math.min(1, Math.max(0.02, pct / 100));
-			textStyle = {
-				backgroundColor: `rgba(59, 130, 246, ${opacity * 0.45})`,
-				color: opacity > 0.6 ? "var(--foreground)" : "var(--muted-foreground)",
-				fontWeight: opacity > 0.5 ? "600" : "500",
-			};
-		} else if (selectedMetric === "revenue") {
-			valueText = formatCurrency(m.revenue, { noDecimals: true });
-			const opacity = Math.min(
-				1,
-				Math.max(0.02, m.revenue / limits.maxRevenue),
+
+			// Same thresholds as before (100% Dark Green, 70% Green, 50% Yellow, 20% Red) — now rendered as a pill badge
+			if (pct >= 80) {
+				pillClass = "bg-emerald-500 text-white";
+			} else if (pct >= 60) {
+				pillClass = "bg-emerald-400 text-emerald-950";
+			} else if (pct >= 40) {
+				pillClass = "bg-amber-400 text-amber-950";
+			} else {
+				pillClass = "bg-rose-500 text-white";
+			}
+
+			return (
+				<TableCell
+					key={m.monthIndex}
+					className="text-center font-mono text-[11px] p-2 md:p-3 border-r border-zinc-900"
+				>
+					<span
+						className={`inline-block min-w-[52px] px-2.5 py-1 rounded-full font-bold ${pillClass}`}
+					>
+						{valueText}
+					</span>
+				</TableCell>
 			);
+		}
+
+		if (selectedMetric === "revenue") {
+			valueText = formatCurrency(m.revenue, { noDecimals: true });
+			const opacity = Math.min(1, Math.max(0.1, m.revenue / limits.maxRevenue));
 			textStyle = {
-				backgroundColor: `rgba(16, 185, 129, ${opacity * 0.45})`,
-				color: opacity > 0.6 ? "var(--foreground)" : "var(--muted-foreground)",
+				backgroundColor: `rgba(16, 185, 129, ${opacity * 0.55})`,
+				color: "var(--foreground)",
 				fontWeight: opacity > 0.5 ? "600" : "500",
 			};
 		} else if (selectedMetric === "aov") {
 			valueText = formatCurrency(m.aov, { noDecimals: true });
-			const opacity = Math.min(1, Math.max(0.02, m.aov / limits.maxAov));
+			const opacity = Math.min(1, Math.max(0.1, m.aov / limits.maxAov));
 			textStyle = {
-				backgroundColor: `rgba(99, 102, 241, ${opacity * 0.45})`,
-				color: opacity > 0.6 ? "var(--foreground)" : "var(--muted-foreground)",
+				backgroundColor: `rgba(99, 102, 241, ${opacity * 0.55})`,
+				color: "var(--foreground)",
 				fontWeight: opacity > 0.5 ? "600" : "500",
 			};
 		} else if (selectedMetric === "billCuts") {
 			valueText = `${m.billCuts}x`;
 			const opacity = Math.min(
 				1,
-				Math.max(0.02, m.billCuts / limits.maxBillCuts),
+				Math.max(0.1, m.billCuts / limits.maxBillCuts),
 			);
 			textStyle = {
-				backgroundColor: `rgba(245, 158, 11, ${opacity * 0.45})`,
-				color: opacity > 0.6 ? "var(--foreground)" : "var(--muted-foreground)",
+				backgroundColor: `rgba(245, 158, 11, ${opacity * 0.55})`,
+				color: "var(--foreground)",
 				fontWeight: opacity > 0.5 ? "600" : "500",
 			};
 		}
@@ -122,30 +250,29 @@ export function CohortsTab({ hasData }: { hasData: boolean }) {
 		return (
 			<TableCell
 				key={m.monthIndex}
-				className="text-center font-mono text-[11px] p-2 md:p-3 border-r border-border transition-all duration-150 hover:brightness-110"
+				className="text-center font-mono text-[11px] p-2 md:p-3 border-r border-zinc-900 transition-all duration-150 hover:brightness-110"
 				style={textStyle}
 			>
 				<span className="block leading-none">{valueText}</span>
-				{selectedMetric !== "retention" && (
-					<span className="block text-[9px] text-muted-foreground/60 mt-0.5 font-sans">
-						({m.activeCustomers} active)
-					</span>
-				)}
+				<span className="block text-[9px] text-zinc-500/80 mt-0.5 font-sans">
+					({m.activeCustomers} active)
+				</span>
 			</TableCell>
 		);
 	};
 
 	return (
 		<div className="flex flex-col gap-6">
-			<Card className="overflow-hidden">
-				<CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pb-4">
+			{/* Cohort Heatmap Card */}
+			<Card className="overflow-hidden border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] shadow-none">
+				<CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between pb-4 border-b border-zinc-900">
 					<div className="flex flex-col gap-1">
-						<CardTitle className="text-lg flex items-center gap-2">
-							Cohort Heatmap
+						<CardTitle className="text-lg text-zinc-100 font-mono flex items-center gap-2">
+							Retention Cohort Analysis
 							<TooltipProvider>
 								<Tooltip>
 									<TooltipTrigger asChild>
-										<HelpCircle className="size-4 text-muted-foreground cursor-pointer" />
+										<HelpCircle className="size-4 text-zinc-500 cursor-pointer" />
 									</TooltipTrigger>
 									<TooltipContent className="max-w-xs p-3 space-y-1.5 text-xs">
 										<p>
@@ -160,54 +287,159 @@ export function CohortsTab({ hasData }: { hasData: boolean }) {
 								</Tooltip>
 							</TooltipProvider>
 						</CardTitle>
-						<CardDescription>
-							Detailed retail cohort grid tracking loyalty behavior over time.
+						<CardDescription className="text-zinc-500">
+							Retail cohort behavior across the active period, with retention,
+							revenue, AOV, and bill-cut views.
 						</CardDescription>
 					</div>
 
+					{/* Custom Local Cohort Filters */}
+					<div className="flex flex-wrap items-center gap-2">
+						<div className="flex items-center gap-2">
+							<Filter className="size-3.5 text-zinc-500" />
+							<span className="text-[10px] uppercase font-bold text-zinc-500">
+								Type
+							</span>
+							<Select value={customerType} onValueChange={setCustomerType}>
+								<SelectTrigger className="w-[100px] h-8 text-xs bg-zinc-900 border-zinc-800 text-zinc-200 rounded-lg">
+									<SelectValue placeholder="All" />
+								</SelectTrigger>
+								<SelectContent className="bg-zinc-950 border-zinc-800 text-zinc-200">
+									<SelectItem value="all">All</SelectItem>
+									<SelectItem value="new">New Customers</SelectItem>
+									<SelectItem value="existing">Existing Customers</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="flex items-center gap-2">
+							<span className="text-[10px] uppercase font-bold text-zinc-500">
+								Bill Cut
+							</span>
+							<Select
+								value={billRangeFilter}
+								onValueChange={setBillRangeFilter}
+							>
+								<SelectTrigger className="w-[110px] h-8 text-xs bg-zinc-900 border-zinc-800 text-zinc-200 rounded-lg">
+									<SelectValue placeholder="All" />
+								</SelectTrigger>
+								<SelectContent className="bg-zinc-950 border-zinc-800 text-zinc-200">
+									<SelectItem value="all">All Cuts</SelectItem>
+									<SelectItem value="0-500">0-500</SelectItem>
+									<SelectItem value="500-1000">500-1000</SelectItem>
+									<SelectItem value="1000-2000">1000-2000</SelectItem>
+									<SelectItem value="2000-5000">2000-5000</SelectItem>
+									<SelectItem value="5000+">5000+</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+					</div>
+				</CardHeader>
+
+				{/* Metric Selector Toggle — its own row, matching the reference layout */}
+				<div className="px-4 pt-4">
 					<Tabs
 						value={selectedMetric}
 						onValueChange={(val) => setSelectedMetric(val as CohortMetricType)}
-						className="w-full md:w-auto"
 					>
-						<TabsList className="grid grid-cols-4 w-full md:w-auto">
-							<TabsTrigger value="retention" className="text-xs">
-								Retention %
+						<TabsList className="bg-zinc-900 border border-zinc-800 rounded-lg p-1 h-auto">
+							<TabsTrigger
+								value="retention"
+								className="text-xs px-3 py-1.5 rounded-md data-[state=active]:bg-zinc-100 data-[state=active]:text-zinc-900"
+							>
+								Retention
 							</TabsTrigger>
-							<TabsTrigger value="revenue" className="text-xs">
+							<TabsTrigger
+								value="revenue"
+								className="text-xs px-3 py-1.5 rounded-md data-[state=active]:bg-zinc-100 data-[state=active]:text-zinc-900"
+							>
 								Revenue
 							</TabsTrigger>
-							<TabsTrigger value="aov" className="text-xs">
+							<TabsTrigger
+								value="aov"
+								className="text-xs px-3 py-1.5 rounded-md data-[state=active]:bg-zinc-100 data-[state=active]:text-zinc-900"
+							>
 								AOV
 							</TabsTrigger>
-							<TabsTrigger value="billCuts" className="text-xs">
-								Bill Cuts
+							<TabsTrigger
+								value="billCuts"
+								className="text-xs px-3 py-1.5 rounded-md data-[state=active]:bg-zinc-100 data-[state=active]:text-zinc-900"
+							>
+								Bill cut
 							</TabsTrigger>
 						</TabsList>
 					</Tabs>
-				</CardHeader>
+				</div>
+
+				{/* Summary stat tiles */}
+				<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-4 pt-4">
+					<div className="rounded-[10px] border border-zinc-800 bg-zinc-900/60 p-3">
+						<div className="text-[11px] text-zinc-500 font-mono">
+							Total customers
+						</div>
+						<div className="text-xl font-semibold text-white font-mono mt-1">
+							{summaryStats.totalCustomers.toLocaleString()}
+						</div>
+					</div>
+					<div className="rounded-[10px] border border-zinc-800 bg-zinc-900/60 p-3">
+						<div className="text-[11px] text-zinc-500 font-mono">
+							Avg M1 retention
+						</div>
+						<div className="text-xl font-semibold text-amber-400 font-mono mt-1">
+							{summaryStats.avgM1Retention}%
+						</div>
+					</div>
+					<div className="rounded-[10px] border border-zinc-800 bg-zinc-900/60 p-3">
+						<div className="text-[11px] text-zinc-500 font-mono">
+							Strongest cohort
+						</div>
+						<div className="text-xl font-semibold text-amber-400 font-mono mt-1">
+							{summaryStats.strongestLabel}
+						</div>
+					</div>
+					<div className="rounded-[10px] border border-zinc-800 bg-zinc-900/60 p-3">
+						<div className="text-[11px] text-zinc-500 font-mono">
+							Weakest cohort
+						</div>
+						<div className="text-xl font-semibold text-rose-400 font-mono mt-1">
+							{summaryStats.weakestLabel}
+						</div>
+					</div>
+				</div>
+
+				{selectedMetric === "retention" && (
+					<div className="px-4 pt-4 pb-2 text-[11px] text-zinc-500">
+						<span className="mr-3 inline-flex items-center gap-1">
+							<span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 80%+
+						</span>
+						<span className="mr-3 inline-flex items-center gap-1">
+							<span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />{" "}
+							60-79%
+						</span>
+						<span className="mr-3 inline-flex items-center gap-1">
+							<span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> 40-59%
+						</span>
+						<span className="inline-flex items-center gap-1">
+							<span className="h-2.5 w-2.5 rounded-full bg-rose-400" /> Below
+							40%
+						</span>
+					</div>
+				)}
 				<CardContent className="p-0">
 					<div className="overflow-x-auto w-full">
 						<Table className="min-w-[800px] border-collapse">
 							<TableHeader>
-								<TableRow className="border-b">
-									<TableHead className="font-semibold text-xs py-3 pl-4 border-r border-border">
-										Cohort Start Month
+								<TableRow className="border-b border-zinc-900 hover:bg-transparent">
+									<TableHead className="font-semibold text-xs py-3 pl-4 border-r border-zinc-900 text-zinc-500">
+										Cohort
 									</TableHead>
-									<TableHead className="font-semibold text-xs py-3 pl-4 text-right border-r border-border">
-										Cohort Size
+									<TableHead className="font-semibold text-xs py-3 pl-4 text-right border-r border-zinc-900 text-zinc-500">
+										Size
 									</TableHead>
-									{[
-										"Month 0",
-										"Month 1",
-										"Month 2",
-										"Month 3",
-										"Month 4",
-										"Month 5",
-									].map((label) => (
+									{["M0", "M1", "M2", "M3", "M4", "M5"].map((label) => (
 										<TableHead
 											key={label}
-											className="font-semibold text-xs py-3 text-center border-r border-border"
+											className="font-semibold text-xs py-3 text-center border-r border-zinc-900 text-zinc-500"
 										>
 											{label}
 										</TableHead>
@@ -216,22 +448,25 @@ export function CohortsTab({ hasData }: { hasData: boolean }) {
 							</TableHeader>
 							<TableBody>
 								{data.length === 0 ? (
-									<TableRow>
+									<TableRow className="hover:bg-transparent">
 										<TableCell
 											colSpan={8}
-											className="h-32 text-center text-muted-foreground"
+											className="h-32 text-center text-zinc-500"
 										>
 											No cohort data matches filters in selected period.
 										</TableCell>
 									</TableRow>
 								) : (
 									data.map((cohort: any) => (
-										<TableRow key={cohort.cohortMonth} className="border-b">
-											<TableCell className="font-semibold py-3 pl-4 text-xs whitespace-nowrap border-r border-border">
+										<TableRow
+											key={cohort.cohortMonth}
+											className="border-b border-zinc-900 hover:bg-zinc-900/40"
+										>
+											<TableCell className="font-semibold py-3 pl-4 text-xs whitespace-nowrap border-r border-zinc-900 text-zinc-200">
 												{cohort.cohortLabel}
 											</TableCell>
-											<TableCell className="font-mono text-xs py-3 pl-4 text-right tabular-nums pr-6 border-r border-border">
-												{cohort.cohortCustomers.toLocaleString()} customers
+											<TableCell className="font-mono text-xs py-3 pl-4 text-right tabular-nums pr-6 border-r border-zinc-900 text-zinc-400">
+												{cohort.cohortCustomers.toLocaleString()}
 											</TableCell>
 											{Array.from({ length: 6 }).map((_, idx) => {
 												const m = cohort.months.find(
@@ -251,38 +486,98 @@ export function CohortsTab({ hasData }: { hasData: boolean }) {
 				</CardContent>
 			</Card>
 
-			<div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-				<Card className="p-5">
-					<h3 className="text-sm font-semibold mb-2">
-						Understanding the Cohort Grid
-					</h3>
-					<ul className="text-xs text-muted-foreground space-y-2 list-disc list-inside">
-						<li>
-							Each row represents a group of unique customers who placed their
-							first order in that month.
-						</li>
-						<li>
-							Columns track their activity at subsequent intervals, e.g.{" "}
-							<strong>Month 1</strong> is exactly 1 calendar month later.
-						</li>
-						<li>
-							Higher color intensities indicate stronger repeat purchases and
-							retention densities.
-						</li>
-					</ul>
+			{/* Bill Cuts Summary Analysis Table */}
+			<div className="grid gap-6 grid-cols-1 md:grid-cols-3">
+				<Card className="md:col-span-2 overflow-hidden border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] shadow-none">
+					<CardHeader className="pb-3 border-b border-zinc-900">
+						<CardTitle className="text-sm font-bold text-zinc-100 font-mono">
+							Cohort By Bill Cut
+						</CardTitle>
+						<CardDescription className="text-xs text-zinc-500">
+							Repeat purchase rate grouped by initial bill size showing
+							retention tiering.
+						</CardDescription>
+					</CardHeader>
+					<CardContent className="p-0">
+						<Table>
+							<TableHeader>
+								<TableRow className="border-b border-zinc-900 hover:bg-transparent">
+									<TableHead className="font-semibold text-xs pl-4 text-zinc-500">
+										Bill Range (₹)
+									</TableHead>
+									<TableHead className="font-semibold text-xs text-right text-zinc-500">
+										Total Customers
+									</TableHead>
+									<TableHead className="font-semibold text-xs text-right text-zinc-500">
+										Repeat Customers
+									</TableHead>
+									<TableHead className="font-semibold text-xs text-right pr-4 text-zinc-500">
+										Retention Rate
+									</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{billCuts.length === 0 ? (
+									<TableRow className="hover:bg-transparent">
+										<TableCell
+											colSpan={4}
+											className="h-24 text-center text-xs text-zinc-500"
+										>
+											No billing transaction records found.
+										</TableCell>
+									</TableRow>
+								) : (
+									billCuts.map((cut: any) => (
+										<TableRow
+											key={cut.billRange}
+											className="border-b border-zinc-900 hover:bg-zinc-900/40"
+										>
+											<TableCell className="font-semibold text-xs pl-4 text-zinc-200">
+												{cut.billRange}
+											</TableCell>
+											<TableCell className="font-mono text-xs text-right tabular-nums text-zinc-300">
+												{cut.totalCustomers.toLocaleString()}
+											</TableCell>
+											<TableCell className="font-mono text-xs text-right tabular-nums text-zinc-300">
+												{cut.repeatCustomers.toLocaleString()}
+											</TableCell>
+											<TableCell className="font-mono text-xs text-right pr-4 tabular-nums">
+												<span
+													className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+														cut.retentionPct >= 70
+															? "bg-emerald-500/15 text-emerald-500"
+															: cut.retentionPct >= 45
+																? "bg-amber-500/15 text-amber-500"
+																: "bg-rose-500/15 text-rose-500"
+													}`}
+												>
+													{cut.retentionPct}%
+												</span>
+											</TableCell>
+										</TableRow>
+									))
+								)}
+							</TableBody>
+						</Table>
+					</CardContent>
 				</Card>
 
-				<Card className="p-5 flex flex-col justify-between">
+				<Card className="p-5 flex flex-col justify-between md:col-span-1 border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] shadow-none">
 					<div>
-						<h3 className="text-sm font-semibold mb-2 text-primary">
-							Cohort Strategy Tip
+						<h3 className="text-sm font-bold mb-2 text-zinc-100 font-mono">
+							Bill Range Insights
 						</h3>
-						<p className="text-xs text-muted-foreground leading-relaxed">
-							If your <strong>AOV Cohort</strong> numbers are increasing over
-							time (Month 1 &gt; Month 0), it confirms customers build trust and
-							expand their checkouts. If AOV or Bill Cuts are falling, consider
-							deploying re-engagement offers.
+						<p className="text-xs text-zinc-500 leading-relaxed">
+							Analyzing cohorts grouped by **Bill Cut** helps you identify your
+							most valuable customer entries. Typically, customers starting with
+							larger invoice ranges (&gt; ₹2000) show higher subsequent trust,
+							resulting in stronger repeat retention densities.
 						</p>
+					</div>
+					<div className="rounded-xl bg-emerald-950/20 border border-emerald-950 p-3 mt-4 text-xs text-emerald-500">
+						<strong>Strategy Tip:</strong> Provide entry incentives (discounts,
+						combos) to push first bills into higher cuts to lift overall
+						lifetime retention rates.
 					</div>
 				</Card>
 			</div>

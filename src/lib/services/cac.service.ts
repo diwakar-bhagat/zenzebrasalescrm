@@ -5,6 +5,7 @@ import {
 } from "@/lib/business-logic/comparison";
 import { FOOD_CATEGORIES } from "@/lib/business-logic/filter-sql";
 import type { DashboardFilters } from "@/lib/founder/types";
+import { customerRepository } from "@/lib/repositories/customer.repository";
 
 type FounderSql = NeonQueryFunction<false, false>;
 
@@ -118,5 +119,92 @@ export async function getCacMetrics(
 		paybackPeriod: {
 			current: Math.round(paybackMonths * 10) / 10,
 		},
+	};
+}
+
+export async function getCacReportData(
+	startDate: string,
+	endDate: string,
+	storeName: string | null,
+) {
+	const start = new Date(startDate);
+	const end = new Date(endDate);
+	const days = Math.max(
+		1,
+		Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1,
+	);
+
+	// Spend function
+	const getSpendForStore = (store: string | null, daysCount: number) => {
+		let monthlySpend = 200000;
+		if (store === "SmartworksNoida Noida") monthlySpend = 150000;
+		else if (store === "Klj store") monthlySpend = 50000;
+		return Math.round((monthlySpend / 30) * daysCount);
+	};
+
+	const currentSpend = getSpendForStore(storeName, days);
+	const newCustomersCount = await customerRepository.getNewCustomersCount(
+		startDate,
+		endDate,
+		storeName,
+	);
+	const newCustomers = Math.max(1, newCustomersCount);
+	const cac = currentSpend / newCustomers;
+
+	const aovMetrics = await customerRepository.getAovMetrics(
+		startDate,
+		endDate,
+		storeName,
+	);
+	const aov = aovMetrics.bills > 0 ? aovMetrics.revenue / aovMetrics.bills : 0;
+
+	const avgMonthlyMargin = aov * 0.26 * 1.5;
+	const paybackMonths = avgMonthlyMargin > 0 ? cac / avgMonthlyMargin : 0;
+
+	const storeOptions = [
+		{ name: "Smart Works Noida", key: "SmartworksNoida Noida" },
+		{ name: "KLJ Store", key: "Klj store" },
+		{ name: "Overall", key: null },
+	];
+
+	const paybackTable = await Promise.all(
+		storeOptions.map(async (opt) => {
+			const sSpend = getSpendForStore(opt.key, days);
+			const sNewCount = await customerRepository.getNewCustomersCount(
+				startDate,
+				endDate,
+				opt.key,
+			);
+			const sNew = Math.max(1, sNewCount);
+			const sCac = sSpend / sNew;
+			const sAovMetrics = await customerRepository.getAovMetrics(
+				startDate,
+				endDate,
+				opt.key,
+			);
+			const sAov =
+				sAovMetrics.bills > 0 ? sAovMetrics.revenue / sAovMetrics.bills : 0;
+			const sMargin = sAov * 0.26 * 1.5;
+			const sPayback = sMargin > 0 ? sCac / sMargin : 0;
+
+			return {
+				storeName: opt.name,
+				spend: sSpend,
+				newCustomers: sNewCount,
+				cac: Math.round(sCac),
+				aov: Math.round(sAov),
+				margin: Math.round(sMargin),
+				payback: Math.round(sPayback * 10) / 10,
+			};
+		}),
+	);
+
+	return {
+		spend: currentSpend,
+		newCustomers: newCustomersCount,
+		cac: Math.round(cac),
+		aov: Math.round(aov),
+		paybackMonths: Math.round(paybackMonths * 10) / 10,
+		paybackTable,
 	};
 }

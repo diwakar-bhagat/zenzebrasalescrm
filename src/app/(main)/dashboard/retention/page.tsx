@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CacTab } from "./_components/cac-tab";
 import { CohortsTab } from "./_components/cohorts-tab";
+import { LtvCacAovTab } from "./_components/ltv-cac-aov-tab";
 import { LtvTab } from "./_components/ltv-tab";
 import { OverviewTab } from "./_components/overview-tab";
 import { SegmentsHealthTab } from "./_components/segments-health-tab";
@@ -84,9 +85,11 @@ function RetentionDashboardContent() {
 			<div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 				<div className="flex flex-col gap-1">
 					<h1 className="text-3xl font-bold leading-none tracking-tight">
-						Customer Retention Intelligence
+						Customer Value Analytics
 					</h1>
-					<p className="text-muted-foreground text-sm">{formattedDate}</p>
+					<p className="text-muted-foreground text-sm">
+						{formattedDate} • AOV, LTV and CAC in one view
+					</p>
 				</div>
 				<div className="flex items-center gap-3">
 					<Button
@@ -112,7 +115,7 @@ function RetentionDashboardContent() {
 				onValueChange={handleTabChange}
 				className="space-y-6"
 			>
-				<TabsList className="bg-white/5 border border-white/10 backdrop-blur-xl p-1 rounded-xl w-full lg:w-auto flex flex-wrap h-auto gap-1">
+				<TabsList className="bg-zinc-950 border-[0.5px] border-zinc-800 p-1 rounded-xl w-full lg:w-auto flex flex-wrap h-auto gap-1">
 					<TabsTrigger
 						value="overview"
 						className="text-xs py-2 px-3 rounded-lg"
@@ -123,16 +126,16 @@ function RetentionDashboardContent() {
 						Cohorts
 					</TabsTrigger>
 					<TabsTrigger
-						value="segments-health"
+						value="segments"
 						className="text-xs py-2 px-3 rounded-lg"
 					>
-						Segments & Health
+						Segments &amp; Health
 					</TabsTrigger>
-					<TabsTrigger value="ltv" className="text-xs py-2 px-3 rounded-lg">
-						LTV & AOV
-					</TabsTrigger>
-					<TabsTrigger value="cac" className="text-xs py-2 px-3 rounded-lg">
-						CAC Analysis
+					<TabsTrigger
+						value="ltv-cac-aov"
+						className="text-xs py-2 px-3 rounded-lg font-mono"
+					>
+						LTV, CAC, AOV
 					</TabsTrigger>
 				</TabsList>
 
@@ -144,16 +147,12 @@ function RetentionDashboardContent() {
 					<CohortsTab hasData={hasData} />
 				</TabsContent>
 
-				<TabsContent value="segments-health" className="outline-none">
+				<TabsContent value="segments" className="outline-none">
 					<SegmentsHealthTab hasData={hasData} />
 				</TabsContent>
 
-				<TabsContent value="ltv" className="outline-none">
-					<LtvTab hasData={hasData} />
-				</TabsContent>
-
-				<TabsContent value="cac" className="outline-none">
-					<CacTab hasData={hasData} />
+				<TabsContent value="ltv-cac-aov" className="outline-none">
+					<LtvCacAovTab />
 				</TabsContent>
 			</Tabs>
 		</div>

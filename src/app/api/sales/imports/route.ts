@@ -1,4 +1,6 @@
+import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
+import { CUSTOMER_INTELLIGENCE_TAG } from "@/lib/cache-tags";
 import { sql } from "@/lib/db";
 import {
 	commitFounderUploadFile,
@@ -22,6 +24,8 @@ async function refreshAnalyticsAfterCommit(dataType: string) {
 		for (const r of results) {
 			if (!r.ok) console.error(`MV refresh failed for ${r.view}: ${r.error}`);
 		}
+		// Invalidate the customer-intelligence cached dashboard response
+		(revalidateTag as any)(CUSTOMER_INTELLIGENCE_TAG);
 	} catch (err) {
 		console.error("MV refresh after commit failed:", err);
 	}
@@ -142,7 +146,24 @@ export async function POST(req: NextRequest) {
 						? await validateStagedPurchaseUpload(sql, Number(batchId))
 						: await validateStagedFounderUpload(sql, Number(batchId));
 
-			return NextResponse.json({ success: true, data: validation });
+			let responseData: any = validation;
+			if (dataType === "purchase" || dataType === "inventory") {
+				const val = validation as any;
+				responseData = {
+					isValid: val.success,
+					totalRows: (val.rowsInserted ?? 0) + (val.quarantined ?? 0),
+					validRows: val.rowsInserted ?? 0,
+					dateRange: val.dateRange ?? { start: null, end: null },
+					normalizationReport: val.normalizationReport,
+					errors:
+						val.quarantineReasons?.map((reason: string, index: number) => ({
+							rowNumber: index + 1,
+							errors: [reason],
+						})) ?? [],
+				};
+			}
+
+			return NextResponse.json({ success: true, data: responseData });
 		}
 
 		if (mode === "commit_batch") {

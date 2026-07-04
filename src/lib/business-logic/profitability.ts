@@ -183,7 +183,7 @@ export async function getStoreProfitability(
 				billedBy: String(s.billed_by),
 				storeDisplayName: String(s.store_display_name || s.billed_by),
 				netSales: block.netSales,
-				netPurchase: block.netPurchase,
+				netPurchase: block.estimatedCogs, // display COGS from cost master (purchase_fact is audit-only)
 				grossProfit: block.grossProfit,
 				marginPercent: block.marginPercent,
 				units: toNumber(s.units),
@@ -268,7 +268,7 @@ export async function getBrandProfitability(
 			return {
 				brand: String(s.brand || "Unknown"),
 				netSales: block.netSales,
-				netPurchase: block.netPurchase,
+				netPurchase: block.estimatedCogs, // display COGS from cost master (purchase_fact is audit-only)
 				grossProfit: block.grossProfit,
 				marginPercent: block.marginPercent,
 				units: toNumber(s.units),
@@ -455,7 +455,7 @@ export async function getCategoryProfitability(
 			return {
 				category: String(s.category),
 				netSales: block.netSales,
-				netPurchase: block.netPurchase,
+				netPurchase: block.estimatedCogs, // display COGS from cost master (purchase_fact is audit-only)
 				grossProfit: block.grossProfit,
 				marginPercent: block.marginPercent,
 				billCuts,

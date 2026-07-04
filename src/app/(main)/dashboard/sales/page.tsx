@@ -603,13 +603,13 @@ export default function SalesDashboardPage() {
 								<CardContent>
 									<div className="text-2xl font-bold">
 										{data.hasPurchaseData
-											? formatCurrency(data.profitability.netPurchase)
+											? formatCurrency(data.profitability.estimatedCogs)
 											: "N/A"}
 									</div>
 									<p className="text-xs text-muted-foreground mt-1">
 										{data.hasPurchaseData
-											? "Inventory cost of goods"
-											: "Purchase data unavailable"}
+											? `Inventory COGS · ${safeFixed(data.profitability.coveragePct)}% cost-matched`
+											: "Upload Inventory Pricing & Stock to enable COGS"}
 									</p>
 								</CardContent>
 							</Card>
@@ -629,7 +629,7 @@ export default function SalesDashboardPage() {
 											: "N/A"}
 									</div>
 									<p className="text-xs text-muted-foreground mt-1">
-										Net Sales − Net Purchase
+										Matched Net Sales − COGS
 									</p>
 								</CardContent>
 							</Card>

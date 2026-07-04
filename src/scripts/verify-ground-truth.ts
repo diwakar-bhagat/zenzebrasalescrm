@@ -4,20 +4,34 @@ import path from "path";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
+/**
+ * Golden baseline — regenerated from the live database.
+ *
+ *   Generated:     2026-07-04
+ *   Data snapshot: 19,506 rows · 12,000 bills · ₹1,918,834.69 net revenue
+ *   Date range:    2025-11-18 → 2026-06-25
+ *   Stores:        Klj store, SmartworksNoida Noida
+ *   Latest upload batch (ref): #39
+ *
+ * This is a regression baseline: it freezes the current known-good numbers so
+ * any future change that alters them is caught. It assumes the DB reflects the
+ * complete intended Excel import at generation time. To refresh after a new
+ * legitimate import, re-run the generator and update these constants + metadata.
+ */
 const EXPECTED = {
-	totalRows: 16136,
-	distinctBills: 10065,
-	totalRevenue: 1605756.36,
-	totalQuantity: 19638,
-	distinctMobile: 1811,
-	klj: { rows: 4395, bills: 2648, revenue: 433880.54, units: 5081 },
-	smart: { rows: 11741, bills: 7417, revenue: 1171875.82, units: 14557 },
-	overallAov: 159.54,
-	repeatCustomers: 832,
-	grossCollection: 1835272.7,
-	gst: 229516.34,
-	discount: 471617.49,
-	mrpValue: 2306890.19,
+	totalRows: 19506,
+	distinctBills: 12000,
+	totalRevenue: 1918834.69,
+	totalQuantity: 23697,
+	distinctMobile: 1930,
+	klj: { rows: 5964, bills: 3452, revenue: 562025.64, units: 6939 },
+	smart: { rows: 13542, bills: 8548, revenue: 1356809.05, units: 16758 },
+	overallAov: 159.9,
+	repeatCustomers: 909,
+	grossCollection: 2196427.99,
+	gst: 277593.3,
+	discount: 554066.45,
+	mrpValue: 2750494.44,
 };
 
 async function main() {

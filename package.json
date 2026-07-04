@@ -11,7 +11,13 @@
     "check": "npm run build && npm run lint",
     "check:fix": "biome check --write",
     "prepare": "husky",
-    "generate:presets": "ts-node -P tsconfig.scripts.json src/scripts/generate-theme-presets.ts"
+    "generate:presets": "ts-node -P tsconfig.scripts.json src/scripts/generate-theme-presets.ts",
+    "migrate:customer-analytics": "ts-node -P tsconfig.scripts.json src/scripts/migrate-customer-analytics.ts",
+    "refresh:mv": "ts-node -P tsconfig.scripts.json src/scripts/refresh-materialized-views.ts",
+    "verify": "ts-node -P tsconfig.scripts.json src/scripts/verify-all.ts",
+    "verify:customer-intelligence": "ts-node -P tsconfig.scripts.json src/scripts/verify-customer-intelligence.ts",
+    "verify:data-platform": "ts-node -P tsconfig.scripts.json src/scripts/verify-data-platform.ts",
+    "verify:performance": "ts-node -P tsconfig.scripts.json src/scripts/verify-performance.ts"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx}": [

@@ -8,6 +8,25 @@ import {
 	validateFounderUploadFile,
 	validateStagedFounderUpload,
 } from "@/lib/founder/import-service";
+import { refreshMaterializedViews } from "@/lib/materialized-views";
+
+/**
+ * After a successful sales commit: refresh materialized views so lifetime
+ * customer metrics reflect the new data. Never throws — a refresh failure is
+ * logged but must not fail the upload (the live-SQL path still serves fresh data).
+ */
+async function refreshAnalyticsAfterCommit(dataType: string) {
+	if (dataType !== "sales") return;
+	try {
+		const results = await refreshMaterializedViews(sql);
+		for (const r of results) {
+			if (!r.ok) console.error(`MV refresh failed for ${r.view}: ${r.error}`);
+		}
+	} catch (err) {
+		console.error("MV refresh after commit failed:", err);
+	}
+}
+
 import {
 	commitStagedInventoryUpload,
 	stageInventoryUploadChunk,
@@ -152,6 +171,7 @@ export async function POST(req: NextRequest) {
 					{ status: 400 },
 				);
 			}
+			await refreshAnalyticsAfterCommit(dataType);
 			return NextResponse.json({
 				success: true,
 				data: {
@@ -218,6 +238,7 @@ export async function POST(req: NextRequest) {
 						>)
 					: (result as unknown as Record<string, unknown>);
 
+			await refreshAnalyticsAfterCommit(dataType);
 			return NextResponse.json({
 				success: true,
 				data: {

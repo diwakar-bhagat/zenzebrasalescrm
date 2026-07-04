@@ -6,6 +6,7 @@ import {
 	LineChart,
 	LogOut,
 	type LucideIcon,
+	Receipt,
 	Settings,
 	ShoppingBag,
 	Upload,
@@ -68,6 +69,12 @@ export const sidebarItems: NavGroup[] = [
 				title: "Finance",
 				url: "/dashboard/finance",
 				icon: DollarSign,
+			},
+			{
+				title: "Net Purchase",
+				url: "/dashboard/net-purchase",
+				icon: Receipt,
+				isNew: true,
 			},
 			{
 				title: "Analytics",

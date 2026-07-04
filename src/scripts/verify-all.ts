@@ -35,6 +35,10 @@ const SUITES: Suite[] = [
 		name: "Profitability (Live)",
 		script: "src/scripts/verify-profitability.ts",
 	},
+	{
+		name: "Net Purchase (Live)",
+		script: "src/scripts/verify-net-purchase.ts",
+	},
 	{ name: "Performance (Live)", script: "src/scripts/verify-performance.ts" },
 ];
 

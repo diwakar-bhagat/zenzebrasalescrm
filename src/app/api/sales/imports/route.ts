@@ -1,4 +1,6 @@
+import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
+import { CUSTOMER_INTELLIGENCE_TAG } from "@/lib/cache-tags";
 import { sql } from "@/lib/db";
 import {
 	commitFounderUploadFile,
@@ -22,6 +24,8 @@ async function refreshAnalyticsAfterCommit(dataType: string) {
 		for (const r of results) {
 			if (!r.ok) console.error(`MV refresh failed for ${r.view}: ${r.error}`);
 		}
+		// Invalidate the customer-intelligence cached dashboard response
+		(revalidateTag as any)(CUSTOMER_INTELLIGENCE_TAG);
 	} catch (err) {
 		console.error("MV refresh after commit failed:", err);
 	}

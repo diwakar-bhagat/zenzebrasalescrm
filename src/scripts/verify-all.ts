@@ -25,6 +25,7 @@ const SUITES: Suite[] = [
 		script: "src/scripts/verify-customer-intelligence.ts",
 	},
 	{ name: "Data Platform", script: "src/scripts/verify-data-platform.ts" },
+	{ name: "Profitability", script: "src/scripts/verify-profitability.ts" },
 	{ name: "Performance", script: "src/scripts/verify-performance.ts" },
 ];
 

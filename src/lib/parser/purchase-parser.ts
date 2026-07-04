@@ -1,5 +1,7 @@
 import * as XLSX from "xlsx";
 
+import { normalizeProductCode } from "./product-code";
+
 /**
  * Purchase (vendor-side) Excel parser.
  *
@@ -128,20 +130,53 @@ const REQUIRED_FIELDS = [
 	"net_purchase_amount",
 ];
 
-function normalizeSkuCode(value: unknown): string | null {
-	if (value == null || value === "") return null;
-	return String(value).replace(/\.0$/, "").trim() || null;
+function isValidIso(iso: string): boolean {
+	return !Number.isNaN(new Date(`${iso}T00:00:00.000Z`).getTime());
 }
 
-function parsePurchaseDate(dateRaw: string): string | null {
-	const parts = dateRaw.split("-");
-	if (parts.length !== 3) return null;
-	const [dd, mm, yyyy] = parts;
-	if (!dd || !mm || !yyyy) return null;
-	const iso = `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
-	const parsed = new Date(`${iso}T00:00:00.000Z`);
-	if (Number.isNaN(parsed.getTime())) return null;
-	return iso;
+/**
+ * Parse a purchase date from any of the formats this pipeline sees:
+ *   • Excel serial number (raw:true cells, e.g. 45678)
+ *   • ISO `YYYY-MM-DD` (optionally with a time component)
+ *   • `DD-MM-YYYY`
+ * Returns ISO `YYYY-MM-DD` or null. Never timezone-shifts.
+ */
+function parsePurchaseDate(raw: unknown): string | null {
+	if (raw === null || raw === undefined || raw === "") return null;
+
+	// Excel serial number (or numeric string in the plausible serial range).
+	const asNum =
+		typeof raw === "number"
+			? raw
+			: /^\d+(\.\d+)?$/.test(String(raw).trim())
+				? Number(String(raw).trim())
+				: NaN;
+	if (!Number.isNaN(asNum) && asNum > 20000 && asNum < 80000) {
+		const d = XLSX.SSF.parse_date_code(asNum);
+		if (d?.y) {
+			return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
+		}
+	}
+
+	const s = String(raw).trim();
+
+	// ISO YYYY-MM-DD (with optional time / "T").
+	const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+	if (iso) {
+		const v = `${iso[1]}-${iso[2]}-${iso[3]}`;
+		return isValidIso(v) ? v : null;
+	}
+
+	// DD-MM-YYYY or DD/MM/YYYY.
+	const parts = s.split(/[-/]/);
+	if (parts.length === 3) {
+		const [dd, mm, yyyy] = parts;
+		if (dd && mm && yyyy && yyyy.length === 4) {
+			const v = `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+			return isValidIso(v) ? v : null;
+		}
+	}
+	return null;
 }
 
 function normalizeHeader(h: string): string {
@@ -266,7 +301,8 @@ export function parsePurchaseRawRows(
 	const dates: string[] = [];
 
 	for (const raw of rawRows) {
-		const dateRaw = String(raw[purchaseDateCol] ?? "").trim();
+		const dateCell = raw[purchaseDateCol];
+		const dateRaw = String(dateCell ?? "").trim();
 		const itemName = String(raw[itemNameCol] ?? "").trim();
 		const quantity = Number(raw[quantityCol]);
 		const netPurchase = Number(raw[netPurchaseCol]);
@@ -296,7 +332,7 @@ export function parsePurchaseRawRows(
 			? String(raw[resolved.billed_by.matchedColumn] ?? "").trim()
 			: "";
 		const skuCode = resolved.sku_code
-			? normalizeSkuCode(raw[resolved.sku_code.matchedColumn])
+			? normalizeProductCode(raw[resolved.sku_code.matchedColumn])
 			: null;
 		const brand = resolved.brand
 			? String(raw[resolved.brand.matchedColumn] ?? "").trim() || null
@@ -328,11 +364,11 @@ export function parsePurchaseRawRows(
 			continue;
 		}
 
-		const purchaseDate = parsePurchaseDate(dateRaw);
+		const purchaseDate = parsePurchaseDate(dateCell);
 		if (!purchaseDate) {
 			quarantined++;
 			quarantine_reasons.push(
-				`Row (bill: ${billNo || "unknown"}): invalid date '${dateRaw}' — expected DD-MM-YYYY`,
+				`Row (bill: ${billNo || "unknown"}): invalid date '${dateRaw}' — expected ISO, Excel serial, or DD-MM-YYYY`,
 			);
 			continue;
 		}

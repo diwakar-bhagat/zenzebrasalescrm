@@ -1,5 +1,7 @@
 import * as XLSX from "xlsx";
 
+import { normalizeProductCode } from "./product-code";
+
 export interface ColumnMatch {
 	field: string;
 	matchedColumn: string;
@@ -142,9 +144,13 @@ function normalizeMobile(value: unknown): string | null {
 	return normalized || null;
 }
 
+/**
+ * Canonical SKU/code normalization — delegates to the shared normalizer so sales,
+ * inventory (cost master), and profitability joins all key on an identical code
+ * (incl. scientific-notation barcodes).
+ */
 function normalizeSkuCode(value: unknown): string | null {
-	if (value == null || value === "") return null;
-	return String(value).replace(/\.0$/, "").trim() || null;
+	return normalizeProductCode(value);
 }
 
 function parseSaleDate(dateRaw: string): string | null {

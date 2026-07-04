@@ -17,6 +17,7 @@
     "verify": "ts-node -P tsconfig.scripts.json src/scripts/verify-all.ts",
     "verify:customer-intelligence": "ts-node -P tsconfig.scripts.json src/scripts/verify-customer-intelligence.ts",
     "verify:data-platform": "ts-node -P tsconfig.scripts.json src/scripts/verify-data-platform.ts",
+    "verify:profitability": "ts-node -P tsconfig.scripts.json src/scripts/verify-profitability.ts",
     "verify:performance": "ts-node -P tsconfig.scripts.json src/scripts/verify-performance.ts"
   },
   "lint-staged": {

@@ -13,6 +13,25 @@ import { getPurchaseSummary, hasPurchaseData } from "./purchase";
 
 type FounderSql = NeonQueryFunction<false, false>;
 
+/**
+ * Tax-adjusted per-line COGS from the cost master (single source of truth).
+ * `pm.purchase_price` is tax-INCLUSIVE, so divide by the line's tax multiplier
+ * (1 + tax/net) to get ex-tax unit cost, then × quantity. Join is on the
+ * normalized `sku_code` (the product code), never the composite product_key.
+ */
+const COGS_LINE_SQL = `(pm.purchase_price / (1 + CASE WHEN s.net_amount > 0 THEN s.tax_amount / s.net_amount ELSE 0 END)) * s.quantity`;
+
+/**
+ * Cost-master aggregates for a `sales_fact_v s LEFT JOIN product_master pm`:
+ * matched (tax-adjusted) COGS, matched taxable revenue, and unmatched counts.
+ * Drops the old silent COALESCE(...,0) — unmatched lines are tracked, not zeroed.
+ */
+const COST_MASTER_AGG_SQL = `
+      COALESCE(SUM(${COGS_LINE_SQL}) FILTER (WHERE pm.purchase_price IS NOT NULL), 0) AS estimated_cogs,
+      COALESCE(SUM(s.net_amount) FILTER (WHERE pm.purchase_price IS NOT NULL), 0) AS matched_net_sales,
+      COUNT(*) FILTER (WHERE pm.purchase_price IS NULL)::int AS unmatched_lines,
+      COUNT(*)::int AS total_lines`;
+
 function retailFilter(filters: DashboardFilters) {
 	return filters.categoryScope === "retail" ? [...FOOD_CATEGORIES] : null;
 }
@@ -44,9 +63,9 @@ export async function getProfitability(
 		`SELECT
       COALESCE(SUM(s.net_amount), 0) AS net_sales,
       COUNT(DISTINCT s.bill_no) AS bill_cuts,
-      COALESCE(SUM(s.quantity * COALESCE(pm.purchase_price, 0)), 0) AS estimated_cogs
+      ${COST_MASTER_AGG_SQL}
     FROM sales_fact_v s
-    LEFT JOIN product_master pm ON s.product_key = pm.product_key
+    LEFT JOIN product_master pm ON s.sku_code = pm.sku_code
     WHERE s.sale_date >= $1::date AND s.sale_date <= $2::date
       AND ($3::text IS NULL OR s.billed_by = $3)
       AND ($4::text IS NULL OR s.category = $4)
@@ -68,11 +87,17 @@ export async function getProfitability(
 	const netSales = toNumber(salesRow?.net_sales);
 	const billCuts = toNumber(salesRow?.bill_cuts);
 	const estimatedCogs = toNumber(salesRow?.estimated_cogs);
+	// COGS authority is product_master; margin uses cost-matched revenue only.
 	const block = buildProfitability(
 		netSales,
 		estimatedCogs,
 		purchase.netPurchase,
-		purchase.hasData,
+		estimatedCogs > 0,
+		{
+			matchedNetSales: salesRow?.matched_net_sales,
+			unmatchedLines: salesRow?.unmatched_lines,
+			totalLines: salesRow?.total_lines,
+		},
 	);
 
 	return {
@@ -107,9 +132,9 @@ export async function getStoreProfitability(
 	const salesRows = await (db as any).query(
 		`SELECT s.billed_by, MAX(s.store_display_name) AS store_display_name,
       SUM(s.net_amount) AS net_sales, SUM(s.quantity) AS units, COUNT(DISTINCT s.bill_no) AS bill_cuts,
-      COALESCE(SUM(s.quantity * COALESCE(pm.purchase_price, 0)), 0) AS estimated_cogs
+      ${COST_MASTER_AGG_SQL}
     FROM sales_fact_v s
-    LEFT JOIN product_master pm ON s.product_key = pm.product_key
+    LEFT JOIN product_master pm ON s.sku_code = pm.sku_code
     WHERE s.sale_date >= $1::date AND s.sale_date <= $2::date
       AND ($3::text IS NULL OR s.billed_by = $3)
       AND ($4::text IS NULL OR s.category = $4)
@@ -147,7 +172,12 @@ export async function getStoreProfitability(
 				s.net_sales,
 				s.estimated_cogs,
 				netPurchase,
-				hasPurchase,
+				toNumber(s.estimated_cogs) > 0,
+				{
+					matchedNetSales: s.matched_net_sales,
+					unmatchedLines: s.unmatched_lines,
+					totalLines: s.total_lines,
+				},
 			);
 			return {
 				billedBy: String(s.billed_by),
@@ -186,9 +216,9 @@ export async function getBrandProfitability(
 
 	const salesRows = await (db as any).query(
 		`SELECT s.brand, SUM(s.net_amount) AS net_sales, SUM(s.quantity) AS units,
-      COALESCE(SUM(s.quantity * COALESCE(pm.purchase_price, 0)), 0) AS estimated_cogs
+      ${COST_MASTER_AGG_SQL}
     FROM sales_fact_v s
-    LEFT JOIN product_master pm ON s.product_key = pm.product_key
+    LEFT JOIN product_master pm ON s.sku_code = pm.sku_code
     WHERE s.sale_date >= $1::date AND s.sale_date <= $2::date
       AND ($3::text IS NULL OR s.billed_by = $3)
       AND ($4::text IS NULL OR s.category = $4)
@@ -228,7 +258,12 @@ export async function getBrandProfitability(
 				s.net_sales,
 				s.estimated_cogs,
 				netPurchase,
-				hasPurchase,
+				toNumber(s.estimated_cogs) > 0,
+				{
+					matchedNetSales: s.matched_net_sales,
+					unmatchedLines: s.unmatched_lines,
+					totalLines: s.total_lines,
+				},
 			);
 			return {
 				brand: String(s.brand || "Unknown"),
@@ -272,9 +307,9 @@ export async function getSkuProfitability(
 		`SELECT s.product_key, MAX(s.item_name) AS item_name, MAX(s.sku_code) AS sku_code,
       MAX(s.brand) AS brand, MAX(s.category) AS category,
       SUM(s.net_amount) AS net_sales, SUM(s.quantity) AS units,
-      COALESCE(SUM(s.quantity * COALESCE(pm.purchase_price, 0)), 0) AS estimated_cogs
+      ${COST_MASTER_AGG_SQL}
     FROM sales_fact_v s
-    LEFT JOIN product_master pm ON s.product_key = pm.product_key
+    LEFT JOIN product_master pm ON s.sku_code = pm.sku_code
     WHERE s.sale_date >= $1::date AND s.sale_date <= $2::date
       AND ($3::text IS NULL OR s.billed_by = $3)
       AND ($4::text IS NULL OR s.category = $4)
@@ -313,7 +348,12 @@ export async function getSkuProfitability(
 					s.net_sales,
 					s.estimated_cogs,
 					netPurchase,
-					hasPurchase,
+					toNumber(s.estimated_cogs) > 0,
+					{
+						matchedNetSales: s.matched_net_sales,
+						unmatchedLines: s.unmatched_lines,
+						totalLines: s.total_lines,
+					},
 				);
 				return {
 					productKey: String(s.product_key),
@@ -360,9 +400,9 @@ export async function getCategoryProfitability(
 
 	const salesRows = await (db as any).query(
 		`SELECT s.category, SUM(s.net_amount) AS net_sales, COUNT(DISTINCT s.bill_no) AS bill_cuts,
-      COALESCE(SUM(s.quantity * COALESCE(pm.purchase_price, 0)), 0) AS estimated_cogs
+      ${COST_MASTER_AGG_SQL}
     FROM sales_fact_v s
-    LEFT JOIN product_master pm ON s.product_key = pm.product_key
+    LEFT JOIN product_master pm ON s.sku_code = pm.sku_code
     WHERE s.sale_date >= $1::date AND s.sale_date <= $2::date
       AND ($3::text IS NULL OR s.billed_by = $3)
       AND ($4::text IS NULL OR s.category = $4)
@@ -402,7 +442,12 @@ export async function getCategoryProfitability(
 				s.net_sales,
 				s.estimated_cogs,
 				netPurchase,
-				hasPurchase,
+				toNumber(s.estimated_cogs) > 0,
+				{
+					matchedNetSales: s.matched_net_sales,
+					unmatchedLines: s.unmatched_lines,
+					totalLines: s.total_lines,
+				},
 			);
 			const billCuts = toNumber(s.bill_cuts);
 			const aov =

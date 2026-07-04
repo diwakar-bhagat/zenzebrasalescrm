@@ -1,5 +1,7 @@
 import * as XLSX from "xlsx";
 
+import { normalizeProductCode } from "./product-code";
+
 /**
  * Inventory master & stock snapshot Excel parser.
  * Maps headers from the "Active Stock Pricing" file.
@@ -205,9 +207,9 @@ export function parseInventoryRawRows(
 	let quarantined = 0;
 
 	for (const raw of rawRows) {
-		const skuCode = String(raw[skuCodeCol] ?? "")
-			.trim()
-			.replace(/\.0$/, "");
+		// Canonical code so the cost master keys match sales sku_code exactly
+		// (handles scientific-notation barcodes, floats, and ".0" artifacts).
+		const skuCode = normalizeProductCode(raw[skuCodeCol]) ?? "";
 		const itemName = String(raw[itemNameCol] ?? "").trim();
 		const mrp = Number(raw[mrpCol]);
 		const purchasePrice = Number(raw[purchasePriceCol]);
@@ -222,7 +224,10 @@ export function parseInventoryRawRows(
 			? String(raw[categoryCol] ?? "").trim() || null
 			: null;
 
-		const productKey = `${skuCode}-${itemName}`;
+		// Cost master is keyed by the normalized SKU code (one authoritative price
+		// per product), so it joins directly to sales_fact_v.sku_code. On duplicate
+		// codes the upsert (ON CONFLICT product_key) keeps the latest price.
+		const productKey = skuCode;
 
 		const errors: string[] = [];
 

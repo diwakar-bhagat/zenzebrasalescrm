@@ -61,6 +61,28 @@ export function CustomerHealthCard({
 
 				<p className="text-muted-foreground text-sm">{quality.headline}</p>
 
+				{quality.reasons.length > 0 && (
+					<div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/20 p-3">
+						<span className="text-muted-foreground text-xs font-medium">
+							Why?
+						</span>
+						{quality.reasons.map((r) => (
+							<div key={r.text} className="flex items-start gap-2 text-xs">
+								<span
+									className={`font-bold ${
+										r.sign === "+"
+											? "text-emerald-600 dark:text-emerald-400"
+											: "text-rose-600 dark:text-rose-400"
+									}`}
+								>
+									{r.sign}
+								</span>
+								<span>{r.text}</span>
+							</div>
+						))}
+					</div>
+				)}
+
 				<div className="flex flex-col gap-2">
 					{quality.factors.map((f) => (
 						<div key={f.key} className="flex flex-col gap-1">

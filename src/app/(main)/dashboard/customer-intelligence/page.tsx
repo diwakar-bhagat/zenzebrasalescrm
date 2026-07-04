@@ -7,7 +7,9 @@ import { useEffect, useState } from "react";
 import { CustomerConcentrationCard } from "@/components/customer-intelligence/CustomerConcentrationCard";
 import { CustomerHealthCard } from "@/components/customer-intelligence/CustomerHealthCard";
 import { CustomerInsightsCard } from "@/components/customer-intelligence/CustomerInsightsCard";
+import { CustomerSnapshotCard } from "@/components/customer-intelligence/CustomerSnapshotCard";
 import { CustomerValueDistributionTable } from "@/components/customer-intelligence/CustomerValueDistributionTable";
+import { FounderPrioritiesCard } from "@/components/customer-intelligence/FounderPrioritiesCard";
 import { IdentityConfidenceCard } from "@/components/customer-intelligence/IdentityConfidenceCard";
 import { ReconciliationBanner } from "@/components/customer-intelligence/ReconciliationBanner";
 import { RetentionCohortTable } from "@/components/customer-intelligence/RetentionCohortTable";
@@ -184,11 +186,19 @@ export default function Page() {
 					<ReconciliationBanner report={data.reconciliation} />
 
 					<div className="mt-2 grid grid-cols-12 gap-4">
-						{/* Decision-first: Customer Health + automated diagnosis */}
+						{/* Observe — 5-second identity card of the business */}
+						<div className="col-span-12">
+							<CustomerSnapshotCard snapshot={data.snapshot} />
+						</div>
+
+						{/* Act — today's priorities + Understand — health & diagnosis */}
+						<div className="col-span-12 xl:col-span-5">
+							<FounderPrioritiesCard priorities={data.priorities} />
+						</div>
 						<div className="col-span-12 xl:col-span-4">
 							<CustomerHealthCard quality={data.qualityScore} />
 						</div>
-						<div className="col-span-12 xl:col-span-8">
+						<div className="col-span-12 xl:col-span-3">
 							<CustomerInsightsCard insights={data.insights} />
 						</div>
 

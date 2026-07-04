@@ -3,6 +3,7 @@ import type {
 	RetentionCohortResult,
 	RevenueQualityScore,
 	ScoreFactor,
+	ScoreReason,
 } from "@/types/customer-intelligence";
 
 import { roundTo, safeDiv } from "./safe-math";
@@ -154,6 +155,7 @@ export function computeRevenueQualityScore(
 		stars: starsFor(score),
 		headline: HEADLINE[band],
 		factors,
+		reasons: buildReasons(inputs, ratio),
 		metrics: {
 			repeatRevenuePct: inputs.repeatRevenuePct,
 			newRevenuePct: inputs.newRevenuePct,
@@ -163,4 +165,44 @@ export function computeRevenueQualityScore(
 			ltv: inputs.ltv,
 		},
 	};
+}
+
+/**
+ * Explainability — the drivers behind the score, so a founder never sees a
+ * black-box number. Positives (+) and drags (−) with the underlying metric.
+ */
+function buildReasons(
+	inputs: QualityScoreInputs,
+	ratio: number,
+): ScoreReason[] {
+	const reasons: ScoreReason[] = [];
+	const r = (sign: "+" | "−", text: string) => reasons.push({ sign, text });
+
+	if (inputs.repeatRevenuePct >= 45)
+		r("+", `Repeat revenue strong (${inputs.repeatRevenuePct}%)`);
+	else if (inputs.repeatRevenuePct < 30)
+		r("−", `Repeat revenue low (${inputs.repeatRevenuePct}%)`);
+
+	if (inputs.month1RetentionPct !== null) {
+		if (inputs.month1RetentionPct >= 40)
+			r("+", `Month-1 retention healthy (${inputs.month1RetentionPct}%)`);
+		else if (inputs.month1RetentionPct < 30)
+			r("−", `Month-1 retention weak (${inputs.month1RetentionPct}%)`);
+	}
+
+	if (inputs.anonymousRevenuePct <= 15)
+		r("+", "Most revenue is from known customers");
+	else if (inputs.anonymousRevenuePct >= 25)
+		r("−", `Anonymous revenue high (${inputs.anonymousRevenuePct}%)`);
+
+	if (ratio >= 2)
+		r("+", `Customers buy repeatedly (LTV ${ratio.toFixed(1)}× AOV)`);
+	else if (ratio < 1.5) r("−", "Shallow loyalty — most customers buy once");
+
+	if (inputs.aov >= 400)
+		r("+", `Solid basket size (₹${Math.round(inputs.aov)} AOV)`);
+	else if (inputs.aov < 150)
+		r("−", `Low basket size (₹${Math.round(inputs.aov)} AOV)`);
+
+	return reasons;
 }

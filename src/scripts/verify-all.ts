@@ -24,6 +24,7 @@ const SUITES: Suite[] = [
 		name: "Customer Intelligence",
 		script: "src/scripts/verify-customer-intelligence.ts",
 	},
+	{ name: "Decision Graph", script: "src/scripts/verify-decision-graph.ts" },
 	{ name: "Data Platform", script: "src/scripts/verify-data-platform.ts" },
 	{ name: "Performance", script: "src/scripts/verify-performance.ts" },
 ];

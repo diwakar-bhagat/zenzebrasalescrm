@@ -4,6 +4,7 @@ import {
 	DollarSign,
 	LayoutDashboard,
 	LineChart,
+	ListChecks,
 	LogOut,
 	type LucideIcon,
 	Settings,
@@ -43,6 +44,12 @@ export const sidebarItems: NavGroup[] = [
 		id: 1,
 		label: "Platform",
 		items: [
+			{
+				title: "Today's Priorities",
+				url: "/dashboard/priorities",
+				icon: ListChecks,
+				isNew: true,
+			},
 			{
 				title: "Sales Dashboard",
 				url: "/dashboard/sales",

@@ -194,6 +194,12 @@ export interface ScoreFactor {
 
 export type QualityBand = "Excellent" | "Healthy" | "Watch" | "Weak";
 
+/** A "Why?" line behind the score — a positive driver or a drag. */
+export interface ScoreReason {
+	sign: "+" | "−";
+	text: string;
+}
+
 export interface RevenueQualityScore {
 	/** 0..100 composite score. */
 	score: number;
@@ -202,6 +208,8 @@ export interface RevenueQualityScore {
 	stars: number;
 	headline: string;
 	factors: ScoreFactor[];
+	/** Explainability — the drivers behind the score (no black box). */
+	reasons: ScoreReason[];
 	/** Key metrics surfaced on the health card. */
 	metrics: {
 		repeatRevenuePct: number;
@@ -222,6 +230,35 @@ export interface CustomerInsight {
 	tone: InsightTone;
 }
 
+/** Priority level for a founder action (red = act now, green = good news). */
+export type PriorityLevel = "high" | "medium" | "good";
+
+/** One founder-facing action item — "what deserves attention today". */
+export interface FounderPriority {
+	id: string;
+	level: PriorityLevel;
+	title: string;
+	detail: string;
+	/** Team that owns the action (Marketing, Category, Operations…). */
+	owner: string;
+	/** Optional quantified stake (e.g. "₹1.8L at risk"). */
+	metric?: string;
+}
+
+/** The 5-second identity card of the business. */
+export interface CustomerSnapshot {
+	customers: number;
+	health: { score: number; band: QualityBand; stars: number };
+	repeatRevenuePct: number;
+	newRevenuePct: number;
+	month1RetentionPct: number | null;
+	anonymousRevenuePct: number;
+	ltv: number;
+	aov: number;
+	vipRevenuePct: number;
+	revenueAtRiskPct: number;
+}
+
 export interface CustomerIntelligenceData {
 	filters: import("@/lib/founder/types").DashboardFilters;
 	periods: import("@/lib/business-logic/comparison").ComparisonPeriods;
@@ -233,6 +270,8 @@ export interface CustomerIntelligenceData {
 	concentration: CustomerConcentrationResult;
 	qualityScore: RevenueQualityScore;
 	insights: CustomerInsight[];
+	snapshot: CustomerSnapshot;
+	priorities: FounderPriority[];
 	/** Combined reconciliation across all engines. */
 	reconciliation: ReconciliationReport;
 }

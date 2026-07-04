@@ -17,6 +17,10 @@ import {
 import { getRetentionCohort } from "@/lib/business-logic/customer-retention-cohort";
 import { getRevenueComposition } from "@/lib/business-logic/customer-revenue-composition";
 import { getValueDistribution } from "@/lib/business-logic/customer-value-distribution";
+import {
+	buildCustomerSnapshot,
+	buildFounderPriorities,
+} from "@/lib/business-logic/founder-priorities";
 import { combine } from "@/lib/business-logic/reconciliation";
 import { safeDiv } from "@/lib/business-logic/safe-math";
 import { CUSTOMER_INTELLIGENCE_TAG } from "@/lib/cache-tags";
@@ -97,6 +101,22 @@ const buildCustomerIntelligence = unstable_cache(
 			month1RetentionPct,
 		});
 
+		const snapshot = buildCustomerSnapshot(
+			revenueComposition,
+			valueDistribution,
+			concentration,
+			qualityScore,
+			month1RetentionPct,
+		);
+
+		const priorities = buildFounderPriorities({
+			composition: revenueComposition,
+			concentration,
+			identity: identityConfidence,
+			quality: qualityScore,
+			month1RetentionPct,
+		});
+
 		const reconciliation = combine([
 			revenueComposition.reconciliation,
 			valueDistribution.reconciliation,
@@ -113,6 +133,8 @@ const buildCustomerIntelligence = unstable_cache(
 			concentration,
 			qualityScore,
 			insights,
+			snapshot,
+			priorities,
 			reconciliation,
 		};
 	},

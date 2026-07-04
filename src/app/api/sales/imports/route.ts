@@ -142,7 +142,24 @@ export async function POST(req: NextRequest) {
 						? await validateStagedPurchaseUpload(sql, Number(batchId))
 						: await validateStagedFounderUpload(sql, Number(batchId));
 
-			return NextResponse.json({ success: true, data: validation });
+			let responseData: any = validation;
+			if (dataType === "purchase" || dataType === "inventory") {
+				const val = validation as any;
+				responseData = {
+					isValid: val.success,
+					totalRows: (val.rowsInserted ?? 0) + (val.quarantined ?? 0),
+					validRows: val.rowsInserted ?? 0,
+					dateRange: val.dateRange ?? { start: null, end: null },
+					normalizationReport: val.normalizationReport,
+					errors:
+						val.quarantineReasons?.map((reason: string, index: number) => ({
+							rowNumber: index + 1,
+							errors: [reason],
+						})) ?? [],
+				};
+			}
+
+			return NextResponse.json({ success: true, data: responseData });
 		}
 
 		if (mode === "commit_batch") {

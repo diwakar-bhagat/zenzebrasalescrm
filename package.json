@@ -15,6 +15,7 @@
     "migrate:customer-analytics": "ts-node -P tsconfig.scripts.json src/scripts/migrate-customer-analytics.ts",
     "refresh:mv": "ts-node -P tsconfig.scripts.json src/scripts/refresh-materialized-views.ts",
     "verify": "ts-node -P tsconfig.scripts.json src/scripts/verify-all.ts",
+    "verify:regression": "ts-node -P tsconfig.scripts.json src/scripts/verify-regression.ts",
     "verify:customer-intelligence": "ts-node -P tsconfig.scripts.json src/scripts/verify-customer-intelligence.ts",
     "verify:data-platform": "ts-node -P tsconfig.scripts.json src/scripts/verify-data-platform.ts",
     "verify:profitability": "ts-node -P tsconfig.scripts.json src/scripts/verify-profitability.ts",

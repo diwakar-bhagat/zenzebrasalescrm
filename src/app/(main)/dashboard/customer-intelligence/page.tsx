@@ -146,11 +146,11 @@ export default function Page() {
 	const formattedDate = format(new Date(), "EEEE, do MMMM yyyy");
 
 	return (
-		<div className="flex flex-col gap-4 p-4 pt-4 md:p-8">
+		<div className="flex flex-col gap-4 md:gap-6">
 			<div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 				<div className="flex flex-col gap-2">
 					<div className="flex flex-col gap-1">
-						<h1 className="text-3xl font-bold leading-none tracking-tight">
+						<h1 className="text-3xl font-semibold leading-none tracking-tight">
 							Customer Intelligence
 						</h1>
 						<p className="text-muted-foreground text-sm">{formattedDate}</p>
@@ -172,7 +172,7 @@ export default function Page() {
 			/>
 
 			{isLoading || !data ? (
-				<div className="mt-2 grid grid-cols-12 gap-4">
+				<div className="mt-2 grid grid-cols-12 gap-6">
 					<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-4" />
 					<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-8" />
 					<Skeleton className="col-span-12 h-[220px] rounded-xl" />
@@ -183,7 +183,7 @@ export default function Page() {
 				<>
 					<ReconciliationBanner report={data.reconciliation} />
 
-					<div className="mt-2 grid grid-cols-12 gap-4">
+					<div className="mt-2 grid grid-cols-12 gap-6">
 						{/* Decision-first: Customer Health + automated diagnosis */}
 						<div className="col-span-12 xl:col-span-4">
 							<CustomerHealthCard quality={data.qualityScore} />

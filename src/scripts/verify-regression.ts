@@ -39,7 +39,7 @@ async function main() {
 	const sql = neon(process.env.DATABASE_URL);
 	let failed = 0;
 
-	console.log("Checking ground-truth metrics in sales_fact_v...");
+	console.log("Checking ground-truth metrics in sales_fact_v_benchmark...");
 	const [totals] = await sql`
     SELECT COUNT(*)::int AS rows, COUNT(DISTINCT bill_no)::int AS bills,
       ROUND(SUM(net_amount)::numeric, 2) AS revenue, SUM(quantity)::int AS units,
@@ -48,7 +48,7 @@ async function main() {
       ROUND(SUM(discount_amount)::numeric, 2) AS discount_given,
       ROUND(SUM(mrp_amount)::numeric, 2) AS mrp_total,
       COUNT(DISTINCT customer_mobile) FILTER (WHERE customer_mobile IS NOT NULL AND customer_mobile <> '')::int AS mobiles
-    FROM sales_fact_v
+    FROM sales_fact_v_benchmark
     WHERE billed_by IN ('Klj store', 'SmartworksNoida Noida')`;
 
 	const checks = [
@@ -89,7 +89,7 @@ async function main() {
 		const [row] = await sql`
       SELECT COUNT(*)::int AS rows, COUNT(DISTINCT bill_no)::int AS bills,
         ROUND(SUM(net_amount)::numeric, 2) AS revenue, SUM(quantity)::int AS units
-      FROM sales_fact_v WHERE billed_by = ${store}`;
+      FROM sales_fact_v_benchmark WHERE billed_by = ${store}`;
 		for (const [label, actual, expected] of [
 			[`${store} rows`, row.rows, exp.rows],
 			[`${store} bills`, row.bills, exp.bills],
@@ -107,7 +107,7 @@ async function main() {
 	}
 
 	const [aovRow] = await sql`
-    SELECT ROUND(SUM(net_amount) / NULLIF(COUNT(DISTINCT bill_no), 0), 2) AS aov FROM sales_fact_v
+    SELECT ROUND(SUM(net_amount) / NULLIF(COUNT(DISTINCT bill_no), 0), 2) AS aov FROM sales_fact_v_benchmark
     WHERE billed_by IN ('Klj store', 'SmartworksNoida Noida')`;
 	const aov = Number(aovRow.aov);
 	console.log(
@@ -117,7 +117,7 @@ async function main() {
 
 	const [repeatRow] = await sql`
     SELECT COUNT(*)::int AS repeat_customers FROM (
-      SELECT customer_mobile FROM sales_fact_v
+      SELECT customer_mobile FROM sales_fact_v_benchmark
       WHERE customer_mobile IS NOT NULL AND customer_mobile <> ''
         AND billed_by IN ('Klj store', 'SmartworksNoida Noida')
       GROUP BY customer_mobile HAVING COUNT(DISTINCT bill_no) > 1) x`;

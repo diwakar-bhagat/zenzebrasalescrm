@@ -18,15 +18,24 @@ interface Suite {
 // Order: correctness first, infra + performance last.
 // Extend as Inventory / Finance / API-contract suites are built.
 const SUITES: Suite[] = [
-	{ name: "Ground Truth", script: "src/scripts/verify-ground-truth.ts" },
-	{ name: "Stores", script: "src/scripts/verify-stores.ts" },
 	{
-		name: "Customer Intelligence",
+		name: "Regression Verification",
+		script: "src/scripts/verify-regression.ts",
+	},
+	{ name: "Stores (Live)", script: "src/scripts/verify-stores.ts" },
+	{
+		name: "Customer Intelligence (Live)",
 		script: "src/scripts/verify-customer-intelligence.ts",
 	},
-	{ name: "Data Platform", script: "src/scripts/verify-data-platform.ts" },
-	{ name: "Profitability", script: "src/scripts/verify-profitability.ts" },
-	{ name: "Performance", script: "src/scripts/verify-performance.ts" },
+	{
+		name: "Data Platform (Live)",
+		script: "src/scripts/verify-data-platform.ts",
+	},
+	{
+		name: "Profitability (Live)",
+		script: "src/scripts/verify-profitability.ts",
+	},
+	{ name: "Performance (Live)", script: "src/scripts/verify-performance.ts" },
 ];
 
 function run(script: string): { ok: boolean; ms: number } {

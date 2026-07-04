@@ -214,12 +214,16 @@ export function parseInventoryRawRows(
 		const mrp = Number(raw[mrpCol]);
 		const purchasePrice = Number(raw[purchasePriceCol]);
 
-		// Optional fields
-		const main_stock = mainStockCol ? Number(raw[mainStockCol] || 0) : 0;
-		const smartworks_stock = smartworksStockCol
-			? Number(raw[smartworksStockCol] || 0)
+		// Optional fields (rounded to integers to prevent DB type errors)
+		const main_stock = mainStockCol
+			? Math.round(Number(raw[mainStockCol] || 0))
 			: 0;
-		const klj_stock = kljStockCol ? Number(raw[kljStockCol] || 0) : 0;
+		const smartworks_stock = smartworksStockCol
+			? Math.round(Number(raw[smartworksStockCol] || 0))
+			: 0;
+		const klj_stock = kljStockCol
+			? Math.round(Number(raw[kljStockCol] || 0))
+			: 0;
 		const category = categoryCol
 			? String(raw[categoryCol] ?? "").trim() || null
 			: null;

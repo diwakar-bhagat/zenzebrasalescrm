@@ -204,14 +204,14 @@ export async function commitFounderUploadFile(
 		if (uploadType === "full_replace") {
 			const timestamp = Date.now();
 			queries.push(
-				tx([
+				tx.query(
 					`CREATE TABLE sales_fact_backup_${timestamp} (LIKE sales_fact INCLUDING ALL)`,
-				] as any),
+				),
 			);
 			queries.push(
-				tx([
+				tx.query(
 					`INSERT INTO sales_fact_backup_${timestamp} SELECT * FROM sales_fact`,
-				] as any),
+				),
 			);
 			// Transaction-safe DELETE instead of truncate to avoid breaking UI during processing
 			queries.push(tx`DELETE FROM sales_fact`);

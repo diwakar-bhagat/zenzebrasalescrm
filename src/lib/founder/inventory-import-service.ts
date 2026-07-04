@@ -175,9 +175,14 @@ export async function commitStagedInventoryUpload(
 		};
 	}
 
-	const mappedRows = validation._validatedRows;
+	// Deduplicate rows by product_key (sku_code) to prevent PostgreSQL "ON CONFLICT DO UPDATE command cannot affect row a second time" error
+	const uniqueRowsMap = new Map<string, ParsedInventoryRow>();
+	for (const row of validation._validatedRows) {
+		uniqueRowsMap.set(row.product_key, row);
+	}
+	const mappedRows = Array.from(uniqueRowsMap.values());
 	const chunks = chunkRows(mappedRows);
-	const rowsInserted = validation.rowsInserted ?? 0;
+	const rowsInserted = mappedRows.length;
 	const quarantined = validation.quarantined ?? 0;
 
 	await db.transaction?.((tx) => {
@@ -257,7 +262,7 @@ export async function commitStagedInventoryUpload(
 	return {
 		success: true,
 		batchId,
-		rowsInserted: validation.rowsInserted,
+		rowsInserted,
 		validation,
 	};
 }

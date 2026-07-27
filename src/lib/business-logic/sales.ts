@@ -293,6 +293,7 @@ export async function getSkuPerformance(
 	db: FounderSql,
 	periods: ComparisonPeriods,
 	filters: DashboardFilters,
+	limit = 20,
 ) {
 	const foodCategories = retailFilter(filters);
 
@@ -343,7 +344,7 @@ export async function getSkuPerformance(
     FROM curr c
     FULL OUTER JOIN prev p USING (product_key)
     ORDER BY abs_unit_change DESC NULLS LAST
-    LIMIT 20`,
+    LIMIT $9::int`,
 		[
 			periods.currentStart,
 			periods.currentEnd,
@@ -353,6 +354,7 @@ export async function getSkuPerformance(
 			foodCategories ?? null,
 			periods.previousStart,
 			periods.previousEnd,
+			limit,
 		],
 	);
 

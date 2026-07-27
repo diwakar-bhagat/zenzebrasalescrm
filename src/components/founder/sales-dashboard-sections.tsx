@@ -1,6 +1,7 @@
 "use client";
 
-import { Download } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -9,8 +10,138 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { exportToExcel } from "@/lib/export-excel";
+import { exportDashboardWorkbook, exportToExcel } from "@/lib/export-excel";
 import { formatCurrency } from "@/lib/utils";
+import { useFilterStore } from "@/stores/founder/filter-store";
+
+interface ExportColumn<T> {
+	header: string;
+	accessor: (row: T, rank: number) => string | number | null;
+}
+
+/** Exports rows already present on the page (no backend LIMIT applies to this dataset). */
+function StaticExportButton<T>({
+	dashboardName,
+	rows,
+	columns,
+	sortBy,
+}: {
+	dashboardName: string;
+	rows: T[];
+	columns: ExportColumn<T>[];
+	sortBy: (row: T) => number;
+}) {
+	const { startDate, endDate, store } = useFilterStore();
+
+	return (
+		<Button
+			variant="outline"
+			size="sm"
+			className="h-8 gap-1.5 text-xs shadow-sm hover:bg-accent"
+			onClick={() =>
+				exportDashboardWorkbook({
+					dashboardName,
+					store,
+					startDate,
+					endDate,
+					rows,
+					columns,
+					sortBy,
+				})
+			}
+		>
+			<Download className="h-3.5 w-3.5" />
+			Export Excel
+		</Button>
+	);
+}
+
+/** Exports the complete filtered dataset from the backend (dashboard only shows a capped Top N). */
+function FetchExportButton<T>({
+	dashboardName,
+	dataset,
+	columns,
+	sortBy,
+}: {
+	dashboardName: string;
+	dataset: "customers" | "skus";
+	columns: ExportColumn<T>[];
+	sortBy: (row: T) => number;
+}) {
+	const {
+		startDate,
+		endDate,
+		store,
+		category,
+		brand,
+		sku,
+		categoryScope,
+		compareMode,
+		compareStartDate,
+		compareEndDate,
+	} = useFilterStore();
+	const [isExporting, setIsExporting] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const handleExport = async () => {
+		setIsExporting(true);
+		setError(null);
+		try {
+			const params = new URLSearchParams({ dataset, startDate, endDate });
+			if (store !== "ALL") params.set("store", store);
+			if (category !== "All Categories") params.set("category", category);
+			if (brand !== "All Brands") params.set("brand", brand);
+			if (sku) params.set("sku", sku);
+			if (categoryScope !== "all") params.set("categoryScope", categoryScope);
+			params.set("compareMode", compareMode);
+			if (compareMode === "custom") {
+				params.set("compareStartDate", compareStartDate);
+				params.set("compareEndDate", compareEndDate);
+			}
+
+			const res = await fetch(`/api/sales/export?${params.toString()}`);
+			const json = await res.json();
+			if (!json.success) {
+				throw new Error(json.error ?? "Export failed");
+			}
+
+			exportDashboardWorkbook({
+				dashboardName,
+				store,
+				startDate,
+				endDate,
+				rows: json.data.rows as T[],
+				columns,
+				sortBy,
+			});
+		} catch (err) {
+			console.error(`Failed to export ${dataset}`, err);
+			setError(err instanceof Error ? err.message : "Export failed");
+		} finally {
+			setIsExporting(false);
+		}
+	};
+
+	return (
+		<div className="flex items-center gap-2">
+			{error && <span className="text-xs text-destructive">{error}</span>}
+			<Button
+				variant="outline"
+				size="sm"
+				className="h-8 gap-1.5 text-xs shadow-sm hover:bg-accent"
+				onClick={handleExport}
+				disabled={isExporting}
+			>
+				{isExporting ? (
+					<Loader2 className="h-3.5 w-3.5 animate-spin" />
+				) : (
+					<Download className="h-3.5 w-3.5" />
+				)}
+				Export Excel
+			</Button>
+		</div>
+	);
+}
 
 function GrowthText({ value }: { value: number | null }) {
 	if (value === null) return <span className="text-muted-foreground">—</span>;
@@ -152,13 +283,6 @@ export function BrandPerformanceTable({
 	}>;
 	comparisonLabel?: string;
 }) {
-	const exportData = data.map((row) => ({
-		Brand: row.brand,
-		Units: row.currentUnits,
-		Revenue: row.currentRevenue,
-		"Growth (%)": row.unitsGrowthPct,
-	}));
-
 	return (
 		<Card>
 			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -173,10 +297,20 @@ export function BrandPerformanceTable({
 						)}
 					</CardDescription>
 				</div>
-				<ExportButton
-					data={exportData}
-					filename="Brand_Performance"
-					sheetName="Brand Performance"
+				<StaticExportButton
+					dashboardName="Brand_Performance"
+					rows={data}
+					sortBy={(row) => row.currentRevenue}
+					columns={[
+						{ header: "Rank", accessor: (_row, rank) => rank },
+						{ header: "Brand", accessor: (row) => row.brand },
+						{ header: "Units", accessor: (row) => row.currentUnits },
+						{ header: "Revenue", accessor: (row) => row.currentRevenue },
+						{
+							header: "Growth (%)",
+							accessor: (row) => row.unitsGrowthPct,
+						},
+					]}
 				/>
 			</CardHeader>
 			<CardContent className="overflow-x-auto">
@@ -227,14 +361,6 @@ export function SkuPerformanceTable({
 	}>;
 	comparisonLabel?: string;
 }) {
-	const exportData = data.map((row) => ({
-		SKU: row.skuCode ?? "—",
-		Item: row.itemName,
-		Units: row.currentUnits,
-		Revenue: row.currentRevenue,
-		"Growth (%)": row.unitsGrowthPct,
-	}));
-
 	return (
 		<Card>
 			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -249,10 +375,27 @@ export function SkuPerformanceTable({
 						)}
 					</CardDescription>
 				</div>
-				<ExportButton
-					data={exportData}
-					filename="SKU_Performance"
-					sheetName="SKU Performance"
+				<FetchExportButton<{
+					skuCode: string | null;
+					itemName: string;
+					currentUnits: number;
+					currentRevenue: number;
+					unitsGrowthPct: number | null;
+				}>
+					dashboardName="SKU_Performance"
+					dataset="skus"
+					sortBy={(row) => row.currentRevenue}
+					columns={[
+						{ header: "Rank", accessor: (_row, rank) => rank },
+						{ header: "SKU", accessor: (row) => row.skuCode ?? "—" },
+						{ header: "Item", accessor: (row) => row.itemName },
+						{ header: "Units", accessor: (row) => row.currentUnits },
+						{ header: "Revenue", accessor: (row) => row.currentRevenue },
+						{
+							header: "Growth (%)",
+							accessor: (row) => row.unitsGrowthPct,
+						},
+					]}
 				/>
 			</CardHeader>
 			<CardContent className="overflow-x-auto">
@@ -305,12 +448,6 @@ export function BillCutAnalysisTable({
 	}>;
 	comparisonLabel?: string;
 }) {
-	const exportData = data.map((row) => ({
-		Category: row.category,
-		"Bill Cuts": row.currentBillCuts,
-		"Growth (%)": row.billCutsGrowthPct,
-	}));
-
 	return (
 		<Card>
 			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -325,10 +462,19 @@ export function BillCutAnalysisTable({
 						)}
 					</CardDescription>
 				</div>
-				<ExportButton
-					data={exportData}
-					filename="Bill_Cut_Analysis"
-					sheetName="Bill Cuts"
+				<StaticExportButton
+					dashboardName="Bill_Cut_Analysis"
+					rows={data}
+					sortBy={(row) => row.currentBillCuts}
+					columns={[
+						{ header: "Rank", accessor: (_row, rank) => rank },
+						{ header: "Category", accessor: (row) => row.category },
+						{ header: "Bill Cuts", accessor: (row) => row.currentBillCuts },
+						{
+							header: "Growth (%)",
+							accessor: (row) => row.billCutsGrowthPct,
+						},
+					]}
 				/>
 			</CardHeader>
 			<CardContent className="overflow-x-auto">
@@ -373,12 +519,6 @@ export function AovAnalysisTable({
 	}>;
 	comparisonLabel?: string;
 }) {
-	const exportData = data.map((row) => ({
-		Category: row.category,
-		AOV: row.currentAov,
-		"Growth (%)": row.aovGrowthPct,
-	}));
-
 	return (
 		<Card>
 			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -393,10 +533,19 @@ export function AovAnalysisTable({
 						)}
 					</CardDescription>
 				</div>
-				<ExportButton
-					data={exportData}
-					filename="AOV_Analysis"
-					sheetName="AOV"
+				<StaticExportButton
+					dashboardName="AOV_Analysis"
+					rows={data}
+					sortBy={(row) => row.currentAov}
+					columns={[
+						{ header: "Rank", accessor: (_row, rank) => rank },
+						{ header: "Category", accessor: (row) => row.category },
+						{ header: "AOV", accessor: (row) => row.currentAov },
+						{
+							header: "Growth (%)",
+							accessor: (row) => row.aovGrowthPct,
+						},
+					]}
 				/>
 			</CardHeader>
 			<CardContent className="overflow-x-auto">
@@ -448,13 +597,6 @@ export function CustomerIntelligenceCard({
 	};
 	comparisonLabel?: string;
 }) {
-	const exportData = data.topCustomers.map((c) => ({
-		Customer: c.customerName ?? c.customerMobile,
-		Mobile: c.customerMobile,
-		Bills: c.billCount,
-		Revenue: c.revenue,
-	}));
-
 	return (
 		<Card>
 			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -469,10 +611,25 @@ export function CustomerIntelligenceCard({
 						)}
 					</CardDescription>
 				</div>
-				<ExportButton
-					data={exportData}
-					filename="Customer_Intelligence_Top_Customers"
-					sheetName="Top Customers"
+				<FetchExportButton<{
+					customerName: string | null;
+					customerMobile: string;
+					billCount: number;
+					revenue: number;
+				}>
+					dashboardName="Customer_Intelligence"
+					dataset="customers"
+					sortBy={(row) => row.revenue}
+					columns={[
+						{ header: "Rank", accessor: (_row, rank) => rank },
+						{
+							header: "Customer",
+							accessor: (row) => row.customerName ?? row.customerMobile,
+						},
+						{ header: "Mobile", accessor: (row) => row.customerMobile },
+						{ header: "Bills", accessor: (row) => row.billCount },
+						{ header: "Revenue", accessor: (row) => row.revenue },
+					]}
 				/>
 			</CardHeader>
 			<CardContent className="space-y-4">
@@ -540,13 +697,6 @@ export function PaymentAnalysisCard({
 	};
 	comparisonLabel?: string;
 }) {
-	const exportData = data.methods.map((row) => ({
-		"Payment Method": row.paymentMethod,
-		Revenue: row.revenue,
-		"Bill Cuts": row.billCuts,
-		"Share (%)": row.revenueSharePct,
-	}));
-
 	return (
 		<Card>
 			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -561,10 +711,20 @@ export function PaymentAnalysisCard({
 						)}
 					</CardDescription>
 				</div>
-				<ExportButton
-					data={exportData}
-					filename="Payment_Analysis"
-					sheetName="Payments"
+				<StaticExportButton
+					dashboardName="Payment_Analysis"
+					rows={data.methods}
+					sortBy={(row) => row.revenue}
+					columns={[
+						{ header: "Rank", accessor: (_row, rank) => rank },
+						{
+							header: "Payment Method",
+							accessor: (row) => row.paymentMethod,
+						},
+						{ header: "Revenue", accessor: (row) => row.revenue },
+						{ header: "Bill Cuts", accessor: (row) => row.billCuts },
+						{ header: "Share (%)", accessor: (row) => row.revenueSharePct },
+					]}
 				/>
 			</CardHeader>
 			<CardContent className="overflow-x-auto">

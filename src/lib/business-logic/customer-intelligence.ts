@@ -16,6 +16,7 @@ export async function getCustomerIntelligence(
 	db: FounderSql,
 	periods: ComparisonPeriods,
 	filters: DashboardFilters,
+	topN = 10,
 ) {
 	const food = retailFilter(filters);
 
@@ -41,7 +42,7 @@ export async function getCustomerIntelligence(
       AND customer_mobile IS NOT NULL AND customer_mobile <> ''
       AND ($3::text IS NULL OR billed_by = $3)
       AND ($4::text[] IS NULL OR category <> ALL($4::text[]))
-    GROUP BY customer_mobile ORDER BY revenue DESC LIMIT 10`;
+    GROUP BY customer_mobile ORDER BY revenue DESC LIMIT $5::int`;
 
 	const [current, previous, repeat, topCustomers] = await Promise.all([
 		(db as any).query(baseQueryString, [
@@ -71,6 +72,7 @@ export async function getCustomerIntelligence(
 			periods.currentEnd,
 			filters.store ?? null,
 			food ?? null,
+			topN,
 		]),
 	]);
 

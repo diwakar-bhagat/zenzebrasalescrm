@@ -39,20 +39,66 @@ function toISODate(date: Date) {
 }
 
 function getPresetRange(preset: string) {
-	const end = new Date();
-	const start = new Date(end);
-	if (preset === "today")
-		return { startDate: toISODate(end), endDate: toISODate(end) };
+	const today = new Date();
+
+	if (preset === "today") {
+		return { startDate: toISODate(today), endDate: toISODate(today) };
+	}
+	if (preset === "yesterday") {
+		const yesterday = new Date(today);
+		yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+		return { startDate: toISODate(yesterday), endDate: toISODate(yesterday) };
+	}
 	if (preset === "last7") {
+		const start = new Date(today);
 		start.setUTCDate(start.getUTCDate() - 6);
-		return { startDate: toISODate(start), endDate: toISODate(end) };
+		return { startDate: toISODate(start), endDate: toISODate(today) };
+	}
+	if (preset === "last30") {
+		const start = new Date(today);
+		start.setUTCDate(start.getUTCDate() - 29);
+		return { startDate: toISODate(start), endDate: toISODate(today) };
 	}
 	if (preset === "thisMonth") {
+		const start = new Date(today);
 		start.setUTCDate(1);
+		return { startDate: toISODate(start), endDate: toISODate(today) };
+	}
+	if (preset === "lastMonth") {
+		const start = new Date(
+			Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1),
+		);
+		const end = new Date(
+			Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0),
+		);
 		return { startDate: toISODate(start), endDate: toISODate(end) };
 	}
+	if (preset === "thisQuarter") {
+		const quarterStartMonth = Math.floor(today.getUTCMonth() / 3) * 3;
+		const start = new Date(
+			Date.UTC(today.getUTCFullYear(), quarterStartMonth, 1),
+		);
+		return { startDate: toISODate(start), endDate: toISODate(today) };
+	}
+	if (preset === "lastQuarter") {
+		const quarterStartMonth = Math.floor(today.getUTCMonth() / 3) * 3;
+		const start = new Date(
+			Date.UTC(today.getUTCFullYear(), quarterStartMonth - 3, 1),
+		);
+		const end = new Date(
+			Date.UTC(today.getUTCFullYear(), quarterStartMonth, 0),
+		);
+		return { startDate: toISODate(start), endDate: toISODate(end) };
+	}
+	if (preset === "thisYear") {
+		const start = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
+		return { startDate: toISODate(start), endDate: toISODate(today) };
+	}
+
+	// Fallback (also used by "custom", which leaves the existing dates alone).
+	const start = new Date(today);
 	start.setUTCDate(start.getUTCDate() - 29);
-	return { startDate: toISODate(start), endDate: toISODate(end) };
+	return { startDate: toISODate(start), endDate: toISODate(today) };
 }
 
 export function GlobalFilterBar({
@@ -133,18 +179,26 @@ export function GlobalFilterBar({
 						</span>
 						<Select
 							onValueChange={(value) => {
+								// "custom" leaves startDate/endDate untouched — use the date inputs below.
+								if (value === "custom") return;
 								const range = getPresetRange(value);
 								setDateRange(range.startDate, range.endDate);
 							}}
 						>
-							<SelectTrigger className="h-7 w-[110px] border-0 bg-transparent p-0 shadow-none focus:ring-0 text-xs">
+							<SelectTrigger className="h-7 w-[130px] border-0 bg-transparent p-0 shadow-none focus:ring-0 text-xs">
 								<SelectValue placeholder="Quick range" />
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="today">Today</SelectItem>
+								<SelectItem value="yesterday">Yesterday</SelectItem>
 								<SelectItem value="last7">Last 7 Days</SelectItem>
 								<SelectItem value="last30">Last 30 Days</SelectItem>
 								<SelectItem value="thisMonth">This Month</SelectItem>
+								<SelectItem value="lastMonth">Last Month</SelectItem>
+								<SelectItem value="thisQuarter">This Quarter</SelectItem>
+								<SelectItem value="lastQuarter">Last Quarter</SelectItem>
+								<SelectItem value="thisYear">This Year</SelectItem>
+								<SelectItem value="custom">Custom Date Range</SelectItem>
 							</SelectContent>
 						</Select>
 						<Input

@@ -6,17 +6,11 @@ import {
 	getComparisonPeriods,
 	getDefaultPeriod,
 } from "@/lib/business-logic/comparison";
-import { getStoreProfitability } from "@/lib/business-logic/profitability";
 import { getStoreCommandDefaultPeriod } from "@/lib/business-logic/store-command-period";
-import { diagnoseStore } from "@/lib/business-logic/store-diagnosis";
-import { getStoreForecast } from "@/lib/business-logic/store-forecast";
-import {
-	getStoreAovBillsHistory,
-	getStorePerformance,
-} from "@/lib/business-logic/store-performance";
 import { getStoreTrend } from "@/lib/business-logic/store-trend";
 import { sql } from "@/lib/db";
 import type { DashboardFilters } from "@/lib/founder/types";
+import { getStoreDiagnostics } from "@/lib/intelligence/store-diagnostics";
 
 export const runtime = "nodejs";
 
@@ -113,99 +107,12 @@ export async function GET(req: NextRequest) {
 			compareEndDate: searchParams.get("compareEndDate") ?? undefined,
 		} satisfies DashboardFilters);
 
-		// 1. Get store performance comparison
-		const performances = await getStorePerformance(sql, periods, filters);
-
-		// 1.1 Profit Intelligence — net sales, net purchase, gross profit, margin %
-		const storeProfitability = await getStoreProfitability(
+		// 1-2. Store performance, profitability, AOV/bills history, forecast, and
+		// diagnosis per store — shared with /api/sales/dashboard's rootCause field.
+		const { hasPurchaseData, stores: storesData } = await getStoreDiagnostics(
 			sql,
 			periods,
 			filters,
-		);
-		const profitByBilledBy = new Map(
-			storeProfitability.map((s) => [s.billedBy, s]),
-		);
-
-		// 1.5 Get store AOV/Bills history
-		const aovBillsHistory = await getStoreAovBillsHistory(
-			sql,
-			periods,
-			filters,
-		);
-
-		// 2. Fetch forecast and run diagnosis for each store
-		const storesData = await Promise.all(
-			performances.map(async (perf) => {
-				const forecast = await getStoreForecast(sql, filters, perf.billedBy);
-				const diagnosis = diagnoseStore(
-					perf.performance.revenue.growth,
-					perf.performance.billCuts.growth,
-					perf.performance.aov.growth,
-				);
-
-				const history = aovBillsHistory.find(
-					(h: any) => h.billedBy === perf.billedBy,
-				) || {
-					periods: [],
-					diagnosis: {
-						type: "STABLE",
-						owner: "STORE_OPS",
-						message: "",
-						affectedCategories: [],
-					},
-					momentum: { billCutsTrend: "stable", aovTrend: "stable" },
-					revenueDriver: "",
-				};
-
-				const profit = profitByBilledBy.get(perf.billedBy);
-
-				return {
-					name: perf.name,
-					billedBy: perf.billedBy,
-					// Profit Intelligence — net sales / net purchase / gross profit / margin %
-					netSales: profit?.netSales ?? perf.performance.revenue.current,
-					netPurchase: profit?.netPurchase ?? 0,
-					grossProfit: profit?.grossProfit ?? perf.performance.revenue.current,
-					marginPercent: profit?.marginPercent ?? null,
-					hasPurchase: profit?.hasPurchase ?? false,
-					// Flattened metrics for the final production schema
-					currentRevenue: perf.performance.revenue.current,
-					previousRevenue: perf.performance.revenue.previous,
-					growth:
-						perf.performance.revenue.growth === "NEW STORE"
-							? 0
-							: perf.performance.revenue.growth,
-					currentBills: perf.performance.billCuts.current,
-					previousBills: perf.performance.billCuts.previous,
-					aovCurrent: perf.performance.aov.current,
-					aovPrevious: perf.performance.aov.previous,
-					// Preserved nested keys for backwards compatibility
-					performance: perf.performance,
-					contributionPercent: perf.contributionPercent,
-					forecast: {
-						workingDaysPassed: forecast.workingDaysPassed,
-						remainingWorkingDays: forecast.remainingWorkingDays,
-						runRate: forecast.runRate,
-						expectedClosing: forecast.expectedClosing,
-						previousMonthClosing: forecast.previousMonthClosing,
-						growthVsPrevMonth: forecast.growthVsPrevMonth,
-						confidence: forecast.confidence,
-						reason: forecast.reason,
-					},
-					diagnosis: {
-						type: diagnosis.type,
-						owner: diagnosis.owner,
-						message: diagnosis.message,
-						priority: diagnosis.priority,
-					},
-					aovBills: {
-						periods: history.periods,
-						diagnosis: history.diagnosis,
-						momentum: history.momentum,
-						revenueDriver: history.revenueDriver,
-					},
-				};
-			}),
 		);
 
 		// 3. Get normalized trends
@@ -302,7 +209,7 @@ export async function GET(req: NextRequest) {
 					},
 				},
 				comparisonLabel: periods.comparisonLabel,
-				hasPurchaseData: storeProfitability.some((s) => s.hasPurchase),
+				hasPurchaseData,
 				stores: storesData,
 				trends,
 			},

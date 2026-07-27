@@ -24,6 +24,8 @@ import {
 import { getStorePerformance } from "@/lib/business-logic/store-performance";
 import { sql } from "@/lib/db";
 import type { DashboardFilters } from "@/lib/founder/types";
+import { buildRootCause } from "@/lib/intelligence/root-cause-engine";
+import { getStoreDiagnostics } from "@/lib/intelligence/store-diagnostics";
 
 export const runtime = "nodejs";
 
@@ -85,6 +87,7 @@ export async function GET(req: NextRequest) {
 			brandProfitability,
 			skuProfitability,
 			categoryProfitability,
+			storeDiagnostics,
 		] = await Promise.all([
 			getDailyHealthMetrics(sql, periods, filters),
 			getStorePerformance(sql, periods, filters),
@@ -99,6 +102,7 @@ export async function GET(req: NextRequest) {
 			getBrandProfitability(sql, periods, filters),
 			getSkuProfitability(sql, periods, filters),
 			getCategoryProfitability(sql, periods, filters),
+			getStoreDiagnostics(sql, periods, filters),
 		]);
 
 		// Purchase availability drives graceful "Purchase data unavailable" states.
@@ -134,6 +138,19 @@ export async function GET(req: NextRequest) {
 			dailyHealthResult.salesKpis.billCuts.current,
 			dailyHealthResult.salesKpis.billCuts.previous,
 		);
+
+		// Root Cause Engine — composes the above (already-computed) outputs into
+		// one consistent "why did revenue move" narrative. Pure composition, no
+		// new calculations: see src/lib/intelligence/root-cause-engine.ts.
+		const rootCause = buildRootCause({
+			revenueDriver,
+			storeDiagnostics: storeDiagnostics.stores,
+			brandPerformance,
+			skuPerformance,
+			categoryBillCuts: billCutAnalysis,
+			categoryAov: aovAnalysis,
+			totalBillCuts: dailyHealthResult.salesKpis.billCuts.current,
+		});
 
 		const adaptedStorePerformance = storePerformance.map((row) => {
 			const profit = storeProfitByBilledBy.get(row.billedBy);
@@ -180,6 +197,7 @@ export async function GET(req: NextRequest) {
 				customerIntelligence,
 				paymentAnalysis: paymentAnalysisWithProfit,
 				revenueDriver,
+				rootCause,
 				// Profit Intelligence layer
 				hasPurchaseData,
 				profitability,

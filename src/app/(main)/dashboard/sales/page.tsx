@@ -123,95 +123,38 @@ function getStoreKpi(
 	);
 }
 
-function getMetricGrowth(
-	metrics: Array<{ metric: string; growth: number | null }>,
-	metric: string,
-) {
-	return metrics.find((row) => row.metric === metric)?.growth ?? null;
-}
-
-function getBusinessImpact({
-	aovGrowth,
-	billCutsGrowth,
-	customerGrowth,
+/**
+ * Consolidated "why did revenue move" narrative — replaces what used to be two
+ * independent, sometimes-disagreeing explanations (the revenueDriver banner and
+ * the ad-hoc BusinessHealthInvestigation card). Purely a renderer: all reasoning
+ * comes from data.rootCause, composed server-side by
+ * src/lib/intelligence/root-cause-engine.ts from existing business-logic outputs.
+ */
+function RootCauseCard({
+	rootCause,
+	skuName,
+	sku,
 }: {
-	aovGrowth: number | null;
-	billCutsGrowth: number | null;
-	customerGrowth: number | null;
+	rootCause: any;
+	skuName?: string | null;
+	sku?: string;
 }) {
-	const customerDrop = Math.abs(Math.min(customerGrowth ?? 0, 0));
-	const billDrop = Math.abs(Math.min(billCutsGrowth ?? 0, 0));
-	const aovDrop = Math.abs(Math.min(aovGrowth ?? 0, 0));
-
-	if (customerDrop >= billDrop && customerDrop >= aovDrop && customerDrop > 0) {
-		return "Customer visits dropped more than basket size.";
-	}
-
-	if (billDrop >= aovDrop && billDrop > 0) {
-		return "Bill cuts dropped, so fewer transactions drove the movement.";
-	}
-
-	if (aovDrop > 0) {
-		return "Basket size dropped more than transaction volume.";
-	}
-
-	return "Revenue is stable across volume and basket size.";
-}
-
-function getMainCause({
-	aovGrowth,
-	billCutsGrowth,
-	customerGrowth,
-}: {
-	aovGrowth: number | null;
-	billCutsGrowth: number | null;
-	customerGrowth: number | null;
-}) {
-	const causes = [
-		{ label: "Customer traffic", value: customerGrowth },
-		{ label: "Bill cuts", value: billCutsGrowth },
-		{ label: "AOV", value: aovGrowth },
-	]
-		.filter((item) => item.value != null)
-		.sort(
-			(a, b) =>
-				Math.abs(Math.min(Number(b.value), 0)) -
-				Math.abs(Math.min(Number(a.value), 0)),
-		);
-
-	const cause = causes[0];
-	if (!cause || Number(cause.value) >= 0) return "No single negative driver";
-	return `${cause.label} ${formatSignedPercent(cause.value).replace("+", "")}`;
-}
-
-function BusinessHealthInvestigation({ data }: { data: any }) {
-	const dailyHealth = data.dailyHealth ?? [];
-	const revenueGrowth = data.salesKpis?.revenue?.growth ?? null;
-	const billCutsGrowth = data.salesKpis?.billCuts?.growth ?? null;
-	const unitsGrowth = data.salesKpis?.unitsSold?.growth ?? null;
-	const aovGrowth = data.aovKpi?.growth ?? null;
-	const customerGrowth = getMetricGrowth(dailyHealth, "Customers");
-	const worstStore = [...(data.storePerformance ?? [])].sort(
-		(a, b) => Number(a.revenueGrowth ?? 0) - Number(b.revenueGrowth ?? 0),
-	)[0];
-	const impact = getBusinessImpact({
-		aovGrowth,
-		billCutsGrowth,
-		customerGrowth,
-	});
-	const mainCause = getMainCause({
-		aovGrowth,
-		billCutsGrowth,
-		customerGrowth,
-	});
-	const revenueDown = Number(revenueGrowth ?? 0) < 0;
+	if (!rootCause) return null;
+	const {
+		revenue,
+		storeContribution = [],
+		topCategory,
+		topBrand,
+		topSku,
+		confidence,
+		confidenceFactors = [],
+	} = rootCause;
+	const revenueDown = revenue.status === "Down";
 
 	const drivers = [
-		{ label: "Revenue", value: revenueGrowth },
-		{ label: "Customers", value: customerGrowth },
-		{ label: "Bill Cuts", value: billCutsGrowth },
-		{ label: "Units", value: unitsGrowth },
-		{ label: "AOV", value: aovGrowth },
+		{ label: "Revenue", value: revenue.growthPct },
+		{ label: "Bill Cuts", value: revenue.billsGrowthPct },
+		{ label: "AOV", value: revenue.aovGrowthPct },
 	];
 
 	return (
@@ -219,77 +162,118 @@ function BusinessHealthInvestigation({ data }: { data: any }) {
 			<CardHeader>
 				<div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 					<div>
-						<CardTitle>Business Health</CardTitle>
+						<CardTitle>Why did revenue move?</CardTitle>
 						<CardDescription>
-							Morning verdict from the current filter context
+							Root cause across stores, categories, brands, and SKUs
 						</CardDescription>
 					</div>
-					<Badge
-						className={
-							revenueDown
-								? "border-transparent bg-destructive/10 text-destructive"
-								: "border-transparent bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300"
-						}
-					>
-						Revenue {formatSignedPercent(revenueGrowth)}
-					</Badge>
+					<div className="flex items-center gap-2">
+						<Badge
+							className={
+								revenueDown
+									? "border-transparent bg-destructive/10 text-destructive"
+									: "border-transparent bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300"
+							}
+						>
+							Revenue {formatSignedPercent(revenue.growthPct)}
+						</Badge>
+						<Badge variant="outline">Confidence {confidence}%</Badge>
+					</div>
 				</div>
 			</CardHeader>
-			<CardContent className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-				<div className="space-y-4">
-					<div className="grid gap-3 sm:grid-cols-3">
-						<div className="rounded-lg border bg-muted/20 p-3">
-							<p className="text-muted-foreground text-xs">Reason</p>
-							<p className="mt-1 font-semibold">{mainCause}</p>
-						</div>
-						<div className="rounded-lg border bg-muted/20 p-3">
-							<p className="text-muted-foreground text-xs">Impact</p>
-							<p className="mt-1 font-semibold">{impact}</p>
-						</div>
-						<div className="rounded-lg border bg-muted/20 p-3">
-							<p className="text-muted-foreground text-xs">Affected</p>
-							<p className="mt-1 font-semibold">
-								{worstStore
-									? `${worstStore.storeDisplayName} (${formatSignedPercent(worstStore.revenueGrowth)})`
-									: "No store pressure detected"}
+			<CardContent className="space-y-4">
+				<div className="rounded-lg border bg-muted/20 p-3">
+					<p className="text-muted-foreground text-xs">Reason</p>
+					<p className="mt-1 font-semibold">{revenue.explanation}</p>
+				</div>
+
+				<div className="grid gap-3 md:grid-cols-3">
+					{drivers.map((driver) => (
+						<div key={driver.label} className="rounded-lg bg-muted/30 p-3">
+							<p className="text-muted-foreground text-xs">{driver.label}</p>
+							<p
+								className={`mt-1 font-semibold ${growthTextClass(driver.value)}`}
+							>
+								{formatSignedPercent(driver.value)}
 							</p>
 						</div>
-					</div>
+					))}
+				</div>
 
-					<div className="rounded-lg border p-4">
-						<p className="font-medium text-sm">Why revenue changed</p>
-						<div className="mt-4 grid gap-3 md:grid-cols-5">
-							{drivers.map((driver, index) => (
-								<div className="flex items-center gap-3" key={driver.label}>
-									<div className="min-w-0 flex-1 rounded-lg bg-muted/30 p-3">
-										<p className="text-muted-foreground text-xs">
-											{driver.label}
-										</p>
-										<p
-											className={`mt-1 font-semibold ${growthTextClass(driver.value)}`}
+				<div className="grid gap-3 sm:grid-cols-2">
+					<div className="rounded-lg border p-3">
+						<p className="mb-2 text-xs font-medium text-muted-foreground">
+							Store Contribution
+						</p>
+						<div className="space-y-1.5">
+							{storeContribution.length === 0 && (
+								<p className="text-sm text-muted-foreground">No store data</p>
+							)}
+							{storeContribution.map(
+								(s: {
+									billedBy: string;
+									storeDisplayName: string;
+									revenueGrowthPct: number | "NEW STORE";
+								}) => (
+									<div
+										key={s.billedBy}
+										className="flex items-center justify-between text-sm"
+									>
+										<span className="font-medium">{s.storeDisplayName}</span>
+										<span
+											className={
+												typeof s.revenueGrowthPct === "number"
+													? growthTextClass(s.revenueGrowthPct)
+													: "text-muted-foreground"
+											}
 										>
-											{formatSignedPercent(driver.value)}
-										</p>
+											{s.revenueGrowthPct === "NEW STORE"
+												? "New store"
+												: formatSignedPercent(s.revenueGrowthPct)}
+										</span>
 									</div>
-									{index < drivers.length - 1 && (
-										<div className="hidden text-muted-foreground md:block">
-											{">"}
-										</div>
-									)}
-								</div>
-							))}
+								),
+							)}
+						</div>
+					</div>
+					<div className="space-y-2 rounded-lg border p-3">
+						<p className="text-xs font-medium text-muted-foreground">
+							Top Movers
+						</p>
+						<div className="text-sm">
+							<span className="text-muted-foreground">Category: </span>
+							<span className="font-medium">
+								{topCategory?.category ?? "—"}
+							</span>
+						</div>
+						<div className="text-sm">
+							<span className="text-muted-foreground">Brand: </span>
+							<span className="font-medium">{topBrand?.brand ?? "—"}</span>
+						</div>
+						<div className="text-sm">
+							<span className="text-muted-foreground">SKU: </span>
+							<span className="font-medium">{topSku?.itemName ?? "—"}</span>
 						</div>
 					</div>
 				</div>
 
-				<div className="rounded-lg border bg-muted/20 p-4">
-					<p className="font-medium text-sm">Action lens</p>
-					<p className="mt-2 text-muted-foreground text-sm">
-						{revenueDown
-							? "Start with the weakest store, then inspect category and SKU movers below. The current signal points to volume before product mix."
-							: "Revenue is not under pressure in the selected period. Use the mover tables below to protect the current gains."}
-					</p>
-				</div>
+				{confidenceFactors.length > 0 && (
+					<div className="space-y-1 text-xs text-muted-foreground">
+						{confidenceFactors.map((factor: string) => (
+							<p key={factor}>• {factor}</p>
+						))}
+					</div>
+				)}
+
+				{skuName && (
+					<div className="border-t pt-3 text-sm">
+						<span className="text-muted-foreground">Filtered SKU: </span>
+						<span className="font-semibold">{skuName}</span>
+						<span className="ml-1 font-mono text-xs text-muted-foreground">
+							{sku}
+						</span>
+					</div>
+				)}
 			</CardContent>
 		</Card>
 	);
@@ -805,57 +789,6 @@ export default function SalesDashboardPage() {
 						</Card>
 					</div>
 
-					{/* Revenue Driver Section */}
-					{data.revenueDriver && (
-						<div
-							className={`p-4 rounded-xl border flex items-center justify-between gap-4 ${
-								data.revenueDriver.revenueStatus === "Up"
-									? "bg-status-on-track-bg border-status-on-track/20"
-									: data.revenueDriver.revenueStatus === "Down"
-										? "bg-status-delayed-bg border-status-delayed/20"
-										: "bg-muted/50 border-border"
-							}`}
-						>
-							<div className="flex items-center gap-4 flex-1 min-w-0">
-								<div className="p-3 bg-background rounded-full shrink-0 shadow-sm">
-									{data.revenueDriver.revenueStatus === "Up" ? (
-										<TrendingUp className="size-6 text-status-on-track" />
-									) : data.revenueDriver.revenueStatus === "Down" ? (
-										<TrendingDown className="size-6 text-status-delayed" />
-									) : (
-										<BarChart3 className="size-6 text-muted-foreground" />
-									)}
-								</div>
-								<div className="flex-1 min-w-0">
-									<h3 className="font-semibold text-lg flex items-center gap-2">
-										Revenue is {data.revenueDriver.revenueStatus}
-										<span className="text-sm font-normal opacity-80">
-											({data.revenueDriver.revenueGrowth > 0 ? "+" : ""}
-											{safeFixed(data.revenueDriver.revenueGrowth)}%)
-										</span>
-									</h3>
-									<p className="text-sm opacity-90 font-medium mt-1">
-										{data.revenueDriver.explanation ??
-											data.revenueDriver.primaryDriver}
-									</p>
-								</div>
-							</div>
-							{data.skuName && (
-								<div className="shrink-0 border-l pl-4 border-border flex flex-col justify-center min-h-[44px]">
-									<p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-										Filtered SKU
-									</p>
-									<p className="font-bold text-sm text-foreground mt-0.5 max-w-[200px] truncate">
-										{data.skuName}
-									</p>
-									<p className="font-mono text-xs text-muted-foreground">
-										{sku}
-									</p>
-								</div>
-							)}
-						</div>
-					)}
-
 					{/* Store KPI Split cards */}
 					{data.storePerformance && (
 						<div className="grid gap-4 md:grid-cols-2 mt-4">
@@ -1120,7 +1053,11 @@ export default function SalesDashboardPage() {
 						</Card>
 					</div>
 
-					<BusinessHealthInvestigation data={data} />
+					<RootCauseCard
+						rootCause={data.rootCause}
+						skuName={data.skuName}
+						sku={sku}
+					/>
 
 					{data.dailyHealth && (
 						<DailyHealthTable

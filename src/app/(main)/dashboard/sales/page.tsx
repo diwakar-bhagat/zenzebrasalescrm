@@ -300,6 +300,7 @@ export default function SalesDashboardPage() {
 	const [data, setData] = useState<any>(null);
 	const [status, setStatus] = useState<any>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
 	const {
 		startDate,
@@ -339,6 +340,7 @@ export default function SalesDashboardPage() {
 
 		const fetchDashboardData = async () => {
 			setIsLoading(true);
+			setError(null);
 			try {
 				const params = new URLSearchParams({ startDate, endDate });
 				if (store !== "ALL") params.set("store", store);
@@ -356,9 +358,15 @@ export default function SalesDashboardPage() {
 				const json = await res.json();
 				if (json.success) {
 					setData(json.data);
+				} else {
+					console.error("Dashboard API returned an error", json.error);
+					setError(json.error ?? "Failed to load dashboard data.");
 				}
 			} catch (err) {
 				console.error("Failed to fetch dashboard data", err);
+				setError(
+					err instanceof Error ? err.message : "Failed to load dashboard data.",
+				);
 			} finally {
 				setIsLoading(false);
 			}
@@ -439,7 +447,25 @@ export default function SalesDashboardPage() {
 				skuName={data?.skuName}
 			/>
 
-			{isLoading || !data ? (
+			{error ? (
+				<div className="flex flex-col items-center justify-center min-h-[40vh] p-4 text-center space-y-4">
+					<div className="bg-destructive/10 p-6 rounded-full">
+						<BarChart3 className="size-16 text-destructive" />
+					</div>
+					<div className="max-w-md space-y-2">
+						<h2 className="text-xl font-bold">Couldn't load the dashboard</h2>
+						<p className="text-muted-foreground text-sm">{error}</p>
+					</div>
+					<Button
+						variant="outline"
+						onClick={() => {
+							setStatus((prev: any) => (prev ? { ...prev } : prev));
+						}}
+					>
+						Retry
+					</Button>
+				</div>
+			) : isLoading || !data ? (
 				<div className="space-y-4">
 					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
 						{["revenue", "bill-cuts", "units", "aov", "discount"].map((key) => (

@@ -1,0 +1,54 @@
+import { type NextRequest, NextResponse } from "next/server";
+import {
+	cleanDashboardFilters,
+	getComparisonPeriods,
+	getDefaultPeriod,
+} from "@/lib/business-logic/comparison";
+import { sql } from "@/lib/db";
+import type { DashboardFilters } from "@/lib/founder/types";
+import {
+	getAiInsights,
+	getRetentionOverview,
+	getRetentionTrend,
+} from "@/lib/services/retention.service";
+
+export const runtime = "nodejs";
+
+export async function GET(req: NextRequest) {
+	try {
+		const { searchParams } = req.nextUrl;
+		const defaults = getDefaultPeriod().current;
+		const filters = cleanDashboardFilters({
+			startDate: searchParams.get("startDate") ?? defaults.startDate,
+			endDate: searchParams.get("endDate") ?? defaults.endDate,
+			store: searchParams.get("store") ?? undefined,
+			categoryScope:
+				(searchParams.get(
+					"categoryScope",
+				) as DashboardFilters["categoryScope"]) ?? "all",
+		} as DashboardFilters);
+		const periods = getComparisonPeriods(filters);
+
+		const overview = await getRetentionOverview(sql, periods, filters);
+		const trend = await getRetentionTrend(sql, periods, filters);
+		const aiInsights = await getAiInsights(sql, periods, filters);
+
+		return NextResponse.json({
+			success: true,
+			data: {
+				overview,
+				trend,
+				aiInsights,
+			},
+		});
+	} catch (error) {
+		console.error("Failed to fetch retention overview:", error);
+		return NextResponse.json(
+			{
+				success: false,
+				error: error instanceof Error ? error.message : "Failed",
+			},
+			{ status: 500 },
+		);
+	}
+}

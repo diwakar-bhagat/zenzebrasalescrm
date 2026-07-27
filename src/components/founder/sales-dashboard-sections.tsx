@@ -2,6 +2,7 @@
 
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { formatStoreName } from "@/components/founder/global-filter-bar";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -10,7 +11,29 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import {
+	DATE_PRESETS,
+	type DatePresetValue,
+	getPresetRange,
+} from "@/lib/date-presets";
 import { exportDashboardWorkbook, exportToExcel } from "@/lib/export-excel";
+import { STORE_WHITELIST } from "@/lib/founder/types";
 import { formatCurrency } from "@/lib/utils";
 import { useFilterStore } from "@/stores/founder/filter-store";
 
@@ -19,59 +42,35 @@ interface ExportColumn<T> {
 	accessor: (row: T, rank: number) => string | number | null;
 }
 
-/** Exports rows already present on the page (no backend LIMIT applies to this dataset). */
-function StaticExportButton<T>({
-	dashboardName,
-	rows,
-	columns,
-	sortBy,
-}: {
-	dashboardName: string;
-	rows: T[];
-	columns: ExportColumn<T>[];
-	sortBy: (row: T) => number;
-}) {
-	const { startDate, endDate, store } = useFilterStore();
+type ExportDataset =
+	| "customers"
+	| "skus"
+	| "brands"
+	| "payments"
+	| "bill-cuts"
+	| "aov";
 
-	return (
-		<Button
-			variant="outline"
-			size="sm"
-			className="h-8 gap-1.5 text-xs shadow-sm hover:bg-accent"
-			onClick={() =>
-				exportDashboardWorkbook({
-					dashboardName,
-					store,
-					startDate,
-					endDate,
-					rows,
-					columns,
-					sortBy,
-				})
-			}
-		>
-			<Download className="h-3.5 w-3.5" />
-			Export Excel
-		</Button>
-	);
-}
-
-/** Exports the complete filtered dataset from the backend (dashboard only shows a capped Top N). */
-function FetchExportButton<T>({
+/**
+ * Export button for every dashboard card: opens a small dialog to confirm/override
+ * the Store and Time Period for this export specifically (defaults to whatever the
+ * dashboard is currently filtered to), then fetches the COMPLETE matching dataset
+ * from the backend — never just the Top N rows shown on screen.
+ */
+function DatasetExportButton<T>({
 	dashboardName,
 	dataset,
 	columns,
 	sortBy,
 }: {
 	dashboardName: string;
-	dataset: "customers" | "skus";
+	dataset: ExportDataset;
 	columns: ExportColumn<T>[];
 	sortBy: (row: T) => number;
 }) {
 	const {
-		startDate,
-		endDate,
-		store,
+		startDate: globalStartDate,
+		endDate: globalEndDate,
+		store: globalStore,
 		category,
 		brand,
 		sku,
@@ -80,8 +79,33 @@ function FetchExportButton<T>({
 		compareStartDate,
 		compareEndDate,
 	} = useFilterStore();
+
+	const [open, setOpen] = useState(false);
+	const [store, setStore] = useState(globalStore);
+	const [preset, setPreset] = useState<DatePresetValue>("custom");
+	const [startDate, setStartDate] = useState(globalStartDate);
+	const [endDate, setEndDate] = useState(globalEndDate);
 	const [isExporting, setIsExporting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+
+	const openDialog = () => {
+		// Re-seed from the dashboard's current filters each time it's opened.
+		setStore(globalStore);
+		setPreset("custom");
+		setStartDate(globalStartDate);
+		setEndDate(globalEndDate);
+		setError(null);
+		setOpen(true);
+	};
+
+	const handlePresetChange = (value: string) => {
+		setPreset(value as DatePresetValue);
+		const range = getPresetRange(value);
+		if (range) {
+			setStartDate(range.startDate);
+			setEndDate(range.endDate);
+		}
+	};
 
 	const handleExport = async () => {
 		setIsExporting(true);
@@ -114,6 +138,7 @@ function FetchExportButton<T>({
 				columns,
 				sortBy,
 			});
+			setOpen(false);
 		} catch (err) {
 			console.error(`Failed to export ${dataset}`, err);
 			setError(err instanceof Error ? err.message : "Export failed");
@@ -123,23 +148,96 @@ function FetchExportButton<T>({
 	};
 
 	return (
-		<div className="flex items-center gap-2">
-			{error && <span className="text-xs text-destructive">{error}</span>}
-			<Button
-				variant="outline"
-				size="sm"
-				className="h-8 gap-1.5 text-xs shadow-sm hover:bg-accent"
-				onClick={handleExport}
-				disabled={isExporting}
-			>
-				{isExporting ? (
-					<Loader2 className="h-3.5 w-3.5 animate-spin" />
-				) : (
+		<Dialog
+			open={open}
+			onOpenChange={(next) => (next ? openDialog() : setOpen(next))}
+		>
+			<DialogTrigger asChild>
+				<Button
+					variant="outline"
+					size="sm"
+					className="h-8 gap-1.5 text-xs shadow-sm hover:bg-accent"
+				>
 					<Download className="h-3.5 w-3.5" />
-				)}
-				Export Excel
-			</Button>
-		</div>
+					Export Excel
+				</Button>
+			</DialogTrigger>
+			<DialogContent className="sm:max-w-md">
+				<DialogHeader>
+					<DialogTitle>Export {dashboardName.replace(/_/g, " ")}</DialogTitle>
+					<DialogDescription>
+						Choose the store and time period for this export. All matching
+						records are included, sorted highest to lowest — not just what's
+						shown on screen.
+					</DialogDescription>
+				</DialogHeader>
+				<div className="grid gap-4 py-2">
+					<div className="grid gap-1.5">
+						<span className="text-xs font-medium text-muted-foreground">
+							Store
+						</span>
+						<Select value={store} onValueChange={setStore}>
+							<SelectTrigger className="h-9 w-full">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="ALL">All Stores</SelectItem>
+								{STORE_WHITELIST.map((storeName) => (
+									<SelectItem key={storeName} value={storeName}>
+										{formatStoreName(storeName)}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+					<div className="grid gap-1.5">
+						<span className="text-xs font-medium text-muted-foreground">
+							Time Period
+						</span>
+						<Select value={preset} onValueChange={handlePresetChange}>
+							<SelectTrigger className="h-9 w-full">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{DATE_PRESETS.map((p) => (
+									<SelectItem key={p.value} value={p.value}>
+										{p.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						{preset === "custom" && (
+							<div className="flex items-center gap-2 pt-1">
+								<input
+									type="date"
+									value={startDate}
+									onChange={(e) => setStartDate(e.target.value)}
+									className="h-9 flex-1 rounded-md border bg-background px-2 text-sm"
+								/>
+								<span className="text-muted-foreground text-xs">to</span>
+								<input
+									type="date"
+									value={endDate}
+									onChange={(e) => setEndDate(e.target.value)}
+									className="h-9 flex-1 rounded-md border bg-background px-2 text-sm"
+								/>
+							</div>
+						)}
+					</div>
+					{error && <p className="text-xs text-destructive">{error}</p>}
+				</div>
+				<DialogFooter>
+					<Button onClick={handleExport} disabled={isExporting}>
+						{isExporting ? (
+							<Loader2 className="h-3.5 w-3.5 animate-spin" />
+						) : (
+							<Download className="h-3.5 w-3.5" />
+						)}
+						Export
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
@@ -297,9 +395,14 @@ export function BrandPerformanceTable({
 						)}
 					</CardDescription>
 				</div>
-				<StaticExportButton
+				<DatasetExportButton<{
+					brand: string;
+					currentUnits: number;
+					currentRevenue: number;
+					unitsGrowthPct: number | null;
+				}>
 					dashboardName="Brand_Performance"
-					rows={data}
+					dataset="brands"
 					sortBy={(row) => row.currentRevenue}
 					columns={[
 						{ header: "Rank", accessor: (_row, rank) => rank },
@@ -375,7 +478,7 @@ export function SkuPerformanceTable({
 						)}
 					</CardDescription>
 				</div>
-				<FetchExportButton<{
+				<DatasetExportButton<{
 					skuCode: string | null;
 					itemName: string;
 					currentUnits: number;
@@ -462,9 +565,13 @@ export function BillCutAnalysisTable({
 						)}
 					</CardDescription>
 				</div>
-				<StaticExportButton
+				<DatasetExportButton<{
+					category: string;
+					currentBillCuts: number;
+					billCutsGrowthPct: number | null;
+				}>
 					dashboardName="Bill_Cut_Analysis"
-					rows={data}
+					dataset="bill-cuts"
 					sortBy={(row) => row.currentBillCuts}
 					columns={[
 						{ header: "Rank", accessor: (_row, rank) => rank },
@@ -533,9 +640,13 @@ export function AovAnalysisTable({
 						)}
 					</CardDescription>
 				</div>
-				<StaticExportButton
+				<DatasetExportButton<{
+					category: string;
+					currentAov: number;
+					aovGrowthPct: number | null;
+				}>
 					dashboardName="AOV_Analysis"
-					rows={data}
+					dataset="aov"
 					sortBy={(row) => row.currentAov}
 					columns={[
 						{ header: "Rank", accessor: (_row, rank) => rank },
@@ -611,7 +722,7 @@ export function CustomerIntelligenceCard({
 						)}
 					</CardDescription>
 				</div>
-				<FetchExportButton<{
+				<DatasetExportButton<{
 					customerName: string | null;
 					customerMobile: string;
 					billCount: number;
@@ -711,9 +822,14 @@ export function PaymentAnalysisCard({
 						)}
 					</CardDescription>
 				</div>
-				<StaticExportButton
+				<DatasetExportButton<{
+					paymentMethod: string;
+					revenue: number;
+					billCuts: number;
+					revenueSharePct: number;
+				}>
 					dashboardName="Payment_Analysis"
-					rows={data.methods}
+					dataset="payments"
 					sortBy={(row) => row.revenue}
 					columns={[
 						{ header: "Rank", accessor: (_row, rank) => rank },

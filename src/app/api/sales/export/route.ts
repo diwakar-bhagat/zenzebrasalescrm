@@ -1,11 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getCategoryAov, getCategoryBillCuts } from "@/lib/business-logic/aov";
 import {
 	cleanDashboardFilters,
 	getComparisonPeriods,
 	getDefaultPeriod,
 } from "@/lib/business-logic/comparison";
 import { getCustomerIntelligence } from "@/lib/business-logic/customer-intelligence";
-import { getSkuPerformance } from "@/lib/business-logic/sales";
+import { getPaymentAnalysis } from "@/lib/business-logic/payment-analysis";
+import {
+	getBrandPerformance,
+	getSkuPerformance,
+} from "@/lib/business-logic/sales";
 import { sql } from "@/lib/db";
 import type { DashboardFilters } from "@/lib/founder/types";
 
@@ -13,6 +18,16 @@ export const runtime = "nodejs";
 
 // Effectively "no limit" — comfortably above the size of this dataset (see CLAUDE.md ground truth).
 const EXPORT_ALL_LIMIT = 100000;
+
+const DATASETS = [
+	"customers",
+	"skus",
+	"brands",
+	"payments",
+	"bill-cuts",
+	"aov",
+] as const;
+type Dataset = (typeof DATASETS)[number];
 
 function getDefaultDateRange() {
 	const defaults = getDefaultPeriod();
@@ -25,8 +40,8 @@ function getDefaultDateRange() {
 export async function GET(req: NextRequest) {
 	try {
 		const { searchParams } = req.nextUrl;
-		const dataset = searchParams.get("dataset");
-		if (dataset !== "customers" && dataset !== "skus") {
+		const dataset = searchParams.get("dataset") as Dataset | null;
+		if (!dataset || !DATASETS.includes(dataset)) {
 			return NextResponse.json(
 				{ success: false, error: "Unsupported or missing dataset parameter" },
 				{ status: 400 },
@@ -53,26 +68,48 @@ export async function GET(req: NextRequest) {
 		} satisfies DashboardFilters);
 		const periods = getComparisonPeriods(filters);
 
-		if (dataset === "customers") {
-			const intelligence = await getCustomerIntelligence(
-				sql,
-				periods,
-				filters,
-				EXPORT_ALL_LIMIT,
-			);
-			return NextResponse.json({
-				success: true,
-				data: { rows: intelligence.topCustomers },
-			});
+		switch (dataset) {
+			case "customers": {
+				const intelligence = await getCustomerIntelligence(
+					sql,
+					periods,
+					filters,
+					EXPORT_ALL_LIMIT,
+				);
+				return NextResponse.json({
+					success: true,
+					data: { rows: intelligence.topCustomers },
+				});
+			}
+			case "skus": {
+				const rows = await getSkuPerformance(
+					sql,
+					periods,
+					filters,
+					EXPORT_ALL_LIMIT,
+				);
+				return NextResponse.json({ success: true, data: { rows } });
+			}
+			case "brands": {
+				const rows = await getBrandPerformance(sql, periods, filters);
+				return NextResponse.json({ success: true, data: { rows } });
+			}
+			case "payments": {
+				const payments = await getPaymentAnalysis(sql, periods, filters);
+				return NextResponse.json({
+					success: true,
+					data: { rows: payments.methods },
+				});
+			}
+			case "bill-cuts": {
+				const rows = await getCategoryBillCuts(sql, periods, filters);
+				return NextResponse.json({ success: true, data: { rows } });
+			}
+			case "aov": {
+				const rows = await getCategoryAov(sql, periods, filters);
+				return NextResponse.json({ success: true, data: { rows } });
+			}
 		}
-
-		const skuPerformance = await getSkuPerformance(
-			sql,
-			periods,
-			filters,
-			EXPORT_ALL_LIMIT,
-		);
-		return NextResponse.json({ success: true, data: { rows: skuPerformance } });
 	} catch (error) {
 		console.error("Failed to export dataset:", error);
 		return NextResponse.json(

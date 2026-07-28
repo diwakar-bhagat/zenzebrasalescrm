@@ -24,6 +24,11 @@ import {
 import { getStorePerformance } from "@/lib/business-logic/store-performance";
 import { sql } from "@/lib/db";
 import type { DashboardFilters } from "@/lib/founder/types";
+import {
+	buildAovExplanation,
+	buildBillsExplanation,
+} from "@/lib/intelligence/kpi-explanations";
+import { generateRootCauseRecommendation } from "@/lib/intelligence/recommendation-rules";
 import { buildRootCause } from "@/lib/intelligence/root-cause-engine";
 import { getStoreDiagnostics } from "@/lib/intelligence/store-diagnostics";
 
@@ -152,6 +157,28 @@ export async function GET(req: NextRequest) {
 			totalBillCuts: dailyHealthResult.salesKpis.billCuts.current,
 		});
 
+		// Sprint 2 — Explainable KPI Framework: Bills/AOV explanations and the
+		// recommendation line are composed entirely from data already fetched
+		// above (customerIntelligence, dailyHealth, billCutAnalysis/aovAnalysis
+		// via rootCause.topCategory) — no new queries.
+		const recommendation = generateRootCauseRecommendation(rootCause);
+		const explanations = {
+			bills: buildBillsExplanation({
+				revenueDriver,
+				dailyHealth: dailyHealthResult.metrics,
+				customerIntelligence: {
+					repeatCustomers: customerIntelligence.repeatCustomers,
+					newCustomers: customerIntelligence.newCustomers,
+				},
+				storeDiagnostics: storeDiagnostics.stores,
+			}),
+			aov: buildAovExplanation({
+				revenueDriver,
+				topCategory: rootCause.topCategory,
+				topCustomers: customerIntelligence.topCustomers,
+			}),
+		};
+
 		const adaptedStorePerformance = storePerformance.map((row) => {
 			const profit = storeProfitByBilledBy.get(row.billedBy);
 			return {
@@ -197,7 +224,8 @@ export async function GET(req: NextRequest) {
 				customerIntelligence,
 				paymentAnalysis: paymentAnalysisWithProfit,
 				revenueDriver,
-				rootCause,
+				rootCause: { ...rootCause, recommendation },
+				explanations,
 				// Profit Intelligence layer
 				hasPurchaseData,
 				profitability,

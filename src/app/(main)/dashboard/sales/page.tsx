@@ -28,6 +28,12 @@ import {
 	PaymentAnalysisCard,
 	SkuPerformanceTable,
 } from "@/components/founder/sales-dashboard-sections";
+import { ConfidenceBadge } from "@/components/intelligence/ConfidenceBadge";
+import { ContributionList } from "@/components/intelligence/ContributionList";
+import { KPIExplanation } from "@/components/intelligence/KPIExplanation";
+import { MetricBreakdown } from "@/components/intelligence/MetricBreakdown";
+import { RecommendationPanel } from "@/components/intelligence/RecommendationPanel";
+import { RootCausePopover } from "@/components/intelligence/RootCausePopover";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -129,6 +135,10 @@ function getStoreKpi(
  * the ad-hoc BusinessHealthInvestigation card). Purely a renderer: all reasoning
  * comes from data.rootCause, composed server-side by
  * src/lib/intelligence/root-cause-engine.ts from existing business-logic outputs.
+ *
+ * Sprint 2: rebuilt on the shared src/components/intelligence/* primitives so
+ * this card and every KPI's Explain popover share one confidence/contribution
+ * renderer instead of each having its own.
  */
 function RootCauseCard({
 	rootCause,
@@ -148,14 +158,9 @@ function RootCauseCard({
 		topSku,
 		confidence,
 		confidenceFactors = [],
+		recommendation,
 	} = rootCause;
 	const revenueDown = revenue.status === "Down";
-
-	const drivers = [
-		{ label: "Revenue", value: revenue.growthPct },
-		{ label: "Bill Cuts", value: revenue.billsGrowthPct },
-		{ label: "AOV", value: revenue.aovGrowthPct },
-	];
 
 	return (
 		<Card>
@@ -177,7 +182,10 @@ function RootCauseCard({
 						>
 							Revenue {formatSignedPercent(revenue.growthPct)}
 						</Badge>
-						<Badge variant="outline">Confidence {confidence}%</Badge>
+						<ConfidenceBadge
+							confidence={confidence}
+							factors={confidenceFactors}
+						/>
 					</div>
 				</div>
 			</CardHeader>
@@ -187,82 +195,61 @@ function RootCauseCard({
 					<p className="mt-1 font-semibold">{revenue.explanation}</p>
 				</div>
 
-				<div className="grid gap-3 md:grid-cols-3">
-					{drivers.map((driver) => (
-						<div key={driver.label} className="rounded-lg bg-muted/30 p-3">
-							<p className="text-muted-foreground text-xs">{driver.label}</p>
-							<p
-								className={`mt-1 font-semibold ${growthTextClass(driver.value)}`}
-							>
-								{formatSignedPercent(driver.value)}
-							</p>
-						</div>
-					))}
-				</div>
+				<MetricBreakdown
+					drivers={[
+						{ label: "Revenue", value: revenue.growthPct },
+						{ label: "Bill Cuts", value: revenue.billsGrowthPct },
+						{ label: "AOV", value: revenue.aovGrowthPct },
+					]}
+				/>
 
 				<div className="grid gap-3 sm:grid-cols-2">
-					<div className="rounded-lg border p-3">
-						<p className="mb-2 text-xs font-medium text-muted-foreground">
-							Store Contribution
-						</p>
-						<div className="space-y-1.5">
-							{storeContribution.length === 0 && (
-								<p className="text-sm text-muted-foreground">No store data</p>
-							)}
-							{storeContribution.map(
-								(s: {
-									billedBy: string;
-									storeDisplayName: string;
-									revenueGrowthPct: number | "NEW STORE";
-								}) => (
-									<div
-										key={s.billedBy}
-										className="flex items-center justify-between text-sm"
-									>
-										<span className="font-medium">{s.storeDisplayName}</span>
-										<span
-											className={
-												typeof s.revenueGrowthPct === "number"
-													? growthTextClass(s.revenueGrowthPct)
-													: "text-muted-foreground"
-											}
-										>
-											{s.revenueGrowthPct === "NEW STORE"
-												? "New store"
-												: formatSignedPercent(s.revenueGrowthPct)}
-										</span>
-									</div>
-								),
-							)}
-						</div>
-					</div>
-					<div className="space-y-2 rounded-lg border p-3">
-						<p className="text-xs font-medium text-muted-foreground">
-							Top Movers
-						</p>
-						<div className="text-sm">
-							<span className="text-muted-foreground">Category: </span>
-							<span className="font-medium">
-								{topCategory?.category ?? "—"}
-							</span>
-						</div>
-						<div className="text-sm">
-							<span className="text-muted-foreground">Brand: </span>
-							<span className="font-medium">{topBrand?.brand ?? "—"}</span>
-						</div>
-						<div className="text-sm">
-							<span className="text-muted-foreground">SKU: </span>
-							<span className="font-medium">{topSku?.itemName ?? "—"}</span>
-						</div>
-					</div>
+					<ContributionList
+						title="Store Contribution"
+						emptyText="No store data"
+						rows={storeContribution.map(
+							(s: {
+								billedBy: string;
+								storeDisplayName: string;
+								revenueGrowthPct: number | "NEW STORE";
+							}) => ({
+								key: s.billedBy,
+								label: s.storeDisplayName,
+								value: s.revenueGrowthPct,
+							}),
+						)}
+					/>
+					<ContributionList
+						title="Top Movers"
+						rows={[
+							{
+								key: "category",
+								label: "Category",
+								value: null,
+								displayValue: topCategory?.category ?? "—",
+							},
+							{
+								key: "brand",
+								label: "Brand",
+								value: null,
+								displayValue: topBrand?.brand ?? "—",
+							},
+							{
+								key: "sku",
+								label: "SKU",
+								value: null,
+								displayValue: topSku?.itemName ?? "—",
+							},
+						]}
+					/>
 				</div>
 
-				{confidenceFactors.length > 0 && (
-					<div className="space-y-1 text-xs text-muted-foreground">
-						{confidenceFactors.map((factor: string) => (
-							<p key={factor}>• {factor}</p>
-						))}
-					</div>
+				{recommendation && (
+					<RecommendationPanel
+						action={recommendation.action}
+						reason={recommendation.reason}
+						tier={recommendation.tier}
+					/>
 				)}
 
 				{skuName && (
@@ -493,7 +480,42 @@ export default function SalesDashboardPage() {
 						<Card>
 							<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 								<CardTitle className="text-sm font-medium">Bill Cuts</CardTitle>
-								<ShoppingCart className="size-4 text-muted-foreground" />
+								<div className="flex items-center gap-1">
+									{data.explanations?.bills && (
+										<RootCausePopover title="Bill Cuts">
+											<KPIExplanation
+												reason={data.explanations.bills.explanation}
+												drivers={[
+													{
+														label: "Bill Cuts",
+														value: data.explanations.bills.growthPct,
+													},
+													{
+														label: "Customers",
+														value: data.explanations.bills.customerGrowthPct,
+													},
+												]}
+												contributionSections={[
+													{
+														title: "Store Mix",
+														rows: data.explanations.bills.storeMix.map(
+															(s: {
+																billedBy: string;
+																storeDisplayName: string;
+																billCutsGrowthPct: number | "NEW STORE";
+															}) => ({
+																key: s.billedBy,
+																label: s.storeDisplayName,
+																value: s.billCutsGrowthPct,
+															}),
+														),
+													},
+												]}
+											/>
+										</RootCausePopover>
+									)}
+									<ShoppingCart className="size-4 text-muted-foreground" />
+								</div>
 							</CardHeader>
 							<CardContent>
 								<div className="text-2xl font-bold">
@@ -541,7 +563,52 @@ export default function SalesDashboardPage() {
 								<CardTitle className="text-sm font-medium">
 									Average Order Value
 								</CardTitle>
-								<TrendingUp className="size-4 text-muted-foreground" />
+								<div className="flex items-center gap-1">
+									{data.explanations?.aov && (
+										<RootCausePopover title="Average Order Value">
+											<KPIExplanation
+												reason={data.explanations.aov.explanation}
+												drivers={[
+													{
+														label: "AOV",
+														value: data.explanations.aov.growthPct,
+													},
+												]}
+												contributionSections={[
+													{
+														title: "Category Mix",
+														rows: [
+															{
+																key: "category",
+																label:
+																	data.explanations.aov.topCategory?.category ??
+																	"—",
+																value:
+																	data.explanations.aov.topCategory
+																		?.aovGrowthPct ?? null,
+															},
+														],
+													},
+													{
+														title: "Top Customers",
+														rows: data.explanations.aov.topCustomers.map(
+															(
+																c: { label: string; revenue: number },
+																index: number,
+															) => ({
+																key: `${index}-${c.label}`,
+																label: c.label,
+																value: null,
+																displayValue: formatCurrency(c.revenue),
+															}),
+														),
+													},
+												]}
+											/>
+										</RootCausePopover>
+									)}
+									<TrendingUp className="size-4 text-muted-foreground" />
+								</div>
 							</CardHeader>
 							<CardContent>
 								<div className="text-2xl font-bold">

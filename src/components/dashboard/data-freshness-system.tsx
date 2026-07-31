@@ -42,7 +42,7 @@ export function DataFreshnessSystem() {
 
 	const fetchStatus = async () => {
 		try {
-			const res = await fetch("/api/sync/status");
+			const res = await fetch("/api/sync/status", { cache: "no-store" });
 			const json = await res.json();
 
 			if (json.success) {

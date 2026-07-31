@@ -71,15 +71,11 @@ export default function Page() {
 		const fetchDashboardData = async () => {
 			setIsLoading(true);
 			try {
-				const params = new URLSearchParams();
-				if (isDateFiltered) {
-					params.set("startDate", startDate);
-					params.set("endDate", endDate);
-					params.set("compareMode", compareMode);
-					if (compareMode === "custom") {
-						params.set("compareStartDate", compareStartDate);
-						params.set("compareEndDate", compareEndDate);
-					}
+				const params = new URLSearchParams({ startDate, endDate });
+				params.set("compareMode", compareMode);
+				if (compareMode === "custom") {
+					params.set("compareStartDate", compareStartDate);
+					params.set("compareEndDate", compareEndDate);
 				}
 				if (store !== "ALL") params.set("store", store);
 				if (category !== "All Categories") params.set("category", category);

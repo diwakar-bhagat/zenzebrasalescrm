@@ -1,0 +1,1562 @@
+[
+  {
+    "id": 1,
+    "name": "account",
+    "shortdesc": "Invoicing",
+    "state": "installed"
+  },
+  {
+    "id": 3,
+    "name": "account_accountant",
+    "shortdesc": "Invoicing",
+    "state": "installed"
+  },
+  {
+    "id": 7,
+    "name": "account_add_gln",
+    "shortdesc": "Add Partner GLN",
+    "state": "installed"
+  },
+  {
+    "id": 8,
+    "name": "account_asset",
+    "shortdesc": "Assets Management",
+    "state": "installed"
+  },
+  {
+    "id": 14,
+    "name": "account_bank_statement_extract",
+    "shortdesc": "Account Bank Statement Extract",
+    "state": "installed"
+  },
+  {
+    "id": 15,
+    "name": "account_bank_statement_import",
+    "shortdesc": "Account Bank Statement Import",
+    "state": "installed"
+  },
+  {
+    "id": 16,
+    "name": "account_bank_statement_import_camt",
+    "shortdesc": "Import CAMT Bank Statement",
+    "state": "installed"
+  },
+  {
+    "id": 17,
+    "name": "account_bank_statement_import_csv",
+    "shortdesc": "Import CSV Bank Statement",
+    "state": "installed"
+  },
+  {
+    "id": 18,
+    "name": "account_bank_statement_import_ofx",
+    "shortdesc": "Import OFX Bank Statement",
+    "state": "installed"
+  },
+  {
+    "id": 20,
+    "name": "account_base_import",
+    "shortdesc": "Accounting Import",
+    "state": "installed"
+  },
+  {
+    "id": 25,
+    "name": "account_debit_note",
+    "shortdesc": "Debit Notes",
+    "state": "installed"
+  },
+  {
+    "id": 28,
+    "name": "account_edi_ubl_cii",
+    "shortdesc": "Import/Export electronic invoices with UBL/CII",
+    "state": "installed"
+  },
+  {
+    "id": 30,
+    "name": "account_extract",
+    "shortdesc": "Account Extract",
+    "state": "installed"
+  },
+  {
+    "id": 31,
+    "name": "account_fiscal_categories",
+    "shortdesc": "Account Fiscal Report",
+    "state": "installed"
+  },
+  {
+    "id": 34,
+    "name": "account_followup",
+    "shortdesc": "Payment Follow-up Management",
+    "state": "installed"
+  },
+  {
+    "id": 37,
+    "name": "account_invoice_extract",
+    "shortdesc": "Account Invoice Extract",
+    "state": "installed"
+  },
+  {
+    "id": 40,
+    "name": "account_loans",
+    "shortdesc": "Loans Management",
+    "state": "installed"
+  },
+  {
+    "id": 42,
+    "name": "account_online_synchronization",
+    "shortdesc": "Online Bank Statement Synchronization",
+    "state": "installed"
+  },
+  {
+    "id": 43,
+    "name": "account_payment",
+    "shortdesc": "Payment - Account",
+    "state": "installed"
+  },
+  {
+    "id": 49,
+    "name": "account_reports",
+    "shortdesc": "Accounting Reports",
+    "state": "installed"
+  },
+  {
+    "id": 54,
+    "name": "account_tax_python",
+    "shortdesc": "Define Taxes as Python Code",
+    "state": "installed"
+  },
+  {
+    "id": 59,
+    "name": "accountant",
+    "shortdesc": "Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 62,
+    "name": "accountant_knowledge",
+    "shortdesc": "Annual Reports",
+    "state": "installed"
+  },
+  {
+    "id": 63,
+    "name": "ai",
+    "shortdesc": "AI",
+    "state": "installed"
+  },
+  {
+    "id": 64,
+    "name": "ai_account",
+    "shortdesc": "AI Text Draft - Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 66,
+    "name": "ai_auto_install",
+    "shortdesc": "AI Auto Install",
+    "state": "installed"
+  },
+  {
+    "id": 71,
+    "name": "ai_documents_source",
+    "shortdesc": "AI Documents Source",
+    "state": "installed"
+  },
+  {
+    "id": 72,
+    "name": "ai_fields",
+    "shortdesc": "ai_fields",
+    "state": "installed"
+  },
+  {
+    "id": 73,
+    "name": "ai_knowledge",
+    "shortdesc": "AI Text Draft - Knowledge",
+    "state": "installed"
+  },
+  {
+    "id": 75,
+    "name": "ai_server_actions",
+    "shortdesc": "ai_server_actions",
+    "state": "installed"
+  },
+  {
+    "id": 78,
+    "name": "analytic",
+    "shortdesc": "Analytic Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 79,
+    "name": "analytic_enterprise",
+    "shortdesc": "Analytic Accounting Enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 80,
+    "name": "api_doc",
+    "shortdesc": "API Documentation",
+    "state": "installed"
+  },
+  {
+    "id": 81,
+    "name": "appointment",
+    "shortdesc": "Appointments",
+    "state": "installed"
+  },
+  {
+    "id": 82,
+    "name": "appointment_account_payment",
+    "shortdesc": "Pay to Book",
+    "state": "installed"
+  },
+  {
+    "id": 83,
+    "name": "appointment_crm",
+    "shortdesc": "Appointment Lead Generation",
+    "state": "installed"
+  },
+  {
+    "id": 84,
+    "name": "appointment_google_calendar",
+    "shortdesc": "Appointment Google Calendar",
+    "state": "installed"
+  },
+  {
+    "id": 86,
+    "name": "appointment_hr",
+    "shortdesc": "Employees on Appointments",
+    "state": "installed"
+  },
+  {
+    "id": 89,
+    "name": "appointment_sms",
+    "shortdesc": "Appointment SMS",
+    "state": "installed"
+  },
+  {
+    "id": 93,
+    "name": "attachment_indexation",
+    "shortdesc": "Attachments List and Document Indexation",
+    "state": "installed"
+  },
+  {
+    "id": 96,
+    "name": "auth_passkey",
+    "shortdesc": "Passkeys",
+    "state": "installed"
+  },
+  {
+    "id": 97,
+    "name": "auth_passkey_portal",
+    "shortdesc": "Passkeys Portal",
+    "state": "installed"
+  },
+  {
+    "id": 101,
+    "name": "auth_signup",
+    "shortdesc": "Signup",
+    "state": "installed"
+  },
+  {
+    "id": 103,
+    "name": "auth_totp",
+    "shortdesc": "Two-Factor Authentication (TOTP)",
+    "state": "installed"
+  },
+  {
+    "id": 104,
+    "name": "auth_totp_mail",
+    "shortdesc": "2FA Invite mail",
+    "state": "installed"
+  },
+  {
+    "id": 105,
+    "name": "auth_totp_portal",
+    "shortdesc": "TOTPortal",
+    "state": "installed"
+  },
+  {
+    "id": 106,
+    "name": "barcodes",
+    "shortdesc": "Barcode",
+    "state": "installed"
+  },
+  {
+    "id": 107,
+    "name": "barcodes_gs1_nomenclature",
+    "shortdesc": "Barcode - GS1 Nomenclature",
+    "state": "installed"
+  },
+  {
+    "id": 108,
+    "name": "base",
+    "shortdesc": "Base",
+    "state": "installed"
+  },
+  {
+    "id": 114,
+    "name": "base_import",
+    "shortdesc": "Base import",
+    "state": "installed"
+  },
+  {
+    "id": 115,
+    "name": "base_import_module",
+    "shortdesc": "Base import module",
+    "state": "installed"
+  },
+  {
+    "id": 116,
+    "name": "base_install_request",
+    "shortdesc": "Base - Module Install Request",
+    "state": "installed"
+  },
+  {
+    "id": 117,
+    "name": "base_setup",
+    "shortdesc": "Initial Setup Tools",
+    "state": "installed"
+  },
+  {
+    "id": 119,
+    "name": "base_vat",
+    "shortdesc": "VAT Number Validation",
+    "state": "installed"
+  },
+  {
+    "id": 121,
+    "name": "bus",
+    "shortdesc": "IM Bus",
+    "state": "installed"
+  },
+  {
+    "id": 122,
+    "name": "calendar",
+    "shortdesc": "Calendar",
+    "state": "installed"
+  },
+  {
+    "id": 123,
+    "name": "calendar_sms",
+    "shortdesc": "Calendar - SMS",
+    "state": "installed"
+  },
+  {
+    "id": 124,
+    "name": "certificate",
+    "shortdesc": "Certificate",
+    "state": "installed"
+  },
+  {
+    "id": 129,
+    "name": "contacts",
+    "shortdesc": "Contacts",
+    "state": "installed"
+  },
+  {
+    "id": 130,
+    "name": "contacts_enterprise",
+    "shortdesc": "Contacts Enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 131,
+    "name": "crm",
+    "shortdesc": "CRM",
+    "state": "installed"
+  },
+  {
+    "id": 132,
+    "name": "crm_enterprise",
+    "shortdesc": "CRM enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 135,
+    "name": "crm_iap_enrich",
+    "shortdesc": "Lead Enrichment",
+    "state": "installed"
+  },
+  {
+    "id": 136,
+    "name": "crm_iap_mine",
+    "shortdesc": "Lead Generation",
+    "state": "installed"
+  },
+  {
+    "id": 139,
+    "name": "crm_sale_subscription",
+    "shortdesc": "CRM Sale Subscription",
+    "state": "installed"
+  },
+  {
+    "id": 140,
+    "name": "crm_sms",
+    "shortdesc": "SMS in CRM",
+    "state": "installed"
+  },
+  {
+    "id": 141,
+    "name": "currency_rate_live",
+    "shortdesc": "Live Currency Exchange Rate",
+    "state": "installed"
+  },
+  {
+    "id": 168,
+    "name": "digest",
+    "shortdesc": "KPI Digests",
+    "state": "installed"
+  },
+  {
+    "id": 169,
+    "name": "digest_enterprise",
+    "shortdesc": "Digest Enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 170,
+    "name": "documents",
+    "shortdesc": "Documents",
+    "state": "installed"
+  },
+  {
+    "id": 171,
+    "name": "documents_account",
+    "shortdesc": "Documents - Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 176,
+    "name": "documents_hr",
+    "shortdesc": "Documents - HR",
+    "state": "installed"
+  },
+  {
+    "id": 185,
+    "name": "documents_product",
+    "shortdesc": "Documents - Product",
+    "state": "installed"
+  },
+  {
+    "id": 186,
+    "name": "documents_project",
+    "shortdesc": "Documents - Projects",
+    "state": "installed"
+  },
+  {
+    "id": 187,
+    "name": "documents_project_sale",
+    "shortdesc": "Documents - Project - Sale",
+    "state": "installed"
+  },
+  {
+    "id": 188,
+    "name": "documents_project_sign",
+    "shortdesc": "Documents Project Sign",
+    "state": "installed"
+  },
+  {
+    "id": 189,
+    "name": "documents_sign",
+    "shortdesc": "Documents - Signatures",
+    "state": "installed"
+  },
+  {
+    "id": 190,
+    "name": "documents_spreadsheet",
+    "shortdesc": "Documents Spreadsheet",
+    "state": "installed"
+  },
+  {
+    "id": 191,
+    "name": "documents_spreadsheet_survey",
+    "shortdesc": "Spreadsheet Survey",
+    "state": "installed"
+  },
+  {
+    "id": 215,
+    "name": "gamification",
+    "shortdesc": "Gamification",
+    "state": "installed"
+  },
+  {
+    "id": 216,
+    "name": "gamification_sale_crm",
+    "shortdesc": "CRM Gamification",
+    "state": "installed"
+  },
+  {
+    "id": 217,
+    "name": "google_account",
+    "shortdesc": "Google Users",
+    "state": "installed"
+  },
+  {
+    "id": 218,
+    "name": "google_address_autocomplete",
+    "shortdesc": "Google Address Autocomplete",
+    "state": "installed"
+  },
+  {
+    "id": 219,
+    "name": "google_calendar",
+    "shortdesc": "Google Calendar",
+    "state": "installed"
+  },
+  {
+    "id": 220,
+    "name": "google_gmail",
+    "shortdesc": "Google Gmail",
+    "state": "installed"
+  },
+  {
+    "id": 237,
+    "name": "hr",
+    "shortdesc": "Employees",
+    "state": "installed"
+  },
+  {
+    "id": 243,
+    "name": "hr_calendar",
+    "shortdesc": "Display Working Hours in Calendar",
+    "state": "installed"
+  },
+  {
+    "id": 253,
+    "name": "hr_gamification",
+    "shortdesc": "HR Gamification",
+    "state": "installed"
+  },
+  {
+    "id": 254,
+    "name": "hr_gantt",
+    "shortdesc": "Employees in Gantt",
+    "state": "installed"
+  },
+  {
+    "id": 259,
+    "name": "hr_homeworking",
+    "shortdesc": "Remote Work",
+    "state": "installed"
+  },
+  {
+    "id": 260,
+    "name": "hr_homeworking_calendar",
+    "shortdesc": "Remote Work with calendar",
+    "state": "installed"
+  },
+  {
+    "id": 261,
+    "name": "hr_hourly_cost",
+    "shortdesc": "Employee Hourly Wage",
+    "state": "installed"
+  },
+  {
+    "id": 264,
+    "name": "hr_mobile",
+    "shortdesc": "Employees in Mobile",
+    "state": "installed"
+  },
+  {
+    "id": 265,
+    "name": "hr_org_chart",
+    "shortdesc": "HR Org Chart",
+    "state": "installed"
+  },
+  {
+    "id": 290,
+    "name": "hr_sign",
+    "shortdesc": "Contract - Signature",
+    "state": "installed"
+  },
+  {
+    "id": 291,
+    "name": "hr_skills",
+    "shortdesc": "Skills Management",
+    "state": "installed"
+  },
+  {
+    "id": 294,
+    "name": "hr_skills_survey",
+    "shortdesc": "Skills Certification",
+    "state": "installed"
+  },
+  {
+    "id": 304,
+    "name": "html_builder",
+    "shortdesc": "HTML Builder",
+    "state": "installed"
+  },
+  {
+    "id": 305,
+    "name": "html_editor",
+    "shortdesc": "HTML Editor",
+    "state": "installed"
+  },
+  {
+    "id": 306,
+    "name": "http_routing",
+    "shortdesc": "Web Routing",
+    "state": "installed"
+  },
+  {
+    "id": 307,
+    "name": "iap",
+    "shortdesc": "In-App Purchases",
+    "state": "installed"
+  },
+  {
+    "id": 308,
+    "name": "iap_crm",
+    "shortdesc": "IAP / CRM",
+    "state": "installed"
+  },
+  {
+    "id": 309,
+    "name": "iap_extract",
+    "shortdesc": "Iap Extract",
+    "state": "installed"
+  },
+  {
+    "id": 310,
+    "name": "iap_mail",
+    "shortdesc": "IAP / Mail",
+    "state": "installed"
+  },
+  {
+    "id": 321,
+    "name": "iot_base",
+    "shortdesc": "IoT Base",
+    "state": "installed"
+  },
+  {
+    "id": 324,
+    "name": "knowledge",
+    "shortdesc": "Knowledge",
+    "state": "installed"
+  },
+  {
+    "id": 589,
+    "name": "l10n_in",
+    "shortdesc": "Indian - Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 590,
+    "name": "l10n_in_asset",
+    "shortdesc": "India - Accounting Assets",
+    "state": "installed"
+  },
+  {
+    "id": 599,
+    "name": "l10n_in_pos",
+    "shortdesc": "Indian - Point of Sale",
+    "state": "installed"
+  },
+  {
+    "id": 601,
+    "name": "l10n_in_purchase_stock",
+    "shortdesc": "India Purchase and Warehouse Management",
+    "state": "installed"
+  },
+  {
+    "id": 604,
+    "name": "l10n_in_sale",
+    "shortdesc": "Indian - Sale Report(GST)",
+    "state": "installed"
+  },
+  {
+    "id": 605,
+    "name": "l10n_in_sale_stock",
+    "shortdesc": "India Sales and Warehouse Management",
+    "state": "installed"
+  },
+  {
+    "id": 606,
+    "name": "l10n_in_stock",
+    "shortdesc": "Indian - Stock Report(GST)",
+    "state": "installed"
+  },
+  {
+    "id": 859,
+    "name": "link_tracker",
+    "shortdesc": "Link Tracker",
+    "state": "installed"
+  },
+  {
+    "id": 860,
+    "name": "loyalty",
+    "shortdesc": "Coupons & Loyalty",
+    "state": "installed"
+  },
+  {
+    "id": 862,
+    "name": "mail",
+    "shortdesc": "Discuss",
+    "state": "installed"
+  },
+  {
+    "id": 863,
+    "name": "mail_bot",
+    "shortdesc": "OdooBot",
+    "state": "installed"
+  },
+  {
+    "id": 864,
+    "name": "mail_bot_hr",
+    "shortdesc": "OdooBot - HR",
+    "state": "installed"
+  },
+  {
+    "id": 865,
+    "name": "mail_enterprise",
+    "shortdesc": "Mail Enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 867,
+    "name": "mail_mobile",
+    "shortdesc": "Mail Mobile",
+    "state": "installed"
+  },
+  {
+    "id": 877,
+    "name": "mass_mailing",
+    "shortdesc": "Email Marketing",
+    "state": "installed"
+  },
+  {
+    "id": 878,
+    "name": "mass_mailing_crm",
+    "shortdesc": "Mass mailing on lead / opportunities",
+    "state": "installed"
+  },
+  {
+    "id": 884,
+    "name": "mass_mailing_sale",
+    "shortdesc": "Mass mailing on sale orders",
+    "state": "installed"
+  },
+  {
+    "id": 886,
+    "name": "mass_mailing_sale_subscription",
+    "shortdesc": "Mass mailing on sale subscriptions",
+    "state": "installed"
+  },
+  {
+    "id": 889,
+    "name": "mass_mailing_themes",
+    "shortdesc": "Mass Mailing Themes",
+    "state": "installed"
+  },
+  {
+    "id": 892,
+    "name": "microsoft_outlook",
+    "shortdesc": "Microsoft Outlook",
+    "state": "installed"
+  },
+  {
+    "id": 917,
+    "name": "onboarding",
+    "shortdesc": "Onboarding Toolbox",
+    "state": "installed"
+  },
+  {
+    "id": 918,
+    "name": "partner_autocomplete",
+    "shortdesc": "Partner Autocomplete",
+    "state": "installed"
+  },
+  {
+    "id": 921,
+    "name": "payment",
+    "shortdesc": "Payment Engine",
+    "state": "installed"
+  },
+  {
+    "id": 938,
+    "name": "payment_razorpay",
+    "shortdesc": "Payment Provider: Razorpay",
+    "state": "installed"
+  },
+  {
+    "id": 945,
+    "name": "phone_validation",
+    "shortdesc": "Phone Numbers Validation",
+    "state": "installed"
+  },
+  {
+    "id": 946,
+    "name": "planning",
+    "shortdesc": "Planning",
+    "state": "installed"
+  },
+  {
+    "id": 949,
+    "name": "planning_hr_skills",
+    "shortdesc": "Planning - Skills",
+    "state": "installed"
+  },
+  {
+    "id": 950,
+    "name": "point_of_sale",
+    "shortdesc": "Point of Sale",
+    "state": "installed"
+  },
+  {
+    "id": 951,
+    "name": "portal",
+    "shortdesc": "Customer Portal",
+    "state": "installed"
+  },
+  {
+    "id": 952,
+    "name": "portal_rating",
+    "shortdesc": "Portal Rating",
+    "state": "installed"
+  },
+  {
+    "id": 953,
+    "name": "pos_account_reports",
+    "shortdesc": "pos_account_reports",
+    "state": "installed"
+  },
+  {
+    "id": 954,
+    "name": "pos_account_tax_python",
+    "shortdesc": "Allow custom taxes in POS",
+    "state": "installed"
+  },
+  {
+    "id": 958,
+    "name": "pos_barcodelookup",
+    "shortdesc": "POS - Barcode Lookup",
+    "state": "installed"
+  },
+  {
+    "id": 961,
+    "name": "pos_discount",
+    "shortdesc": "Point of Sale Discounts",
+    "state": "installed"
+  },
+  {
+    "id": 964,
+    "name": "pos_enterprise",
+    "shortdesc": "Point of Sale enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 970,
+    "name": "pos_hr",
+    "shortdesc": "POS - HR",
+    "state": "installed"
+  },
+  {
+    "id": 971,
+    "name": "pos_hr_mobile",
+    "shortdesc": "POS Barcode in Mobile",
+    "state": "installed"
+  },
+  {
+    "id": 979,
+    "name": "pos_loyalty",
+    "shortdesc": "Point of Sale - Coupons & Loyalty",
+    "state": "installed"
+  },
+  {
+    "id": 984,
+    "name": "pos_online_payment",
+    "shortdesc": "Point of Sale online payment",
+    "state": "installed"
+  },
+  {
+    "id": 994,
+    "name": "pos_razorpay",
+    "shortdesc": "POS Razorpay",
+    "state": "installed"
+  },
+  {
+    "id": 1004,
+    "name": "pos_sale",
+    "shortdesc": "POS - Sales",
+    "state": "installed"
+  },
+  {
+    "id": 1005,
+    "name": "pos_sale_loyalty",
+    "shortdesc": "POS - Sales Loyality",
+    "state": "installed"
+  },
+  {
+    "id": 1008,
+    "name": "pos_sale_subscription",
+    "shortdesc": "Point of Sale Subscription",
+    "state": "installed"
+  },
+  {
+    "id": 1019,
+    "name": "pos_settle_due",
+    "shortdesc": "Point of Sale Settle Due",
+    "state": "installed"
+  },
+  {
+    "id": 1020,
+    "name": "pos_sms",
+    "shortdesc": "POS - SMS",
+    "state": "installed"
+  },
+  {
+    "id": 1027,
+    "name": "privacy_lookup",
+    "shortdesc": "Privacy",
+    "state": "installed"
+  },
+  {
+    "id": 1028,
+    "name": "product",
+    "shortdesc": "Products & Pricelists",
+    "state": "installed"
+  },
+  {
+    "id": 1029,
+    "name": "product_barcodelookup",
+    "shortdesc": "Product Barcode Lookup",
+    "state": "installed"
+  },
+  {
+    "id": 1031,
+    "name": "product_expiry",
+    "shortdesc": "Products Expiration Date",
+    "state": "installed"
+  },
+  {
+    "id": 1035,
+    "name": "project",
+    "shortdesc": "Project",
+    "state": "installed"
+  },
+  {
+    "id": 1036,
+    "name": "project_account",
+    "shortdesc": "Project - Account",
+    "state": "installed"
+  },
+  {
+    "id": 1037,
+    "name": "project_account_asset",
+    "shortdesc": "Project Accounting Assets",
+    "state": "installed"
+  },
+  {
+    "id": 1039,
+    "name": "project_enterprise",
+    "shortdesc": "Project Enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 1040,
+    "name": "project_enterprise_hr",
+    "shortdesc": "Project Enterprise HR",
+    "state": "installed"
+  },
+  {
+    "id": 1041,
+    "name": "project_enterprise_hr_skills",
+    "shortdesc": "Project - Skills",
+    "state": "installed"
+  },
+  {
+    "id": 1047,
+    "name": "project_hr_skills",
+    "shortdesc": "Project - Skills",
+    "state": "installed"
+  },
+  {
+    "id": 1054,
+    "name": "project_purchase",
+    "shortdesc": "Project Purchase",
+    "state": "installed"
+  },
+  {
+    "id": 1055,
+    "name": "project_purchase_stock",
+    "shortdesc": "Project - Purchase - Stock",
+    "state": "installed"
+  },
+  {
+    "id": 1057,
+    "name": "project_sale_subscription",
+    "shortdesc": "Project Sales Subscription",
+    "state": "installed"
+  },
+  {
+    "id": 1058,
+    "name": "project_sms",
+    "shortdesc": "Project - SMS",
+    "state": "installed"
+  },
+  {
+    "id": 1059,
+    "name": "project_stock",
+    "shortdesc": "Project Stock",
+    "state": "installed"
+  },
+  {
+    "id": 1060,
+    "name": "project_stock_account",
+    "shortdesc": "Project Stock Account",
+    "state": "installed"
+  },
+  {
+    "id": 1065,
+    "name": "project_todo",
+    "shortdesc": "To-Do",
+    "state": "installed"
+  },
+  {
+    "id": 1066,
+    "name": "purchase",
+    "shortdesc": "Purchase",
+    "state": "installed"
+  },
+  {
+    "id": 1067,
+    "name": "purchase_accountant",
+    "shortdesc": "Purchase Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 1074,
+    "name": "purchase_requisition",
+    "shortdesc": "Purchase Agreements",
+    "state": "installed"
+  },
+  {
+    "id": 1076,
+    "name": "purchase_requisition_stock",
+    "shortdesc": "Purchase Requisition Stock",
+    "state": "installed"
+  },
+  {
+    "id": 1077,
+    "name": "purchase_stock",
+    "shortdesc": "Purchase Stock",
+    "state": "installed"
+  },
+  {
+    "id": 1089,
+    "name": "rating",
+    "shortdesc": "Customer Rating",
+    "state": "installed"
+  },
+  {
+    "id": 1091,
+    "name": "resource",
+    "shortdesc": "Resource",
+    "state": "installed"
+  },
+  {
+    "id": 1092,
+    "name": "resource_mail",
+    "shortdesc": "Resource Mail",
+    "state": "installed"
+  },
+  {
+    "id": 1094,
+    "name": "rpc",
+    "shortdesc": "RPC endpoints",
+    "state": "installed"
+  },
+  {
+    "id": 1097,
+    "name": "saas_ai",
+    "shortdesc": "SaaS AI",
+    "state": "installed"
+  },
+  {
+    "id": 1098,
+    "name": "saas_base_import",
+    "shortdesc": "saas_base_import",
+    "state": "installed"
+  },
+  {
+    "id": 1099,
+    "name": "saas_dashboard_activities",
+    "shortdesc": "saas_dashboard_activities",
+    "state": "installed"
+  },
+  {
+    "id": 1104,
+    "name": "saas_google_account",
+    "shortdesc": "Saas Google Calendar",
+    "state": "installed"
+  },
+  {
+    "id": 1109,
+    "name": "saas_pos",
+    "shortdesc": "SaaS Point of Sale Integration",
+    "state": "installed"
+  },
+  {
+    "id": 1110,
+    "name": "saas_product_barcodelookup",
+    "shortdesc": "Product Barcode Lookup Saas",
+    "state": "installed"
+  },
+  {
+    "id": 1112,
+    "name": "saas_trial",
+    "shortdesc": "saas_trial",
+    "state": "installed"
+  },
+  {
+    "id": 1113,
+    "name": "saas_unsplash",
+    "shortdesc": "Unsplash SaaS Integration",
+    "state": "installed"
+  },
+  {
+    "id": 1118,
+    "name": "saas_whatsapp",
+    "shortdesc": "SaaS WhatsApp",
+    "state": "installed"
+  },
+  {
+    "id": 1120,
+    "name": "sale",
+    "shortdesc": "Sales",
+    "state": "installed"
+  },
+  {
+    "id": 1121,
+    "name": "sale_account_accountant",
+    "shortdesc": "Sale Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 1127,
+    "name": "sale_crm",
+    "shortdesc": "Opportunity to Quotation",
+    "state": "installed"
+  },
+  {
+    "id": 1128,
+    "name": "sale_edi_ubl",
+    "shortdesc": "Import electronic orders with UBL",
+    "state": "installed"
+  },
+  {
+    "id": 1129,
+    "name": "sale_enterprise",
+    "shortdesc": "Sale Enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 1137,
+    "name": "sale_loyalty",
+    "shortdesc": "Sale Loyalty",
+    "state": "installed"
+  },
+  {
+    "id": 1139,
+    "name": "sale_management",
+    "shortdesc": "Sales",
+    "state": "installed"
+  },
+  {
+    "id": 1145,
+    "name": "sale_pdf_quote_builder",
+    "shortdesc": "Sales PDF Quotation Builder",
+    "state": "installed"
+  },
+  {
+    "id": 1146,
+    "name": "sale_planning",
+    "shortdesc": "Sale Planning",
+    "state": "installed"
+  },
+  {
+    "id": 1148,
+    "name": "sale_project",
+    "shortdesc": "Sales - Project",
+    "state": "installed"
+  },
+  {
+    "id": 1150,
+    "name": "sale_project_stock",
+    "shortdesc": "Sale Project - Sale Stock",
+    "state": "installed"
+  },
+  {
+    "id": 1151,
+    "name": "sale_project_stock_account",
+    "shortdesc": "Sale Project Stock Account",
+    "state": "installed"
+  },
+  {
+    "id": 1161,
+    "name": "sale_service",
+    "shortdesc": "Sales - Service",
+    "state": "installed"
+  },
+  {
+    "id": 1163,
+    "name": "sale_sms",
+    "shortdesc": "Sale - SMS",
+    "state": "installed"
+  },
+  {
+    "id": 1164,
+    "name": "sale_stock",
+    "shortdesc": "Sales and Warehouse Management",
+    "state": "installed"
+  },
+  {
+    "id": 1166,
+    "name": "sale_stock_product_expiry",
+    "shortdesc": "Sale Stock Product Expiry",
+    "state": "installed"
+  },
+  {
+    "id": 1168,
+    "name": "sale_subscription",
+    "shortdesc": "Subscriptions",
+    "state": "installed"
+  },
+  {
+    "id": 1171,
+    "name": "sale_subscription_stock",
+    "shortdesc": "Sale Subscriptions Stock",
+    "state": "installed"
+  },
+  {
+    "id": 1177,
+    "name": "sales_team",
+    "shortdesc": "Sales Teams",
+    "state": "installed"
+  },
+  {
+    "id": 1178,
+    "name": "sign",
+    "shortdesc": "Sign",
+    "state": "installed"
+  },
+  {
+    "id": 1179,
+    "name": "sign_ai",
+    "shortdesc": "Sign AI Integration",
+    "state": "installed"
+  },
+  {
+    "id": 1182,
+    "name": "sms",
+    "shortdesc": "SMS gateway",
+    "state": "installed"
+  },
+  {
+    "id": 1184,
+    "name": "snailmail",
+    "shortdesc": "Snail Mail",
+    "state": "installed"
+  },
+  {
+    "id": 1185,
+    "name": "snailmail_account",
+    "shortdesc": "Snail Mail - Account",
+    "state": "installed"
+  },
+  {
+    "id": 1186,
+    "name": "snailmail_account_followup",
+    "shortdesc": "Snail Mail Follow-Up",
+    "state": "installed"
+  },
+  {
+    "id": 1193,
+    "name": "social_media",
+    "shortdesc": "Social Media",
+    "state": "installed"
+  },
+  {
+    "id": 1199,
+    "name": "spreadsheet",
+    "shortdesc": "Spreadsheet",
+    "state": "installed"
+  },
+  {
+    "id": 1200,
+    "name": "spreadsheet_account",
+    "shortdesc": "Spreadsheet Accounting Formulas",
+    "state": "installed"
+  },
+  {
+    "id": 1201,
+    "name": "spreadsheet_dashboard",
+    "shortdesc": "Spreadsheet dashboard",
+    "state": "installed"
+  },
+  {
+    "id": 1202,
+    "name": "spreadsheet_dashboard_account",
+    "shortdesc": "Spreadsheet dashboard for accounting",
+    "state": "installed"
+  },
+  {
+    "id": 1203,
+    "name": "spreadsheet_dashboard_account_accountant",
+    "shortdesc": "Spreadsheet dashboard for accounting",
+    "state": "installed"
+  },
+  {
+    "id": 1204,
+    "name": "spreadsheet_dashboard_crm",
+    "shortdesc": "Spreadsheet dashboard for CRM",
+    "state": "installed"
+  },
+  {
+    "id": 1205,
+    "name": "spreadsheet_dashboard_documents",
+    "shortdesc": "Spreadsheet Documents",
+    "state": "installed"
+  },
+  {
+    "id": 1206,
+    "name": "spreadsheet_dashboard_edition",
+    "shortdesc": "Spreadsheet dashboard edition",
+    "state": "installed"
+  },
+  {
+    "id": 1216,
+    "name": "spreadsheet_dashboard_pos_hr",
+    "shortdesc": "Spreadsheet dashboard for point of sale",
+    "state": "installed"
+  },
+  {
+    "id": 1218,
+    "name": "spreadsheet_dashboard_purchase_stock",
+    "shortdesc": "Spreadsheet dashboard for purchases",
+    "state": "installed"
+  },
+  {
+    "id": 1219,
+    "name": "spreadsheet_dashboard_sale",
+    "shortdesc": "Spreadsheet dashboard for sales",
+    "state": "installed"
+  },
+  {
+    "id": 1221,
+    "name": "spreadsheet_dashboard_sale_subscription",
+    "shortdesc": "Spreadsheet dashboard for subscriptions",
+    "state": "installed"
+  },
+  {
+    "id": 1223,
+    "name": "spreadsheet_dashboard_stock",
+    "shortdesc": "Spreadsheet dashboard for stock",
+    "state": "installed"
+  },
+  {
+    "id": 1224,
+    "name": "spreadsheet_dashboard_stock_account",
+    "shortdesc": "Spreadsheet dashboard for stock",
+    "state": "installed"
+  },
+  {
+    "id": 1227,
+    "name": "spreadsheet_edition",
+    "shortdesc": "Spreadsheet",
+    "state": "installed"
+  },
+  {
+    "id": 1228,
+    "name": "spreadsheet_sale_management",
+    "shortdesc": "Sale order spreadsheet",
+    "state": "installed"
+  },
+  {
+    "id": 1229,
+    "name": "stock",
+    "shortdesc": "Inventory",
+    "state": "installed"
+  },
+  {
+    "id": 1230,
+    "name": "stock_account",
+    "shortdesc": "WMS Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 1231,
+    "name": "stock_accountant",
+    "shortdesc": "Stock Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 1232,
+    "name": "stock_barcode",
+    "shortdesc": "Barcode",
+    "state": "installed"
+  },
+  {
+    "id": 1237,
+    "name": "stock_barcode_product_expiry",
+    "shortdesc": "Barcode Expiry",
+    "state": "installed"
+  },
+  {
+    "id": 1243,
+    "name": "stock_enterprise",
+    "shortdesc": "Stock enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 1250,
+    "name": "stock_sms",
+    "shortdesc": "Stock - SMS",
+    "state": "installed"
+  },
+  {
+    "id": 1251,
+    "name": "survey",
+    "shortdesc": "Surveys",
+    "state": "installed"
+  },
+  {
+    "id": 1252,
+    "name": "survey_crm",
+    "shortdesc": "Survey CRM",
+    "state": "installed"
+  },
+  {
+    "id": 1348,
+    "name": "uom",
+    "shortdesc": "Units of measure",
+    "state": "installed"
+  },
+  {
+    "id": 1349,
+    "name": "utm",
+    "shortdesc": "UTM Trackers",
+    "state": "installed"
+  },
+  {
+    "id": 1359,
+    "name": "web",
+    "shortdesc": "Web",
+    "state": "installed"
+  },
+  {
+    "id": 1360,
+    "name": "web_cohort",
+    "shortdesc": "Cohort View",
+    "state": "installed"
+  },
+  {
+    "id": 1361,
+    "name": "web_enterprise",
+    "shortdesc": "Web Enterprise",
+    "state": "installed"
+  },
+  {
+    "id": 1362,
+    "name": "web_gantt",
+    "shortdesc": "Web Gantt",
+    "state": "installed"
+  },
+  {
+    "id": 1363,
+    "name": "web_grid",
+    "shortdesc": "Grid View",
+    "state": "installed"
+  },
+  {
+    "id": 1364,
+    "name": "web_hierarchy",
+    "shortdesc": "Web Hierarchy",
+    "state": "installed"
+  },
+  {
+    "id": 1365,
+    "name": "web_map",
+    "shortdesc": "Map View",
+    "state": "installed"
+  },
+  {
+    "id": 1366,
+    "name": "web_mobile",
+    "shortdesc": "Mobile",
+    "state": "installed"
+  },
+  {
+    "id": 1369,
+    "name": "web_tour",
+    "shortdesc": "Tours",
+    "state": "installed"
+  },
+  {
+    "id": 1370,
+    "name": "web_unsplash",
+    "shortdesc": "Unsplash Image Library",
+    "state": "installed"
+  },
+  {
+    "id": 1458,
+    "name": "whatsapp",
+    "shortdesc": "WhatsApp Messaging",
+    "state": "installed"
+  },
+  {
+    "id": 1459,
+    "name": "whatsapp_account",
+    "shortdesc": "Whatsapp Accounting",
+    "state": "installed"
+  },
+  {
+    "id": 1460,
+    "name": "whatsapp_account_followup",
+    "shortdesc": "WhatsApp Follow-Up",
+    "state": "installed"
+  },
+  {
+    "id": 1461,
+    "name": "whatsapp_calendar",
+    "shortdesc": "WhatsApp-Calendar",
+    "state": "installed"
+  },
+  {
+    "id": 1483,
+    "name": "whatsapp_identifiers",
+    "shortdesc": "WhatsApp Identifiers",
+    "state": "installed"
+  },
+  {
+    "id": 1465,
+    "name": "whatsapp_payment",
+    "shortdesc": "Whatsapp-Payment",
+    "state": "installed"
+  },
+  {
+    "id": 1466,
+    "name": "whatsapp_pos",
+    "shortdesc": "WhatsApp-POS",
+    "state": "installed"
+  },
+  {
+    "id": 1467,
+    "name": "whatsapp_sale",
+    "shortdesc": "WhatsApp-Sale",
+    "state": "installed"
+  },
+  {
+    "id": 1468,
+    "name": "whatsapp_sign",
+    "shortdesc": "WhatsApp-Sign",
+    "state": "installed"
+  },
+  {
+    "id": 1469,
+    "name": "whatsapp_stock",
+    "shortdesc": "Stock - WhatsApp",
+    "state": "installed"
+  }
+]

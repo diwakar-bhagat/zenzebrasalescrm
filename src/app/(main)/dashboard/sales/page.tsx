@@ -326,9 +326,19 @@ export default function SalesDashboardPage() {
 				}
 
 				const res = await fetch(`/api/sales/dashboard?${params.toString()}`);
+				if (res.status === 401) {
+					window.location.href = "/login";
+					return;
+				}
 				const json = await res.json();
 				if (json.success) {
 					setData(json.data);
+				} else if (
+					json.error === "Unauthorized" ||
+					json.message === "Unauthorized"
+				) {
+					window.location.href = "/login";
+					return;
 				} else {
 					console.error("Dashboard API returned an error", json.error);
 					setError(json.error ?? "Failed to load dashboard data.");

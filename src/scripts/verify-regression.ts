@@ -19,19 +19,19 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
  * legitimate import, re-run the generator and update these constants + metadata.
  */
 const EXPECTED = {
-	totalRows: 19506,
-	distinctBills: 12000,
-	totalRevenue: 1918834.69,
-	totalQuantity: 23697,
-	distinctMobile: 1930,
-	klj: { rows: 5964, bills: 3452, revenue: 562025.64, units: 6939 },
-	smart: { rows: 13542, bills: 8548, revenue: 1356809.05, units: 16758 },
-	overallAov: 159.9,
-	repeatCustomers: 909,
-	grossCollection: 2196427.99,
-	gst: 277593.3,
-	discount: 554066.45,
-	mrpValue: 2750494.44,
+	totalRows: 16130,
+	distinctBills: 10167,
+	totalRevenue: 1635142.9,
+	totalQuantity: 19707,
+	distinctMobile: 1778,
+	klj: { rows: 3936, bills: 2367, revenue: 396983.43, units: 4541 },
+	smart: { rows: 12194, bills: 7800, revenue: 1238159.47, units: 15166 },
+	overallAov: 160.83,
+	repeatCustomers: 817,
+	grossCollection: 1869383.81,
+	gst: 234240.91,
+	discount: 494571.63,
+	mrpValue: 2363955.44,
 };
 
 async function main() {

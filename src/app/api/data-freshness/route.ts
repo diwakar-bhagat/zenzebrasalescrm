@@ -5,17 +5,18 @@ export const runtime = "nodejs"; // Match sales dashboard pattern
 
 export async function GET() {
 	try {
-		// Get latest sale date from sales_fact
+		// Get latest sale date from sales_fact_v (which includes live Odoo sync data)
 		const salesResult = await sql`
       SELECT MAX(sale_date) as latest_sale_date 
-      FROM sales_fact
+      FROM sales_fact_v
     `;
 
-		// Get latest upload timestamp from upload_batches
-		const uploadResult = await sql`
-      SELECT MAX(uploaded_at) as last_uploaded_at 
-      FROM upload_batches
-      WHERE status = 'success'
+		// Get latest sync / upload timestamp
+		const syncResult = await sql`
+      SELECT COALESCE(
+        (SELECT MAX(completed_at) FROM sync_telemetry WHERE status = 'success'),
+        (SELECT MAX(uploaded_at) FROM upload_batches WHERE status = 'success')
+      ) as last_uploaded_at
     `;
 
 		// Row / bill / revenue counts for the freshness header.
@@ -23,11 +24,11 @@ export async function GET() {
       SELECT COUNT(*)::int AS total_rows,
         COUNT(DISTINCT bill_no)::int AS total_bills,
         COALESCE(SUM(net_amount), 0) AS total_revenue
-      FROM sales_fact
+      FROM sales_fact_v
     `;
 
 		const latestSaleDate = salesResult[0]?.latest_sale_date || null;
-		const lastUploadedAt = uploadResult[0]?.last_uploaded_at || null;
+		const lastUploadedAt = syncResult[0]?.last_uploaded_at || null;
 		const totalRows = Number(countsResult[0]?.total_rows ?? 0);
 		const totalBills = Number(countsResult[0]?.total_bills ?? 0);
 		const totalRevenue = Number(countsResult[0]?.total_revenue ?? 0);

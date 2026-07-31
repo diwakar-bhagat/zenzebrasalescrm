@@ -28,54 +28,60 @@ export function MetricCard({
 	return (
 		<div
 			className={cn(
-				tokens.effects.glass,
-				tokens.effects.glassHover,
-				tokens.radius.lg,
-				"flex flex-col gap-2 p-5 transition-all duration-300",
+				"relative flex flex-col justify-between h-full min-h-[135px] p-6 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-xl transition-all duration-300 hover:border-zinc-700/80 hover:shadow-lg hover:-translate-y-0.5",
 				className,
 			)}
 			{...props}
 		>
-			<div className="flex items-center justify-between">
-				<span className={tokens.typography.kpiLabel}>
+			<div className="flex items-center justify-between gap-2">
+				<span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
 					{title}
 				</span>
 				{Icon && (
-					<div className="p-2 rounded-lg bg-white/5 border border-white/5 text-zinc-300">
-						<Icon className="size-4" />
+					<div className="p-2 rounded-xl bg-zinc-800/50 border border-zinc-700/40 text-zinc-300">
+						<Icon className="size-4 shrink-0" />
 					</div>
 				)}
 			</div>
 
-			<div className="flex items-baseline gap-1 mt-1">
-				<span className="text-2xl font-bold tracking-tight text-foreground">
+			<div className="my-2 flex items-baseline gap-1.5">
+				<span className="text-3xl font-bold tracking-tight text-zinc-100 font-mono">
 					{value}
 				</span>
 				{suffix && (
-					<span className="text-xs font-medium text-muted-foreground ml-0.5">
-						{suffix}
-					</span>
+					<span className="text-xs font-medium text-zinc-400">{suffix}</span>
 				)}
 			</div>
 
-			{growth !== undefined && growth !== null && (
-				<div className="flex items-center gap-1.5 mt-1 text-xs">
+			{growth !== undefined && growth !== null ? (
+				<div className="flex items-center gap-2 text-xs">
 					<span
 						className={cn(
-							"flex items-center font-semibold gap-0.5 rounded px-1.5 py-0.5",
-							isPositive && "bg-emerald-500/10 text-emerald-500",
-							isNegative && "bg-rose-500/10 text-rose-500",
-							growth === 0 && "bg-gray-500/10 text-gray-500",
+							"inline-flex items-center font-bold gap-0.5 rounded-md px-2 py-0.5 text-xs",
+							isPositive &&
+								"bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+							isNegative &&
+								"bg-rose-500/10 text-rose-400 border border-rose-500/20",
+							growth === 0 &&
+								"bg-zinc-800/50 text-zinc-400 border border-zinc-700/30",
 						)}
 					>
-						{isPositive && <ArrowUpRight className="size-3 shrink-0" />}
-						{isNegative && <ArrowDownRight className="size-3 shrink-0" />}
+						{isPositive && <ArrowUpRight className="size-3.5 shrink-0" />}
+						{isNegative && <ArrowDownRight className="size-3.5 shrink-0" />}
 						{growth >= 0 ? `+${Math.abs(growth)}%` : `-${Math.abs(growth)}%`}
 					</span>
 					{comparisonLabel && (
-						<span className="text-muted-foreground/60">{comparisonLabel}</span>
+						<span className="text-xs text-zinc-400 truncate">
+							{comparisonLabel}
+						</span>
 					)}
 				</div>
+			) : (
+				comparisonLabel && (
+					<span className="text-xs text-zinc-400 truncate block mt-1">
+						{comparisonLabel}
+					</span>
+				)
 			)}
 		</div>
 	);

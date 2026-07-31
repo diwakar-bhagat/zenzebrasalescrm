@@ -52,7 +52,7 @@ function run(script: string): { ok: boolean; ms: number } {
 			"tsconfig.scripts.json",
 			path.resolve(process.cwd(), script),
 		],
-		{ stdio: "inherit", env: process.env },
+		{ stdio: "inherit", env: process.env, shell: process.platform === "win32" },
 	);
 	return { ok: res.status === 0, ms: performance.now() - t0 };
 }

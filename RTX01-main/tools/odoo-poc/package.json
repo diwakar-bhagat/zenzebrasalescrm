@@ -1,0 +1,23 @@
+{
+  "name": "odoo-poc",
+  "version": "1.0.0",
+  "description": "Odoo Standard Discovery & Feasibility POC Audit",
+  "main": "src/run-all-tests.ts",
+  "scripts": {
+    "test:health": "tsx src/test-00-health.ts",
+    "test:auth": "tsx src/test-01-auth-callkw.ts",
+    "test:models": "tsx src/test-02-models-audit.ts",
+    "test:fields": "tsx src/test-03-fields-discovery.ts",
+    "test:filters": "tsx src/test-04-filtering-sorting.ts",
+    "test:pagination": "tsx src/test-05-pagination.ts",
+    "test:all": "tsx src/run-all-tests.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,9 +1,10 @@
 "use client";
 
 import { format } from "date-fns";
-import { Upload, Users } from "lucide-react";
+import { FileSpreadsheet, Upload, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { CustomerConcentrationCard } from "@/components/customer-intelligence/CustomerConcentrationCard";
 import { CustomerHealthCard } from "@/components/customer-intelligence/CustomerHealthCard";
 import { CustomerInsightsCard } from "@/components/customer-intelligence/CustomerInsightsCard";
@@ -17,6 +18,7 @@ import { GlobalFilterBar } from "@/components/founder/global-filter-bar";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { exportCustomerIntelligenceExcel } from "@/lib/customer-intelligence-export";
 import { useFilterStore } from "@/stores/founder/filter-store";
 import { tokens } from "@/styles/tokens";
 import type {
@@ -88,6 +90,10 @@ export default function Page() {
 				const res = await fetch(
 					`/api/customer-intelligence?${params.toString()}`,
 				);
+				if (res.status === 401) {
+					window.location.href = "/login";
+					return;
+				}
 				const json: CustomerIntelligenceResponse = await res.json();
 				if (json.success && json.data) setData(json.data);
 			} catch (err) {
@@ -147,6 +153,21 @@ export default function Page() {
 
 	const formattedDate = format(new Date(), "EEEE, do MMMM yyyy");
 
+	const handleExport = () => {
+		if (!data) {
+			toast.error("No customer intelligence data available to export");
+			return;
+		}
+		try {
+			const dateStr = isDateFiltered ? `${startDate}_to_${endDate}` : "AllTime";
+			const fileName = exportCustomerIntelligenceExcel(data, store, dateStr);
+			toast.success(`Exported ${fileName} successfully!`);
+		} catch (err) {
+			console.error("Export failed:", err);
+			toast.error("Failed to export Excel file");
+		}
+	};
+
 	return (
 		<ErrorBoundary fallbackTitle="Customer Intelligence Module">
 			<div className={tokens.layout.dashboardPadding}>
@@ -156,76 +177,89 @@ export default function Page() {
 							<h1 className={tokens.typography.titleExecutive}>
 								Customer Intelligence
 							</h1>
-							<p className={tokens.typography.subtitleExecutive}>{formattedDate}</p>
+							<p className={tokens.typography.subtitleExecutive}>
+								{formattedDate}
+							</p>
 						</div>
 						<DataFreshnessBadge />
 					</div>
-				<Button
-					variant="outline"
-					onClick={() => router.push("/dashboard/sales/upload")}
-				>
-					<Upload className="mr-2 size-4" />
-					Upload Data
-				</Button>
-			</div>
-
-			<GlobalFilterBar
-				availableCategories={status.availableCategories || []}
-				availableBrands={status.availableBrands || []}
-			/>
-
-			{isLoading || !data ? (
-				<div className="mt-2 grid grid-cols-12 gap-6">
-					<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-4" />
-					<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-8" />
-					<Skeleton className="col-span-12 h-[220px] rounded-xl" />
-					<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-7" />
-					<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-5" />
-				</div>
-			) : (
-				<>
-					<ReconciliationBanner report={data.reconciliation} />
-
-					<div className="mt-2 grid grid-cols-12 gap-6">
-						{/* Decision-first: Customer Health + automated diagnosis */}
-						<div className="col-span-12 xl:col-span-4">
-							<CustomerHealthCard quality={data.qualityScore} />
-						</div>
-						<div className="col-span-12 xl:col-span-8">
-							<CustomerInsightsCard insights={data.insights} />
-						</div>
-
-						{/* Section 2 — Revenue Composition (full width) */}
-						<div className="col-span-12">
-							<RevenueCompositionCards
-								composition={data.revenueComposition}
-								comparisonLabel={data.comparisonLabel}
-							/>
-						</div>
-
-						{/* Section 1 — Retention Cohort */}
-						<div className="col-span-12 xl:col-span-7">
-							<RetentionCohortTable cohort={data.retentionCohort} />
-						</div>
-
-						{/* Section 3 — Customer Value Distribution */}
-						<div className="col-span-12 xl:col-span-5">
-							<CustomerValueDistributionTable
-								distribution={data.valueDistribution}
-							/>
-						</div>
-
-						{/* Concentration / Revenue at Risk + Identity confidence */}
-						<div className="col-span-12 xl:col-span-6">
-							<CustomerConcentrationCard concentration={data.concentration} />
-						</div>
-						<div className="col-span-12 xl:col-span-6">
-							<IdentityConfidenceCard identity={data.identityConfidence} />
-						</div>
+					<div className="flex items-center gap-3">
+						<Button
+							variant="outline"
+							onClick={handleExport}
+							disabled={!data || isLoading}
+							className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+						>
+							<FileSpreadsheet className="mr-2 size-4" />
+							Export Excel
+						</Button>
+						<Button
+							variant="outline"
+							onClick={() => router.push("/dashboard/sales/upload")}
+						>
+							<Upload className="mr-2 size-4" />
+							Upload Data
+						</Button>
 					</div>
-				</>
-			)}
-		</div>
+				</div>
+
+				<GlobalFilterBar
+					availableCategories={status.availableCategories || []}
+					availableBrands={status.availableBrands || []}
+				/>
+
+				{isLoading || !data ? (
+					<div className="mt-2 grid grid-cols-12 gap-6">
+						<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-4" />
+						<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-8" />
+						<Skeleton className="col-span-12 h-[220px] rounded-xl" />
+						<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-7" />
+						<Skeleton className="col-span-12 h-[360px] rounded-xl xl:col-span-5" />
+					</div>
+				) : (
+					<>
+						<ReconciliationBanner report={data.reconciliation} />
+
+						<div className="mt-2 grid grid-cols-12 gap-6">
+							{/* Decision-first: Customer Health + automated diagnosis */}
+							<div className="col-span-12 xl:col-span-4">
+								<CustomerHealthCard quality={data.qualityScore} />
+							</div>
+							<div className="col-span-12 xl:col-span-8">
+								<CustomerInsightsCard insights={data.insights} />
+							</div>
+
+							{/* Section 2 — Revenue Composition (full width) */}
+							<div className="col-span-12">
+								<RevenueCompositionCards
+									composition={data.revenueComposition}
+									comparisonLabel={data.comparisonLabel}
+								/>
+							</div>
+
+							{/* Section 1 — Retention Cohort */}
+							<div className="col-span-12 xl:col-span-7">
+								<RetentionCohortTable cohort={data.retentionCohort} />
+							</div>
+
+							{/* Section 3 — Customer Value Distribution */}
+							<div className="col-span-12 xl:col-span-5">
+								<CustomerValueDistributionTable
+									distribution={data.valueDistribution}
+								/>
+							</div>
+
+							{/* Concentration / Revenue at Risk + Identity confidence */}
+							<div className="col-span-12 xl:col-span-6">
+								<CustomerConcentrationCard concentration={data.concentration} />
+							</div>
+							<div className="col-span-12 xl:col-span-6">
+								<IdentityConfidenceCard identity={data.identityConfidence} />
+							</div>
+						</div>
+					</>
+				)}
+			</div>
 		</ErrorBoundary>
 	);
 }

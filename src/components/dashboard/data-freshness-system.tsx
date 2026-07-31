@@ -110,8 +110,8 @@ export function DataFreshnessSystem() {
 						Data Source Status
 					</SheetTitle>
 					<SheetDescription>
-						This dashboard is powered by daily Excel uploads. It is not a
-						realtime system.
+						This dashboard is powered by live incremental synchronization from
+						Odoo 19 Enterprise SaaS.
 					</SheetDescription>
 				</SheetHeader>
 
@@ -119,7 +119,7 @@ export function DataFreshnessSystem() {
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 							<CardTitle className="text-sm font-medium">
-								Latest Sale Date
+								Latest Transaction Date
 							</CardTitle>
 							<Calendar className="size-4 text-muted-foreground" />
 						</CardHeader>
@@ -132,7 +132,7 @@ export function DataFreshnessSystem() {
 							<p className="text-xs text-muted-foreground mt-1">
 								{data?.dataAgeDays !== null && data?.dataAgeDays !== undefined
 									? data.dataAgeDays === 0
-										? "Data is up to date"
+										? "Data is fully up to date with Odoo"
 										: `${data.dataAgeDays} day${data.dataAgeDays === 1 ? "" : "s"} behind current date`
 									: "No data available"}
 							</p>
@@ -142,7 +142,7 @@ export function DataFreshnessSystem() {
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 							<CardTitle className="text-sm font-medium">
-								Last Uploaded At
+								Last Odoo Sync Timestamp
 							</CardTitle>
 							<Clock className="size-4 text-muted-foreground" />
 						</CardHeader>
@@ -153,7 +153,7 @@ export function DataFreshnessSystem() {
 									: "N/A"}
 							</div>
 							<p className="text-xs text-muted-foreground mt-1">
-								The timestamp when the last spreadsheet was processed.
+								Timestamp of the last incremental sync cycle from Odoo 19.
 							</p>
 						</CardContent>
 					</Card>
@@ -164,10 +164,10 @@ export function DataFreshnessSystem() {
 							<div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-3 flex items-start mt-4">
 								<AlertCircle className="size-5 mr-2 mt-0.5 shrink-0" />
 								<div className="text-sm">
-									<p className="font-semibold">Stale Data Warning</p>
+									<p className="font-semibold">Sync Data Lag Warning</p>
 									<p className="opacity-90">
-										The dashboard data is {data.dataAgeDays} days old. Please
-										upload the latest sales sheet to update the metrics.
+										The dashboard data is {data.dataAgeDays} days behind.
+										Trigger a sync run or check Odoo connectivity.
 									</p>
 								</div>
 							</div>

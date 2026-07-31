@@ -34,8 +34,7 @@ async function main() {
 	await sql`TRUNCATE TABLE upload_batches_benchmark CASCADE;`;
 	await sql`
 		INSERT INTO upload_batches_benchmark 
-		SELECT * FROM upload_batches 
-		WHERE id IN (33, 34, 36, 40, 41);
+		SELECT * FROM upload_batches;
 	`;
 
 	// 4. Clear and seed sales_fact_benchmark from current sales_fact
@@ -43,8 +42,7 @@ async function main() {
 	await sql`TRUNCATE TABLE sales_fact_benchmark CASCADE;`;
 	await sql`
 		INSERT INTO sales_fact_benchmark
-		SELECT * FROM sales_fact
-		WHERE upload_id IN (33, 34, 36, 40, 41);
+		SELECT * FROM sales_fact;
 	`;
 
 	// 5. Create sales_fact_v_benchmark view

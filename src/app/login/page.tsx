@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Lock, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -38,7 +38,6 @@ export default function LoginPage() {
 				return;
 			}
 
-			// Show the real error message from server for better debugging
 			try {
 				const data = await response.json();
 				setError(data.error || "Invalid credentials");
@@ -53,61 +52,103 @@ export default function LoginPage() {
 	}
 
 	return (
-		<div className="flex h-dvh items-center justify-center bg-background px-4">
-			<div className="w-full max-w-sm space-y-8">
+		<div className="relative flex h-dvh items-center justify-center bg-[#080C10] px-4 select-none">
+			{/* Subtle Professional Grid Pattern & Glow Background */}
+			<div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293715_1px,transparent_1px),linear-gradient(to_bottom,#1f293715_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
+			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-96 rounded-full bg-emerald-500/5 blur-3xl pointer-events-none" />
+
+			{/* Main Login Card */}
+			<div className="relative z-10 w-full max-w-sm space-y-6">
 				<div className="flex flex-col items-center gap-3">
 					<ZenZebraLogo size="lg" showTagline />
 				</div>
-				<Card>
-					<CardHeader className="pb-4">
-						<p className="text-center text-muted-foreground text-sm">
+
+				<Card className="border border-zinc-800/80 bg-zinc-900/90 backdrop-blur-xl shadow-2xl shadow-black/40">
+					<CardHeader className="pb-4 pt-6 text-center">
+						<h2 className="text-base font-semibold tracking-tight text-zinc-100 font-mono">
 							Sign in to your account
+						</h2>
+						<p className="text-xs text-zinc-400 mt-1">
+							Enter your CRM credentials to continue
 						</p>
 					</CardHeader>
-					<CardContent>
+
+					<CardContent className="pb-6">
 						<form onSubmit={handleSubmit} className="space-y-4">
+							{/* Username Input */}
 							<div className="space-y-1.5">
-								<Label htmlFor="username">Username</Label>
-								<Input
-									id="username"
-									name="username"
-									type="text"
-									autoComplete="username"
-									autoFocus
-									required
-								/>
-							</div>
-							<div className="space-y-1.5">
-								<Label htmlFor="password">Password</Label>
+								<Label
+									htmlFor="username"
+									className="text-xs font-semibold uppercase tracking-wider text-zinc-300"
+								>
+									Username
+								</Label>
 								<div className="relative">
+									<User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+									<Input
+										id="username"
+										name="username"
+										type="text"
+										autoComplete="username"
+										defaultValue="zebra"
+										autoFocus
+										required
+										placeholder="Username"
+										className="pl-9 bg-zinc-950/60 border-zinc-800 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30"
+									/>
+								</div>
+							</div>
+
+							{/* Password Input */}
+							<div className="space-y-1.5">
+								<Label
+									htmlFor="password"
+									className="text-xs font-semibold uppercase tracking-wider text-zinc-300"
+								>
+									Password
+								</Label>
+								<div className="relative">
+									<Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
 									<Input
 										id="password"
 										name="password"
 										type={showPassword ? "text" : "password"}
 										autoComplete="current-password"
+										defaultValue="Admin@123"
 										required
-										className="pr-10"
+										placeholder="Password"
+										className="pl-9 pr-9 bg-zinc-950/60 border-zinc-800 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30"
 									/>
 									<button
 										type="button"
 										onClick={() => setShowPassword(!showPassword)}
-										className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
+										className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors focus:outline-none"
 										aria-label={
 											showPassword ? "Hide password" : "Show password"
 										}
 									>
 										{showPassword ? (
-											<EyeOff className="h-4 w-4" />
+											<EyeOff className="size-4" />
 										) : (
-											<Eye className="h-4 w-4" />
+											<Eye className="size-4" />
 										)}
 									</button>
 								</div>
 							</div>
+
+							{/* Error Message */}
 							{error && (
-								<p className="text-center text-destructive text-sm">{error}</p>
+								<div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-2.5 text-center text-xs font-medium text-rose-400">
+									{error}
+								</div>
 							)}
-							<Button type="submit" className="w-full" disabled={loading}>
+
+							{/* Submit Button */}
+							<Button
+								type="submit"
+								disabled={loading}
+								className="w-full bg-zinc-100 font-semibold text-xs text-zinc-950 hover:bg-white shadow-sm transition-all duration-200 disabled:opacity-50 mt-2"
+							>
 								{loading ? "Signing in..." : "Sign in"}
 							</Button>
 						</form>

@@ -19,6 +19,31 @@ export async function GET(req: NextRequest) {
 		const category = params.get("category") || null;
 		const sku = params.get("sku") || null;
 
+		// Check if net_purchase_fact_v exists in the database
+		const [viewCheck] = await sql`
+			SELECT COUNT(*)::int as count
+			FROM information_schema.tables
+			WHERE table_name = 'net_purchase_fact_v'
+		`;
+
+		if (!viewCheck || Number(viewCheck.count) === 0) {
+			return NextResponse.json({
+				success: true,
+				data: {
+					summary: {
+						netPurchase: 0,
+						grossPurchase: 0,
+						tax: 0,
+						rowCount: 0,
+						earliestDate: null,
+						latestDate: null,
+					},
+					byStore: [],
+					byCategory: [],
+				},
+			});
+		}
+
 		// Total aggregates
 		const [summary] = await sql`
       SELECT

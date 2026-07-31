@@ -66,7 +66,7 @@ async function composition(
        COUNT(DISTINCT ck) FILTER (WHERE first_date < $1::date)::int AS repeat_cust,
        COUNT(DISTINCT bill_no)::int AS bills,
        COUNT(DISTINCT bill_no) FILTER (WHERE is_identified)::int AS ident_bills,
-       COUNT(DISTINCT bill_no) FILTER (WHERE NOT is_identified)::int AS anon_bills
+       COUNT(DISTINCT bill_no) FILTER (WHERE NOT is_identified AND bill_no NOT IN (SELECT bill_no FROM period WHERE is_identified))::int AS anon_bills
      FROM period`,
 		[start, end, store],
 	);

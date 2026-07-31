@@ -42,6 +42,17 @@ class JobScheduler {
 				await sql`SELECT 1;`;
 			},
 		});
+
+		this.registerJob({
+			id: "job_odoo_sync",
+			name: "Odoo Standard Sync Engine",
+			cronSchedule: "*/5 * * * *", // Every 5 minutes
+			status: "IDLE",
+			handler: async () => {
+				const { runSyncPipeline } = await import("../odoo/sync/orchestrator");
+				await runSyncPipeline();
+			},
+		});
 	}
 
 	public registerJob(job: ScheduledJob): void {

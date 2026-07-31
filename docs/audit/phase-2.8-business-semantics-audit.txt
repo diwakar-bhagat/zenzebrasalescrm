@@ -1,0 +1,289 @@
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 1: STORE IDENTITY — What represents a physical store?
+══════════════════════════════════════════════════════════════════════════════
+
+  ── 1a. pos.config (POS Configurations) ──
+    config_id=1 | name="ZenZebra" | active=true
+      company_id=[1,"ZenZebra"]
+      warehouse_id=[1,"ZenZebra"]
+      picking_type_id=[9,"ZenZebra: PoS Orders"]
+    config_id=2 | name="KLJ" | active=true
+      company_id=[1,"ZenZebra"]
+      warehouse_id=[2,"KLJ"]
+      picking_type_id=[18,"KLJ: PoS Orders"]
+    config_id=3 | name="SWN" | active=true
+      company_id=[1,"ZenZebra"]
+      warehouse_id=[3,"SWN"]
+      picking_type_id=[27,"SWN: PoS Orders"]
+
+  ── 1b. stock.warehouse (Warehouses) ──
+    warehouse_id=1 | name="ZenZebra" | code="WH" | company=[1,"ZenZebra"]
+    warehouse_id=2 | name="KLJ" | code="KLJ" | company=[1,"ZenZebra"]
+    warehouse_id=3 | name="SWN" | code="SWN" | company=[1,"ZenZebra"]
+
+  ── 1c. res.company (Companies) ──
+    company_id=1 | name="ZenZebra" | currency=[20,"INR"]
+
+  ── 1d. POS Order Distribution by config_id (store) ──
+    config_id=1 (ZenZebra): 87 orders | Revenue: ₹12290.25
+    config_id=2 (KLJ): 937 orders | Revenue: ₹102495.45
+    config_id=3 (SWN): 460 orders | Revenue: ₹56940.50
+
+  ── 1e. POS Session Distribution by config_id ──
+    config_id=1 (ZenZebra): 5 recent sessions
+      session=ZenZebra/00066 | state=opened | start=2026-07-28 14:48:36 | stop=false
+      session=ZenZebra/00065 | state=closed | start=2026-07-28 14:48:04 | stop=2026-07-28 14:48:18
+      session=ZenZebra/00062 | state=closed | start=2026-07-27 14:19:18 | stop=2026-07-28 14:47:47
+    config_id=2 (KLJ): 5 recent sessions
+      session=KLJ/00064 | state=opened | start=2026-07-28 04:33:35 | stop=false
+      session=KLJ/00058 | state=closed | start=2026-07-27 08:26:15 | stop=2026-07-27 13:55:23
+      session=KLJ/00057 | state=closed | start=2026-07-27 08:25:07 | stop=2026-07-27 08:25:29
+    config_id=3 (SWN): 5 recent sessions
+      session=SWN/00061 | state=opened | start=2026-07-27 14:07:17 | stop=false
+      session=SWN/00059 | state=closed | start=2026-07-27 08:26:25 | stop=2026-07-27 13:58:48
+      session=SWN/00056 | state=closed | start=2026-07-27 08:25:03 | stop=2026-07-27 08:26:16
+
+  ── STORE IDENTITY CONCLUSION ──
+    ✅ Store identity = pos.config (config_id)
+    ✅ 3 physical stores: ZenZebra (1), KLJ (2), SWN (3)
+    ⚠️  Warehouses exist but map 1:1 with company, not directly to POS stores.
+    ⚠️  Single company setup (res.company has 1 record).
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 2: CUSTOMER IDENTITY — Guest checkout? Duplicates? Missing data?
+══════════════════════════════════════════════════════════════════════════════
+
+    Total customer-ranked partners: 190
+
+  ── 2a. Contact Information Completeness ──
+
+  ❌ AUDIT FAILED: Customer Identity — RPC [res.partner.search_count]: Invalid field res.partner.mobile in condition ('mobile', '!=', False)
+     Stack:     at rpc (C:\Users\pc\Documents\zenzebrasalescrm-main\src\scripts\phase28-business-semantics-audit.ts:71:24)
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 3: POS vs SALE — Which one powers retail?
+══════════════════════════════════════════════════════════════════════════════
+
+    pos.order total records:  1484
+    sale.order total records: 0
+
+  ── 3a. POS Order State Breakdown ──
+    state="paid": 544 orders
+    state="done": 933 orders
+    state="cancel": 7 orders
+
+  ── 3b. Sale Order State Breakdown ──
+
+  ── 3c. Revenue Comparison ──
+    POS Revenue (paid/done/invoiced):  ₹171726.20
+    Sale Revenue (sale/done):           ₹0.00
+
+  ── 3d. POS Order Date Range ──
+    Oldest POS order: 2026-07-18 11:33:00 (KLJ - 000001)
+    Newest POS order: 2026-07-31 09:12:01 (KLJ - 000391)
+
+  ── POS vs SALE CONCLUSION ──
+    ✅ Retail is 100% POS (pos.order). 1484 orders, ₹171726.20 revenue.
+    ✅ sale.order has 0 records (NOT USED for retail).
+    ⚠️  Dashboard retail modules should query ONLY pos.order, not sale.order.
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 4: RETURNS & REFUNDS — How are they stored?
+══════════════════════════════════════════════════════════════════════════════
+
+  ── 4a. POS Orders with amount_total < 0 (Returns/Refunds) ──
+    Total refund orders (amount_total < 0): 4
+    KLJ - 000278 REFUND | ₹-42 | tax ₹0 | state=paid | store=KLJ | customer=GUEST | date=2026-07-30 14:55:05
+    SWN - 000172 REFUND | ₹-119 | tax ₹0 | state=done | store=SWN | customer=Darshpreet | date=2026-07-23 13:47:04
+    ZenZebra - 000028 REFUND | ₹-20 | tax ₹0 | state=done | store=ZenZebra | customer=Gautam Zz | date=2026-07-23 06:11:17
+    ZenZebra - 000022 REFUND | ₹-70 | tax ₹0 | state=done | store=ZenZebra | customer=TanmayJain | date=2026-07-22 13:44:22
+
+  ── 4b. POS Order Lines with qty < 0 (Return Lines) ──
+    Lines with negative qty: 4+
+    order=ZenZebra - 000022 REFUND | product="Makino Corn Munch Red Chilli Chatka" | qty=-1 | unit=₹70 | subtotal=₹70 | incl=₹70
+    order=ZenZebra - 000028 REFUND | product="Lay's indian magic masala 48 gm" | qty=-1 | unit=₹20 | subtotal=₹20 | incl=₹20
+    order=SWN - 000172 REFUND | product="M&M - peanut" | qty=-1 | unit=₹119 | subtotal=₹119 | incl=₹119
+    order=KLJ - 000278 REFUND | product="Rite Bite Max Protein 7 grain Protein Snack Chinese Manchurian 60g 60 g" | qty=-1 | unit=₹42 | subtotal=₹42 | incl=₹42
+
+  ── 4c. Credit Notes in Accounting (account.move) ──
+    Credit notes found: 0
+
+  ── RETURNS & REFUNDS CONCLUSION ──
+    ✅ Returns = pos.order with amount_total < 0 AND state = "paid"
+    ✅ Return lines have negative qty and negative price_subtotal
+    ✅ Net revenue = SUM(amount_total) inclusive of refunds (no separate handling needed)
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 5: ACCOUNTING — Can it be Source of Truth for Revenue/GST?
+══════════════════════════════════════════════════════════════════════════════
+
+  ── 5a. account.move Type Breakdown ──
+    move_type="entry": 89 entries
+    move_type="out_invoice": 25 entries
+
+  ── 5b. Invoice Revenue vs POS Revenue ──
+    Posted out_invoices: 25
+    Invoice Revenue: ₹7161.10
+    Invoice Tax (GST): ₹0.00
+
+  ── 5c. Accounting Journals ──
+    id=8 | name="Sales" | type=sale | code=INV
+    id=9 | name="Purchases" | type=purchase | code=BILL
+    id=13 | name="Bank" | type=bank | code=BNK1
+    id=10 | name="Miscellaneous Operations" | type=general | code=MISC
+    id=17 | name="Cash ZenZebra" | type=cash | code=CSH1
+    id=12 | name="Cash Basis Taxes" | type=general | code=CABA
+    id=11 | name="Exchange Difference" | type=general | code=EXCH
+    id=16 | name="Point of Sale" | type=general | code=POSS
+    id=15 | name="Inventory Valuation" | type=general | code=STJ
+    id=14 | name="Tax Returns" | type=general | code=TAX
+
+  ── 5d. Tax Configuration (account.tax) ──
+    id=71 | name="5% GST P" | amount=5% | type=group | use=purchase
+    id=103 | name="5% GST RC" | amount=5% | type=group | use=purchase
+    id=9 | name="0% Exempt" | amount=0% | type=percent | use=sale
+    id=10 | name="Nil Rated" | amount=0% | type=percent | use=sale
+    id=40 | name="5% CESS P" | amount=5% | type=percent | use=none
+    id=41 | name="1.591% CESS P" | amount=1.591% | type=fixed | use=none
+    id=42 | name="5%+1.591 CESS P" | amount=0% | type=group | use=purchase
+    id=43 | name="21% or 4.170 CESS P" | amount=0% | type=code | use=purchase
+    id=44 | name="0% Exempt" | amount=0% | type=percent | use=purchase
+    id=45 | name="Nil Rated" | amount=0% | type=percent | use=purchase
+    id=46 | name="0% NGST P" | amount=0% | type=percent | use=purchase
+    id=47 | name="1% IGST P" | amount=1% | type=percent | use=purchase
+    id=48 | name="2% IGST P" | amount=2% | type=percent | use=purchase
+    id=49 | name="28% IGST P" | amount=28% | type=percent | use=purchase
+    id=50 | name="18% IGST P" | amount=18% | type=percent | use=purchase
+
+  ── ACCOUNTING CONCLUSION ──
+    📊 Accounting entries exist and are queryable.
+    ⚠️  Compare invoice revenue vs POS revenue to determine if accounting is a reliable SOT.
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 6: LOYALTY — Programs, Cards, Customer Linkage
+══════════════════════════════════════════════════════════════════════════════
+
+    Loyalty programs found: 2
+    id=1 | name="Gift Cards" | type=gift_card | active=true
+      rules: 1 | rewards: 1
+    id=2 | name="Loyalty Cards" | type=loyalty | active=true
+      rules: 1 | rewards: 2
+
+    Loyalty cards found: 20
+    Cards linked to customer: 19
+    Cards WITHOUT customer: 1
+    card_id=1 | code=0448-f02f-47f9 | points=0 | partner=UNLINKED | program=Loyalty Cards
+    card_id=2 | code=0444-222b-4578 | points=20 | partner=Parth Zz | program=Loyalty Cards
+    card_id=3 | code=044c-032f-48b4 | points=5 | partner=Deepika | program=Loyalty Cards
+    card_id=4 | code=0441-2fe8-4a74 | points=6 | partner=Anupam | program=Loyalty Cards
+    card_id=5 | code=0447-a624-42fd | points=5 | partner=shruti | program=Loyalty Cards
+    card_id=6 | code=0442-552b-4d78 | points=7 | partner=Sabrina swn n | program=Loyalty Cards
+    card_id=7 | code=044c-2e75-40bf | points=5 | partner=Shivani s swn | program=Loyalty Cards
+    card_id=8 | code=0445-1c27-4d76 | points=20 | partner=Customer parcel | program=Loyalty Cards
+    card_id=9 | code=0446-aaa1-42ef | points=10 | partner=Astha | program=Loyalty Cards
+    card_id=10 | code=0448-bfe4-4f2e | points=6 | partner=Garima | program=Loyalty Cards
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 7: ARCHIVED RECORDS — Products, Customers, Sessions
+══════════════════════════════════════════════════════════════════════════════
+
+    Products active:   1356
+    Products archived: 969
+    Total:             2325
+
+    Customers active:   190
+    Customers archived: 0
+
+    POS Sessions open:   3
+    POS Sessions closed: 62
+
+  ── Sample Archived Products ──
+    id=9285 | name="Mr. Beast Feastables -Milk Chocolate" | sku=1806 | archived_date=2026-07-19 17:38:52
+    id=18977 | name="29 TEE overized thirt POP UP FIZZ- orange color S" | sku=NULL | archived_date=2026-07-30 06:45:29
+    id=7548 | name="3 Sisters PEACH MANGO BEER - NON ALCOHOLIC 330ML 330 ml" | sku=NULL | archived_date=2026-07-27 08:18:33
+    id=8883 | name="4700BC Crunchy Corn Himalayan Salt" | sku=NULL | archived_date=2026-07-27 08:18:33
+    id=7893 | name="A Fragrance Story Bajirao-tester 50 ml" | sku=NULL | archived_date=2026-07-27 08:18:33
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 8: WHATSAPP — Templates, Messages, Customer Mapping
+══════════════════════════════════════════════════════════════════════════════
+
+    WhatsApp templates: 15
+    id=15 | name="POS Invoice" | template="pos_invoice" | status=approved | model=Point of Sale Orders | active=true
+    id=13 | name="Hello World" | template="hello_world" | status=approved | model=Contact | active=true
+    id=14 | name="Test Template" | template="test_template" | status=pending | model=Contact | active=true
+    id=12 | name="Payment Reminder" | template="payment_reminder" | status=draft | model=Contact | active=true
+    id=11 | name="Sale Order" | template="sale" | status=approved | model=Sales Order | active=true
+    id=9 | name="POS Receipt" | template="pos_receipt" | status=approved | model=Point of Sale Orders | active=true
+    id=10 | name="Point of Sale: Marketing" | template="pos_marketing" | status=draft | model=Point of Sale Orders | active=true
+    id=8 | name="Delivery Confirmation" | template="delivery_confirmation" | status=draft | model=Transfer | active=true
+    id=6 | name="Payment Receipt" | template="payment_receipt" | status=approved | model=Payments | active=true
+    id=7 | name="Invoice" | template="invoice" | status=approved | model=Journal Entry | active=true
+    id=3 | name="Sign Request" | template="sign_request" | status=draft | model=Signature Request Item | active=true
+    id=4 | name="Sign Request Completion" | template="sign_request_completion" | status=draft | model=Signature Request Item | active=true
+    id=5 | name="Sign Request Refusal" | template="sign_request_refusal" | status=draft | model=Signature Request Item | active=true
+    id=2 | name="Payment Link" | template="payment_link" | status=approved | model=Generate Sales Payment Link | active=true
+    id=1 | name="Conversation Reviver" | template="conversation_reviver" | status=draft | model=Discussion Channel | active=true
+
+    WhatsApp messages (recent): 11
+    msg_id=11 | state=sent | template=Invoice [Odoo Demo Account] | date=2026-07-31 08:24:06
+    msg_id=10 | state=sent | template=Invoice [Odoo Demo Account] | date=2026-07-31 08:23:10
+    msg_id=9 | state=sent | template=POS Receipt [Odoo Demo Account] | date=2026-07-31 07:50:36
+    msg_id=8 | state=sent | template=POS Receipt [Odoo Demo Account] | date=2026-07-31 07:01:51
+    msg_id=7 | state=sent | template=POS Receipt [Odoo Demo Account] | date=2026-07-30 15:00:21
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 9: WEBSITE — Visitor → Lead → Customer → Order Funnel
+══════════════════════════════════════════════════════════════════════════════
+
+    ❌ website module:         NOT INSTALLED (404 on fields_get)
+    ❌ website.visitor module:  NOT INSTALLED (404 on fields_get)
+    ❌ website.page module:     NOT INSTALLED (404 on fields_get)
+
+    CONCLUSION: Website-to-Customer funnel tracing is NOT possible.
+    The Visitor → Lead → Customer → Order → Repeat journey cannot be
+    built from Odoo data alone. If website tracking is needed, it must
+    come from an external analytics source (GA4, Mixpanel, etc.).
+
+══════════════════════════════════════════════════════════════════════════════
+  AUDIT 10: PRODUCT IDENTITY — SKU, Categories, Attributes
+══════════════════════════════════════════════════════════════════════════════
+
+  ── 10a. SKU (default_code) Coverage & Uniqueness ──
+    Total products:          2325
+    With SKU (default_code): 3 (0.1%)
+    With Barcode:            1545 (66.5%)
+
+  ── 10b. Product Categories ──
+    id=22 | name="Glow Up Corner" | parent=ROOT
+    id=5 | name="Glow Up Corner / Cosmetics" | parent=Glow Up Corner
+    id=6 | name="Glow Up Corner / Fragrance" | parent=Glow Up Corner
+    id=8 | name="Glow Up Corner / Skincare" | parent=Glow Up Corner
+    id=18 | name="Live menu " | parent=ROOT
+    id=23 | name="Snack Spot" | parent=ROOT
+    id=19 | name="Snack Spot / Beverages " | parent=Snack Spot
+    id=17 | name="Snack Spot / Snack Corner" | parent=Snack Spot
+    id=21 | name="Style Studio" | parent=ROOT
+    id=7 | name="Style Studio / Bags" | parent=Style Studio
+    id=10 | name="Style Studio / Brand & zz own" | parent=Style Studio
+    id=16 | name="Style Studio / Clothing " | parent=Style Studio
+    id=11 | name="Style Studio / Jewellery" | parent=Style Studio
+
+  ── 10c. Product Attributes (Size, Color, etc.) ──
+    id=1 | name="color" | display=radio | variant=always
+      Values (0): 
+    id=2 | name="gender" | display=radio | variant=always
+      Values (1): Unisex
+    id=3 | name="material" | display=radio | variant=always
+      Values (0): 
+    id=4 | name="pattern" | display=radio | variant=always
+      Values (0): 
+    id=5 | name="manufacturer" | display=radio | variant=always
+      Values (6): Minimalist, Feastables inc, Pilgrim, Girnar, Gm genuine parts, Mondelez international
+    id=6 | name="brand" | display=radio | variant=always
+      Values (9): Minimalist, Mr beast, Feastables, Pilgrim, Girnar, Gm genuine parts, Starbucks, Trident, Epigamua
+    id=7 | name="size" | display=radio | variant=always
+      Values (6): 30ml, 60, 2.1oz (60g), 140gr, 250ml, 14 count (pack of 1)
+    id=8 | name="age group" | display=radio | variant=always
+      Values (0): 

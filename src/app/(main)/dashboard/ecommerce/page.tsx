@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { format } from "date-fns";
 import { AlertTriangle, BarChart3, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";

@@ -117,6 +117,13 @@ export async function POST(req: NextRequest) {
 			];
 		}
 
+		// 3.5 Ensure upload batch row exists in upload_batches
+		await sql`
+			INSERT INTO upload_batches (id, filename, status, row_count, valid_row_count, date_range_start, date_range_end, uploaded_at)
+			VALUES (9999, 'Odoo Enterprise SaaS Pipeline', 'completed', 0, 0, '2025-01-01', NOW()::date, NOW())
+			ON CONFLICT (id) DO NOTHING
+		`;
+
 		// 4. Atomic Upsert into sales_fact
 		let upserted = 0;
 		for (const line of linesToProcess) {
@@ -136,7 +143,7 @@ export async function POST(req: NextRequest) {
 					mrp_amount, discount_amount, gross_amount, tax_amount, net_amount,
 					payment_method, customer_mobile, customer_name, source_billed_by, store_id
 				) VALUES (
-					0, ${sale_date}::date, ${order_name}, ${canonicalStore}, ${product_key},
+					9999, ${sale_date}::date, ${order_name}, ${canonicalStore}, ${product_key},
 					${line.category ?? "General"}, ${line.brand ?? "Odoo"}, ${line.sku_code ?? null}, ${item_name}, ${quantity},
 					${mrp_amount}, ${discount_amount}, ${gross_amount}, ${tax_amount}, ${net_amount},
 					${payment_method}, ${customer_mobile}, ${customer_name}, ${rawStoreName}, ${storeId}

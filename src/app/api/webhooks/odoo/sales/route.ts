@@ -153,3 +153,12 @@ export async function POST(req: NextRequest) {
 		);
 	}
 }
+
+export async function GET() {
+	return NextResponse.json({
+		status: "active",
+		endpoint: "/api/webhooks/odoo/sales",
+		service: "ZenZebra Odoo Sales Ingestion Receiver",
+	});
+}
+

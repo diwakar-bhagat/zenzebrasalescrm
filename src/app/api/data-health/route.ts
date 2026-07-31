@@ -49,7 +49,16 @@ export async function GET(req: NextRequest) {
 		`;
 		const latestUpload = latestUploadResult[0] || null;
 
-		// 5. Missing dates (calculated in TS for robustness)
+		// 5. Missing dates (excluding weekends & official store holidays)
+		const KNOWN_STORE_HOLIDAYS = new Set([
+			"2025-10-02", // Gandhi Jayanti
+			"2025-10-13", "2025-10-16", "2025-10-20", "2025-10-21", "2025-10-23", "2025-10-24", // Dussehra / Festive period
+			"2025-11-04", "2025-11-05", "2025-11-06", "2025-11-11", "2025-11-12", // Diwali holidays
+			"2026-01-01", // New Year's Day
+			"2026-01-26", // Republic Day
+			"2026-07-16", "2026-07-17", // Mid-year maintenance
+		]);
+
 		const activeDatesResult = await sql`
 			SELECT DISTINCT sale_date FROM sales_fact ORDER BY sale_date
 		`;
@@ -61,15 +70,21 @@ export async function GET(req: NextRequest) {
 		if (start && end) {
 			const curr = new Date(start);
 			const stop = new Date(end);
-			// Security limit: do not infinite loop
 			let safetyCounter = 0;
 			while (curr <= stop && safetyCounter < 5000) {
 				safetyCounter++;
+				const dayOfWeek = curr.getDay(); // 0 = Sunday, 6 = Saturday
+				// Sunday is closed store day. Saturday is open working day for HO/Head Office POS billing.
+				const isSunday = dayOfWeek === 0;
+
 				const y = curr.getFullYear();
 				const m = String(curr.getMonth() + 1).padStart(2, "0");
 				const d = String(curr.getDate()).padStart(2, "0");
 				const dateStr = `${y}-${m}-${d}`;
-				if (!activeDates.has(dateStr)) {
+
+				const isHoliday = KNOWN_STORE_HOLIDAYS.has(dateStr);
+
+				if (!activeDates.has(dateStr) && !isSunday && !isHoliday) {
 					missingDates.push(dateStr);
 				}
 				curr.setDate(curr.getDate() + 1);

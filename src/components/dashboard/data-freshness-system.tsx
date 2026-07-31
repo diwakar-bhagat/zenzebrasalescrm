@@ -1,8 +1,9 @@
 "use client";
 
 import { format } from "date-fns";
-import { AlertCircle, Calendar, Clock, Database } from "lucide-react";
+import { AlertCircle, Calendar, Clock, Database, RefreshCw, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Sheet,
@@ -13,50 +14,55 @@ import {
 	SheetTrigger,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 
-const TEXT_CLASS = {
-	green: "text-green-600 dark:text-green-400",
-	yellow: "text-yellow-600 dark:text-yellow-400",
-	red: "text-destructive",
-	neutral: "text-foreground",
-} as const;
-
-interface FreshnessData {
-	latestSaleDate: string | null;
-	lastUploadedAt: string | null;
-	dataAgeDays: number | null;
+interface SyncStatusData {
+	status: "LIVE" | "FRESH" | "SYNCING" | "DELAYED" | "OFFLINE";
+	lastSyncAt: string | null;
+	secondsAgo: number | null;
+	formattedTimeAgo: string;
+	isStale: boolean;
+	entityStatuses?: Record<
+		string,
+		{
+			syncType: string;
+			lastSyncAt: string | null;
+			recordsProcessed: number;
+			status: string;
+			errorMessage: string | null;
+			secondsAgo: number | null;
+			isStale: boolean;
+		}
+	>;
 }
 
 export function DataFreshnessSystem() {
-	const [data, setData] = useState<FreshnessData | null>(null);
+	const [data, setData] = useState<SyncStatusData | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				const res = await fetch("/api/data-freshness");
-				const json = await res.json();
+	const fetchStatus = async () => {
+		try {
+			const res = await fetch("/api/sync/status");
+			const json = await res.json();
 
-				if (json.success) {
-					setData(json.data);
-					setError(null);
-				} else {
-					setError("Failed to load freshness data");
-				}
-			} catch (err) {
-				console.error("Failed to fetch data freshness:", err);
-				setError("Network error");
-			} finally {
-				setIsLoading(false);
+			if (json.success) {
+				setData(json.data);
+				setError(null);
+			} else {
+				setError("Failed to load sync status");
 			}
-		};
+		} catch (err) {
+			console.error("Failed to fetch sync status:", err);
+			setError("Network error");
+		} finally {
+			setIsLoading(false);
+		}
+	};
 
-		fetchData();
-
-		// Lightweight polling every 5 minutes (300,000 ms)
-		const interval = setInterval(fetchData, 300000);
+	useEffect(() => {
+		fetchStatus();
+		// Poll status every 5 seconds for live status
+		const interval = setInterval(fetchStatus, 5000);
 		return () => clearInterval(interval);
 	}, []);
 
@@ -64,41 +70,55 @@ export function DataFreshnessSystem() {
 		return <Skeleton className="h-9 w-28 rounded-full" />;
 	}
 
-	// Determine number tone and copy based on age.
-	// 0-1 days: green, 2-5 days: yellow, 6+ days (1-2 weeks or more): red.
-	// The pill itself always stays neutral grey — only the number changes color.
-	let tone: keyof typeof TEXT_CLASS = "neutral";
-	let primaryText = "Loading";
-	let secondaryText: string | null = null;
-
-	if (error) {
-		tone = "red";
-		primaryText = "Data error";
-	} else if (!data?.latestSaleDate) {
-		tone = "neutral";
-		primaryText = "No data";
-	} else if (data.dataAgeDays === 0) {
-		tone = "green";
-		primaryText = "Fresh";
-	} else if (data.dataAgeDays !== null) {
-		const days = data.dataAgeDays;
-		tone = days <= 1 ? "green" : days <= 5 ? "yellow" : "red";
-		primaryText = String(days);
-		secondaryText = days === 1 ? "day old" : "days old";
-	}
+	const status = data?.status || "OFFLINE";
+	const timeAgo = data?.formattedTimeAgo || "just now";
 
 	return (
 		<Sheet>
 			<SheetTrigger asChild>
 				<button
 					type="button"
-					className="flex h-9 items-center justify-center gap-1.5 rounded-full border bg-muted/20 px-3.5 text-sm leading-none outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
+					className="flex h-9 items-center justify-center gap-2 rounded-full border bg-muted/20 px-3.5 text-xs font-medium leading-none outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
 				>
-					<span className={cn("font-semibold tabular-nums", TEXT_CLASS[tone])}>
-						{primaryText}
-					</span>
-					{secondaryText && (
-						<span className="text-muted-foreground">{secondaryText}</span>
+					{status === "LIVE" && (
+						<>
+							<span className="relative flex size-2">
+								<span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+								<span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+							</span>
+							<span className="font-semibold text-emerald-600 dark:text-emerald-400">
+								🟢 LIVE — Last Sync {timeAgo}
+							</span>
+						</>
+					)}
+					{status === "FRESH" && (
+						<>
+							<span className="relative flex size-2">
+								<span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+							</span>
+							<span className="font-semibold text-emerald-600 dark:text-emerald-400">
+								🟢 FRESH — {timeAgo}
+							</span>
+						</>
+					)}
+					{status === "SYNCING" && (
+						<>
+							<RefreshCw className="size-3.5 animate-spin text-blue-500" />
+							<span className="font-semibold text-blue-600 dark:text-blue-400">
+								🟡 SYNCING — {timeAgo}
+							</span>
+						</>
+					)}
+					{status === "DELAYED" && (
+						<>
+							<AlertCircle className="size-3.5 text-amber-500" />
+							<span className="font-semibold text-amber-600 dark:text-amber-400">
+								🔴 DELAYED — {timeAgo}
+							</span>
+						</>
+					)}
+					{status === "OFFLINE" && (
+						<span className="text-muted-foreground font-semibold">🔴 OFFLINE</span>
 					)}
 				</button>
 			</SheetTrigger>
@@ -107,71 +127,66 @@ export function DataFreshnessSystem() {
 				<SheetHeader className="mb-6">
 					<SheetTitle className="flex items-center">
 						<Database className="mr-2 size-5 text-muted-foreground" />
-						Data Source Status
+						Odoo 19 Live Synchronization Telemetry
 					</SheetTitle>
 					<SheetDescription>
-						This dashboard is powered by live incremental synchronization from
-						Odoo 19 Enterprise SaaS.
+						Near real-time incremental synchronization powered by Neon PostgreSQL.
 					</SheetDescription>
 				</SheetHeader>
 
 				<div className="space-y-4">
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-							<CardTitle className="text-sm font-medium">
-								Latest Transaction Date
-							</CardTitle>
-							<Calendar className="size-4 text-muted-foreground" />
+							<CardTitle className="text-sm font-medium">Sync Status</CardTitle>
+							<Zap className="size-4 text-emerald-500" />
 						</CardHeader>
 						<CardContent>
-							<div className="text-2xl font-bold">
-								{data?.latestSaleDate
-									? format(new Date(data.latestSaleDate), "dd MMM yyyy")
-									: "N/A"}
+							<div className="flex items-center gap-2">
+								<Badge
+									className={
+										status === "LIVE" || status === "FRESH"
+											? "bg-emerald-500 text-white"
+											: status === "SYNCING"
+											? "bg-blue-500 text-white"
+											: "bg-amber-500 text-white"
+									}
+								>
+									{status}
+								</Badge>
+								<span className="text-xs text-muted-foreground">
+									Last successful sync: {timeAgo}
+								</span>
 							</div>
-							<p className="text-xs text-muted-foreground mt-1">
-								{data?.dataAgeDays !== null && data?.dataAgeDays !== undefined
-									? data.dataAgeDays === 0
-										? "Data is fully up to date with Odoo"
-										: `${data.dataAgeDays} day${data.dataAgeDays === 1 ? "" : "s"} behind current date`
-									: "No data available"}
-							</p>
 						</CardContent>
 					</Card>
 
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 							<CardTitle className="text-sm font-medium">
-								Last Odoo Sync Timestamp
+								Last Write Date Timestamp
 							</CardTitle>
 							<Clock className="size-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
 							<div className="text-lg font-semibold">
-								{data?.lastUploadedAt
-									? format(new Date(data.lastUploadedAt), "dd MMM yyyy, HH:mm")
+								{data?.lastSyncAt
+									? format(new Date(data.lastSyncAt), "dd MMM yyyy, HH:mm:ss")
 									: "N/A"}
 							</div>
-							<p className="text-xs text-muted-foreground mt-1">
-								Timestamp of the last incremental sync cycle from Odoo 19.
-							</p>
 						</CardContent>
 					</Card>
 
-					{data?.dataAgeDays !== null &&
-						data?.dataAgeDays !== undefined &&
-						data.dataAgeDays > 1 && (
-							<div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-3 flex items-start mt-4">
-								<AlertCircle className="size-5 mr-2 mt-0.5 shrink-0" />
-								<div className="text-sm">
-									<p className="font-semibold">Sync Data Lag Warning</p>
-									<p className="opacity-90">
-										The dashboard data is {data.dataAgeDays} days behind.
-										Trigger a sync run or check Odoo connectivity.
-									</p>
-								</div>
+					{status === "DELAYED" && (
+						<div className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 rounded-md p-3 flex items-start mt-4">
+							<AlertCircle className="size-5 mr-2 mt-0.5 shrink-0" />
+							<div className="text-sm">
+								<p className="font-semibold">Sync Delay Warning</p>
+								<p className="opacity-90">
+									Data update latency is currently {timeAgo}. The Always-On Sync Worker is automatically attempting background reconnection.
+								</p>
 							</div>
-						)}
+						</div>
+					)}
 				</div>
 			</SheetContent>
 		</Sheet>

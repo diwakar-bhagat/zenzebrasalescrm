@@ -385,16 +385,15 @@ export default function SalesDashboardPage() {
 				<div className="max-w-md space-y-2">
 					<h2 className="text-2xl font-bold">Welcome to ZenZebra</h2>
 					<p className="text-muted-foreground">
-						No data has been uploaded yet. Upload your first daily sales sheet
-						to unlock insights.
+						No data synced yet. Ensure Odoo SaaS background sync worker is running.
 					</p>
 				</div>
 				<Button
 					size="lg"
-					onClick={() => router.push("/dashboard/sales/upload")}
+					onClick={() => router.push("/dashboard/inventory")}
 				>
-					<Upload className="mr-2 size-5" />
-					Upload Sales Data
+					<Store className="mr-2 size-5" />
+					Open Inventory Dashboard
 				</Button>
 			</div>
 		);
@@ -405,17 +404,18 @@ export default function SalesDashboardPage() {
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
 				<div>
 					<h2 className="text-3xl font-bold tracking-tight">Sales Dashboard</h2>
-					<p className="text-muted-foreground mt-1">System of Attention</p>
+					<p className="text-muted-foreground mt-1">System of Attention • Odoo SaaS Live Sync</p>
 				</div>
 				<div className="flex items-center gap-3">
 					<DataFreshnessSystem />
 					<Button
 						size="lg"
-						className="shadow-sm"
-						onClick={() => router.push("/dashboard/sales/upload")}
+						variant="outline"
+						className="shadow-sm gap-2"
+						onClick={() => router.push("/dashboard/inventory")}
 					>
-						<Upload data-icon="inline-start" />
-						Upload Data
+						<Store className="size-4" />
+						Inventory Ops
 					</Button>
 				</div>
 			</div>

@@ -1,31 +1,27 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { getLatestTelemetryStatus } from "@/lib/repositories/odoo.repository";
 
-export const runtime = "nodejs"; // Match sales dashboard pattern
+export const runtime = "nodejs";
 
 export async function GET() {
 	try {
-		// Get latest sale date from sales_fact_v (which includes live Odoo sync data)
-		const salesResult = await sql`
-      SELECT MAX(sale_date) as latest_sale_date 
-      FROM sales_fact_v
-    `;
-
-		// Get latest sync / upload timestamp
-		const syncResult = await sql`
-      SELECT COALESCE(
-        (SELECT MAX(completed_at) FROM sync_telemetry WHERE status = 'success'),
-        (SELECT MAX(uploaded_at) FROM upload_batches WHERE status = 'success')
-      ) as last_uploaded_at
-    `;
-
-		// Row / bill / revenue counts for the freshness header.
-		const countsResult = await sql`
-      SELECT COUNT(*)::int AS total_rows,
-        COUNT(DISTINCT bill_no)::int AS total_bills,
-        COALESCE(SUM(net_amount), 0) AS total_revenue
-      FROM sales_fact_v
-    `;
+		const [salesResult, syncResult, countsResult, telemetry] = await Promise.all([
+			sql`SELECT MAX(sale_date) as latest_sale_date FROM sales_fact_v`,
+			sql`
+				SELECT COALESCE(
+					(SELECT MAX(completed_at) FROM sync_telemetry WHERE status = 'success'),
+					(SELECT MAX(uploaded_at) FROM upload_batches WHERE status = 'success')
+				) as last_uploaded_at
+			`,
+			sql`
+				SELECT COUNT(*)::int AS total_rows,
+					COUNT(DISTINCT bill_no)::int AS total_bills,
+					COALESCE(SUM(net_amount), 0) AS total_revenue
+				FROM sales_fact_v
+			`,
+			getLatestTelemetryStatus(),
+		]);
 
 		const latestSaleDate = salesResult[0]?.latest_sale_date || null;
 		const lastUploadedAt = syncResult[0]?.last_uploaded_at || null;
@@ -35,14 +31,10 @@ export async function GET() {
 
 		let dataAgeDays = null;
 		if (latestSaleDate) {
-			// Calculate difference in days between today and latest sale date
 			const today = new Date();
-			// Reset time to start of day for accurate day calculation
 			today.setHours(0, 0, 0, 0);
-
 			const saleDate = new Date(latestSaleDate);
 			saleDate.setHours(0, 0, 0, 0);
-
 			const diffTime = Math.abs(today.getTime() - saleDate.getTime());
 			dataAgeDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 		}
@@ -56,6 +48,10 @@ export async function GET() {
 				totalRows,
 				totalBills,
 				totalRevenue,
+				status: telemetry.overallStatus,
+				secondsAgo: telemetry.maxSecondsAgo,
+				isStale: telemetry.maxSecondsAgo === null || telemetry.maxSecondsAgo > 60,
+				entityStatuses: telemetry.entityStatuses,
 			},
 		});
 	} catch (error) {

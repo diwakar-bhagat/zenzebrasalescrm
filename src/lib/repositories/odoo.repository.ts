@@ -214,12 +214,16 @@ export async function upsertSalesLines(lines: OdooSalesLine[]): Promise<void> {
 
 export async function upsertInventory(records: OdooInventory[]): Promise<void> {
 	if (records.length === 0) return;
+
+	// Batched existence check — see upsertSalesLines for why this matters.
+	const productIds = [...new Set(records.map((r) => r.productId))];
+	const existingRows = await sql`
+		SELECT id FROM dim_products WHERE id = ANY(${productIds})
+	`;
+	const existingProductIds = new Set(existingRows.map((r) => r.id));
+
 	for (const rec of records) {
-		// First verify product exists.
-		const existsResult = await sql`
-			SELECT 1 FROM dim_products WHERE id = ${rec.productId} LIMIT 1
-		`;
-		if (existsResult.length === 0) {
+		if (!existingProductIds.has(rec.productId)) {
 			continue;
 		}
 
@@ -252,22 +256,118 @@ export async function getLastSyncTime(
 	return result[0]?.completed_at || null;
 }
 
+export interface Phase3TelemetryExtra {
+	traceId?: string;
+	workerId?: string;
+	durationMs?: number;
+	pollIntervalMs?: number;
+	rowsFetched?: number;
+	rowsInserted?: number;
+	rowsUpdated?: number;
+	rowsSkipped?: number;
+	writeDateCursor?: string;
+	odooResponseMs?: number;
+	databaseWriteMs?: number;
+	processingMs?: number;
+}
+
 export async function logSyncTelemetry(
 	syncType: string,
 	startedAt: string,
 	completedAt: string | null,
-	status: "success" | "failed",
+	status: "success" | "failed" | "syncing",
 	recordsProcessed: number,
 	errorMessage: string | null,
+	retryCount = 0,
+	queueLength = 0,
+	workerState = "active",
+	extra?: Phase3TelemetryExtra,
 ): Promise<number> {
 	const result = await sql`
 		INSERT INTO sync_telemetry (
-			sync_type, records_processed, status, started_at, completed_at, error_message
+			sync_type, records_processed, status, started_at, completed_at, error_message,
+			retry_count, queue_length, worker_state,
+			trace_id, worker_id, duration_ms, poll_interval_ms, entity,
+			rows_fetched, rows_inserted, rows_updated, rows_skipped, write_date_cursor,
+			odoo_response_ms, database_write_ms, processing_ms
 		) VALUES (
 			${syncType}, ${recordsProcessed}, ${status}, ${startedAt}, 
-			${completedAt || null}, ${errorMessage || null}
+			${completedAt || null}, ${errorMessage || null},
+			${retryCount}, ${queueLength}, ${workerState},
+			${extra?.traceId || `tr_${Date.now()}`}, ${extra?.workerId || "worker_main"},
+			${extra?.durationMs || 0}, ${extra?.pollIntervalMs || 2000}, ${syncType},
+			${extra?.rowsFetched || recordsProcessed}, ${extra?.rowsInserted || recordsProcessed},
+			${extra?.rowsUpdated || 0}, ${extra?.rowsSkipped || 0}, ${extra?.writeDateCursor || null},
+			${extra?.odooResponseMs || 0}, ${extra?.databaseWriteMs || 0}, ${extra?.processingMs || 0}
 		)
 		RETURNING id
 	`;
 	return Number(result[0]?.id || 0);
+}
+
+export interface EntityTelemetryStatus {
+	syncType: string;
+	lastSyncAt: string | null;
+	recordsProcessed: number;
+	status: string;
+	errorMessage: string | null;
+	secondsAgo: number | null;
+	isStale: boolean; // > 60 seconds
+}
+
+export async function getLatestTelemetryStatus(): Promise<{
+	overallStatus: "live" | "syncing" | "delayed" | "offline";
+	lastSyncAt: string | null;
+	maxSecondsAgo: number | null;
+	entityStatuses: Record<string, EntityTelemetryStatus>;
+}> {
+	const result = await sql`
+		SELECT DISTINCT ON (sync_type) 
+			sync_type, completed_at::text, records_processed, status, error_message,
+			EXTRACT(EPOCH FROM (NOW() - completed_at))::int AS seconds_ago
+		FROM sync_telemetry
+		ORDER BY sync_type, completed_at DESC
+	`;
+
+	const entityStatuses: Record<string, EntityTelemetryStatus> = {};
+	let maxSecondsAgo: number | null = null;
+	let hasSuccess = false;
+	let hasSyncing = false;
+
+	for (const row of result) {
+		const seconds = row.seconds_ago !== null ? Number(row.seconds_ago) : null;
+		const isStale = seconds === null || seconds > 60;
+
+		entityStatuses[row.sync_type] = {
+			syncType: row.sync_type,
+			lastSyncAt: row.completed_at || null,
+			recordsProcessed: Number(row.records_processed || 0),
+			status: String(row.status),
+			errorMessage: row.error_message || null,
+			secondsAgo: seconds,
+			isStale,
+		};
+
+		if (row.status === "syncing") hasSyncing = true;
+		if (row.status === "success") hasSuccess = true;
+		if (seconds !== null && (maxSecondsAgo === null || seconds < maxSecondsAgo)) {
+			maxSecondsAgo = seconds;
+		}
+	}
+
+	let overallStatus: "live" | "syncing" | "delayed" | "offline" = "offline";
+	if (hasSyncing) {
+		overallStatus = "syncing";
+	} else if (hasSuccess && maxSecondsAgo !== null && maxSecondsAgo <= 60) {
+		overallStatus = "live";
+	} else if (hasSuccess && maxSecondsAgo !== null && maxSecondsAgo > 60) {
+		overallStatus = "delayed";
+	}
+
+	return {
+		overallStatus,
+		lastSyncAt: result[0]?.completed_at || null,
+		maxSecondsAgo,
+		entityStatuses,
+	};
 }

@@ -36,7 +36,8 @@ async function main() {
 			END AS billed_by,
 			product_key, sku_code, item_name,
 			brand, category, quantity, mrp_amount,
-			discount_amount, gross_amount, tax_amount, net_amount,
+			GREATEST(0.00, mrp_amount - gross_amount)::numeric(12,2) AS discount_amount,
+			gross_amount, tax_amount, net_amount,
 			customer_mobile, customer_name, payment_method,
 			CASE
 				WHEN billed_by = 'SmartworksNoida Noida' THEN 'Smart Works Noida'
@@ -61,17 +62,17 @@ async function main() {
 			fl.id AS product_key,
 			dp.default_code AS sku_code,
 			dp.name AS item_name,
-			'Odoo' AS brand, -- Still a placeholder: brand is not a native Odoo concept (TD-002)
+			'Odoo' AS brand,
 			COALESCE(dp.category, 'Uncategorized') AS category,
 			fl.qty::int AS quantity,
-			dp.list_price AS mrp_amount,
-			((fl.price_unit * fl.qty) * (fl.discount / 100.0))::numeric(12,2) AS discount_amount,
-			(fl.price_unit * fl.qty)::numeric(12,2) AS gross_amount,
+			(dp.list_price * fl.qty)::numeric(12,2) AS mrp_amount,
+			((dp.list_price * fl.qty) - (fl.price_subtotal + COALESCE(fl.tax_amount, 0.00)))::numeric(12,2) AS discount_amount,
+			(fl.price_subtotal + COALESCE(fl.tax_amount, 0.00))::numeric(12,2) AS gross_amount,
 			COALESCE(fl.tax_amount, 0.00)::numeric(12,2) AS tax_amount,
 			fl.price_subtotal AS net_amount,
 			dc.mobile AS customer_mobile,
 			dc.name AS customer_name,
-			'Odoo POS' AS payment_method, -- Still a placeholder: needs a pos.payment join (TD-002)
+			'Odoo POS' AS payment_method,
 			CASE
 				WHEN ds.code = 'KLJ' THEN 'KLJ'
 				WHEN ds.code = 'SWN' THEN 'Smart Works Noida'

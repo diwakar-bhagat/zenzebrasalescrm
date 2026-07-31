@@ -6,10 +6,10 @@ import {
 	LineChart,
 	LogOut,
 	type LucideIcon,
+	Package,
 	Receipt,
 	Settings,
 	ShoppingBag,
-	Upload,
 	Users,
 } from "lucide-react";
 
@@ -82,9 +82,10 @@ export const sidebarItems: NavGroup[] = [
 				icon: LineChart,
 			},
 			{
-				title: "Upload Data",
-				url: "/dashboard/sales/upload",
-				icon: Upload,
+				title: "Inventory Dashboard",
+				url: "/dashboard/inventory",
+				icon: Package,
+				isNew: true,
 			},
 		],
 	},

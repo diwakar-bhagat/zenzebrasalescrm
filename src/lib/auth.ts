@@ -54,32 +54,37 @@ export async function createSession(userId: number): Promise<string> {
 export async function validateSession(token: string): Promise<{ userId: number; name: string; username: string; employeeId: string } | null> {
   if (!token) return null;
 
-  const tokenHash = sha256(token);
+  try {
+    const tokenHash = sha256(token);
 
-  const rows = await sql`
-    SELECT s.user_id, s.expires_at, u.name, u.username, u.employee_id
-    FROM sessions s
-    JOIN users u ON u.id = s.user_id
-    WHERE s.token_hash = ${tokenHash}
-  `;
+    const rows = await sql`
+      SELECT s.user_id, s.expires_at, u.name, u.username, u.employee_id
+      FROM sessions s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.token_hash = ${tokenHash}
+    `;
 
-  if (rows.length === 0) return null;
+    if (rows.length === 0) return null;
 
-  const session = rows[0];
-  const expiresAt = new Date(session.expires_at);
+    const session = rows[0];
+    const expiresAt = new Date(session.expires_at);
 
-  if (expiresAt < new Date()) {
-    // Expired — clean up
-    await sql`DELETE FROM sessions WHERE token_hash = ${tokenHash}`;
+    if (expiresAt < new Date()) {
+      // Expired — clean up
+      await sql`DELETE FROM sessions WHERE token_hash = ${tokenHash}`;
+      return null;
+    }
+
+    return {
+      userId: session.user_id,
+      name: session.name,
+      username: session.username,
+      employeeId: session.employee_id,
+    };
+  } catch (error) {
+    console.warn("Database connection error during session validation:", error);
     return null;
   }
-
-  return {
-    userId: session.user_id,
-    name: session.name,
-    username: session.username,
-    employeeId: session.employee_id,
-  };
 }
 
 export async function deleteSession(token: string): Promise<void> {

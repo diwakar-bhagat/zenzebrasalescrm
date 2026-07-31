@@ -49,7 +49,6 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { resolveNetPurchaseColumnMappings } from "@/lib/parser/net-purchase-parser";
 import { formatCurrency } from "@/lib/utils";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -124,261 +123,14 @@ function CustomTooltip({ active, payload, label }: any) {
 	);
 }
 
-// ── Upload Dialog Component ──────────────────────────────────────────────
+// ── Odoo Sync Badge Component ──────────────────────────────────────────────
 
-function NetPurchaseUploadDialog({
-	onUploadComplete,
-}: {
-	onUploadComplete: () => void;
-}) {
-	const [file, setFile] = useState<File | null>(null);
-	const [isProcessing, setIsProcessing] = useState(false);
-	const [progress, setProgress] = useState(0);
-	const [result, setResult] = useState<{
-		success: boolean;
-		message: string;
-		details?: string;
-	} | null>(null);
-
-	const handleUpload = async () => {
-		if (!file) return;
-		setIsProcessing(true);
-		setProgress(10);
-		setResult(null);
-
-		try {
-			// Parse in browser first
-			const XLSX = await import("xlsx");
-			const reader = new FileReader();
-
-			const rawRows = await new Promise<Record<string, unknown>[]>(
-				(resolve, reject) => {
-					reader.onload = (e) => {
-						try {
-							const data = new Uint8Array(e.target?.result as ArrayBuffer);
-							const workbook = XLSX.read(data, { type: "array" });
-							const sheetName = workbook.SheetNames.includes("main")
-								? "main"
-								: workbook.SheetNames[0];
-							const worksheet = sheetName
-								? workbook.Sheets[sheetName]
-								: undefined;
-							if (!worksheet) {
-								reject(new Error("No worksheet found"));
-								return;
-							}
-							const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-								worksheet,
-								{ raw: true, defval: null },
-							);
-							resolve(rows);
-						} catch (err) {
-							reject(err);
-						}
-					};
-					reader.onerror = reject;
-					reader.readAsArrayBuffer(file);
-				},
-			);
-
-			setProgress(30);
-
-			// Validate column mappings
-			if (rawRows.length === 0) {
-				setResult({
-					success: false,
-					message: "No rows found in the spreadsheet.",
-				});
-				setIsProcessing(false);
-				return;
-			}
-
-			const mappingResult = resolveNetPurchaseColumnMappings(rawRows[0] ?? {});
-			if (!mappingResult.isValid) {
-				setResult({
-					success: false,
-					message: "Column mapping failed.",
-					details: mappingResult.errors.join("\n"),
-				});
-				setIsProcessing(false);
-				return;
-			}
-
-			setProgress(50);
-
-			// Start batch
-			const startRes = await fetch(
-				"/api/net-purchase/upload?mode=start_batch",
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ filename: file.name }),
-				},
-			);
-			const startData = await startRes.json();
-			if (!startData.success) throw new Error("Failed to start batch");
-			const batchId = startData.data.batchId;
-
-			setProgress(60);
-
-			// Upload chunks
-			const CHUNK_SIZE = 500;
-			for (let i = 0; i < rawRows.length; i += CHUNK_SIZE) {
-				const chunk = rawRows.slice(i, i + CHUNK_SIZE);
-				await fetch("/api/net-purchase/upload?mode=upload_chunk", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						batchId,
-						chunkIndex: Math.floor(i / CHUNK_SIZE),
-						rows: chunk,
-					}),
-				});
-				setProgress(60 + Math.round((i / rawRows.length) * 20));
-			}
-
-			setProgress(85);
-
-			// Commit
-			const commitRes = await fetch("/api/net-purchase/upload?mode=commit", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ batchId, uploadType: "full_replace" }),
-			});
-			const commitData = await commitRes.json();
-
-			setProgress(100);
-
-			if (commitData.success) {
-				const inserted = commitData.data?.rowsInserted ?? 0;
-				const quarantined = commitData.data?.validation?.quarantined ?? 0;
-				setResult({
-					success: true,
-					message: `Successfully uploaded ${inserted} rows.`,
-					details:
-						quarantined > 0 ? `${quarantined} rows quarantined.` : undefined,
-				});
-				onUploadComplete();
-			} else {
-				setResult({
-					success: false,
-					message: commitData.error || "Upload failed.",
-				});
-			}
-		} catch (err) {
-			setResult({
-				success: false,
-				message: err instanceof Error ? err.message : "Upload failed.",
-			});
-		} finally {
-			setIsProcessing(false);
-		}
-	};
-
+function NetPurchaseSyncBadge() {
 	return (
-		<Dialog>
-			<DialogTrigger asChild>
-				<Button
-					variant="outline"
-					className="gap-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10"
-				>
-					<Upload className="size-4" />
-					Upload Net Purchase
-				</Button>
-			</DialogTrigger>
-			<DialogContent className="sm:max-w-lg">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<FileSpreadsheet className="size-5 text-primary" />
-						Upload Net Purchase Excel
-					</DialogTitle>
-					<DialogDescription>
-						Upload the finance team&apos;s Net Purchase ledger spreadsheet. This
-						is completely independent from Sales and Inventory uploads.
-					</DialogDescription>
-				</DialogHeader>
-
-				<div className="space-y-4 py-2">
-					{/* File input */}
-					<div className="flex flex-col items-center gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/20 p-8 transition-colors hover:border-primary/40 hover:bg-primary/5">
-						<UploadCloud className="size-10 text-muted-foreground/50" />
-						<label className="cursor-pointer text-center">
-							<span className="font-medium text-primary text-sm underline-offset-4 hover:underline">
-								Choose file
-							</span>
-							<span className="text-muted-foreground text-sm">
-								{" "}
-								or drag and drop
-							</span>
-							<input
-								type="file"
-								accept=".xlsx,.xls,.csv"
-								className="hidden"
-								onChange={(e) => {
-									if (e.target.files?.[0]) {
-										setFile(e.target.files[0]);
-										setResult(null);
-									}
-								}}
-							/>
-						</label>
-						{file && (
-							<Badge variant="secondary" className="gap-1">
-								<FileSpreadsheet className="size-3" />
-								{file.name}
-							</Badge>
-						)}
-					</div>
-
-					{/* Progress */}
-					{isProcessing && (
-						<div className="space-y-2">
-							<Progress value={progress} className="h-2" />
-							<p className="text-center text-muted-foreground text-xs">
-								Processing... {progress}%
-							</p>
-						</div>
-					)}
-
-					{/* Result */}
-					{result && (
-						<div
-							className={`flex items-start gap-2 rounded-lg p-3 text-sm ${
-								result.success
-									? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-									: "bg-destructive/10 text-destructive"
-							}`}
-						>
-							{result.success ? (
-								<CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-							) : (
-								<AlertCircle className="mt-0.5 size-4 shrink-0" />
-							)}
-							<div>
-								<p className="font-medium">{result.message}</p>
-								{result.details && (
-									<p className="mt-1 text-xs opacity-80">{result.details}</p>
-								)}
-							</div>
-						</div>
-					)}
-
-					{/* Upload button */}
-					<Button
-						onClick={handleUpload}
-						disabled={!file || isProcessing}
-						className="w-full gap-2"
-					>
-						{isProcessing ? (
-							<Loader2 className="size-4 animate-spin" />
-						) : (
-							<Upload className="size-4" />
-						)}
-						{isProcessing ? "Processing..." : "Upload & Process"}
-					</Button>
-				</div>
-			</DialogContent>
-		</Dialog>
+		<Badge variant="outline" className="gap-1.5 py-1 px-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+			<CheckCircle2 className="size-3.5" />
+			Odoo Live Ledger
+		</Badge>
 	);
 }
 
@@ -469,7 +221,7 @@ export default function NetPurchaseDashboardPage() {
 							{summaryData?.summary.rowCount.toLocaleString()} records
 						</Badge>
 					)}
-					<NetPurchaseUploadDialog onUploadComplete={fetchData} />
+					<NetPurchaseSyncBadge />
 				</div>
 			</div>
 
@@ -487,7 +239,7 @@ export default function NetPurchaseDashboardPage() {
 							Upload the finance team&apos;s Net Purchase Excel to see purchase
 							analytics, store breakdowns, and comparison charts.
 						</p>
-						<NetPurchaseUploadDialog onUploadComplete={fetchData} />
+						<NetPurchaseSyncBadge />
 					</CardContent>
 				</Card>
 			)}

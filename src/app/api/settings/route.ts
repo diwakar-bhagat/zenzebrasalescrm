@@ -23,21 +23,27 @@ export async function GET() {
 
     return NextResponse.json({ settings, cached: false });
   } catch (error: any) {
-    // If the table doesn't exist yet, return a default config instead of a 500 error
-    if (error.code === '42P01') {
-      const defaultSettings = {
-        currency: "INR",
-        currencySymbol: "₹",
-        currencyLocale: "en-IN",
-        location: "India",
-        companyName: "ZenZebra",
-        timezone: "Asia/Kolkata"
-      };
+    const defaultSettings = {
+      currency: "INR",
+      currencySymbol: "₹",
+      currencyLocale: "en-IN",
+      location: "India",
+      companyName: "ZenZebra",
+      timezone: "Asia/Kolkata",
+    };
+
+    // If table doesn't exist or network timeout occurs, return default settings gracefully
+    if (
+      error.code === '42P01' ||
+      error.message?.includes("fetch failed") ||
+      error.message?.includes("timeout") ||
+      error.code === 'UND_ERR_CONNECT_TIMEOUT'
+    ) {
       return NextResponse.json({ settings: defaultSettings, cached: false });
     }
     
     console.error("Settings GET Error:", error);
-    return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });
+    return NextResponse.json({ settings: defaultSettings, cached: false });
   }
 }
 

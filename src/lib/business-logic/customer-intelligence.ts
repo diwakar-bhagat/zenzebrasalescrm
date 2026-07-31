@@ -20,32 +20,49 @@ export async function getCustomerIntelligence(
 ) {
 	const food = retailFilter(filters);
 
-	const baseQueryString = `
-    SELECT COUNT(DISTINCT customer_mobile) FILTER (WHERE customer_mobile IS NOT NULL AND customer_mobile <> '') AS total_customers
-    FROM sales_fact_v WHERE sale_date BETWEEN $1::date AND $2::date
-      AND ($3::text IS NULL OR billed_by = $3)
-      AND ($4::text IS NULL OR category = $4)
-      AND ($5::text IS NULL OR brand = $5)
-      AND ($6::text[] IS NULL OR category <> ALL($6::text[]))`;
+	// Optimized single-pass aggregation query: computes total & repeat customers in ONE scan
+	const aggregatedCustomerQuery = `
+		WITH cust_summary AS (
+			SELECT 
+				customer_mobile,
+				MAX(customer_name) AS customer_name,
+				${METRICS.bills} AS bill_count,
+				${METRICS.revenue} AS revenue
+			FROM sales_fact_v 
+			WHERE sale_date BETWEEN $1::date AND $2::date
+				AND customer_mobile IS NOT NULL 
+				AND customer_mobile <> ''
+				AND ($3::text IS NULL OR billed_by = $3)
+				AND ($4::text IS NULL OR category = $4)
+				AND ($5::text IS NULL OR brand = $5)
+				AND ($6::text[] IS NULL OR category <> ALL($6::text[]))
+			GROUP BY customer_mobile
+		)
+		SELECT 
+			COUNT(*)::integer AS total_customers,
+			COUNT(*) FILTER (WHERE bill_count > 1)::integer AS repeat_customers
+		FROM cust_summary
+	`;
 
-	const repeatQueryString = `
-    SELECT COUNT(*)::integer AS repeat_customers FROM (
-      SELECT customer_mobile FROM sales_fact_v WHERE sale_date BETWEEN $1::date AND $2::date
-        AND customer_mobile IS NOT NULL AND customer_mobile <> ''
-        AND ($3::text IS NULL OR billed_by = $3)
-        AND ($4::text[] IS NULL OR category <> ALL($4::text[]))
-      GROUP BY customer_mobile HAVING ${METRICS.bills} > 1) x`;
+	const topCustomersQuery = `
+		SELECT 
+			customer_mobile, 
+			MAX(customer_name) AS customer_name, 
+			${METRICS.bills} AS bill_count, 
+			${METRICS.revenue} AS revenue
+		FROM sales_fact_v 
+		WHERE sale_date BETWEEN $1::date AND $2::date
+			AND customer_mobile IS NOT NULL 
+			AND customer_mobile <> ''
+			AND ($3::text IS NULL OR billed_by = $3)
+			AND ($4::text[] IS NULL OR category <> ALL($4::text[]))
+		GROUP BY customer_mobile 
+		ORDER BY revenue DESC 
+		LIMIT $5::int
+	`;
 
-	const topCustomersQueryString = `
-    SELECT customer_mobile, MAX(customer_name) AS customer_name, ${METRICS.bills} AS bill_count, ${METRICS.revenue} AS revenue
-    FROM sales_fact_v WHERE sale_date BETWEEN $1::date AND $2::date
-      AND customer_mobile IS NOT NULL AND customer_mobile <> ''
-      AND ($3::text IS NULL OR billed_by = $3)
-      AND ($4::text[] IS NULL OR category <> ALL($4::text[]))
-    GROUP BY customer_mobile ORDER BY revenue DESC LIMIT $5::int`;
-
-	const [current, previous, repeat, topCustomers] = await Promise.all([
-		(db as any).query(baseQueryString, [
+	const [current, previous, topCustomers] = await Promise.all([
+		(db as any).query(aggregatedCustomerQuery, [
 			periods.currentStart,
 			periods.currentEnd,
 			filters.store ?? null,
@@ -53,7 +70,7 @@ export async function getCustomerIntelligence(
 			filters.brand ?? null,
 			food ?? null,
 		]),
-		(db as any).query(baseQueryString, [
+		(db as any).query(aggregatedCustomerQuery, [
 			periods.previousStart,
 			periods.previousEnd,
 			filters.store ?? null,
@@ -61,13 +78,7 @@ export async function getCustomerIntelligence(
 			filters.brand ?? null,
 			food ?? null,
 		]),
-		(db as any).query(repeatQueryString, [
-			periods.currentStart,
-			periods.currentEnd,
-			filters.store ?? null,
-			food ?? null,
-		]),
-		(db as any).query(topCustomersQueryString, [
+		(db as any).query(topCustomersQuery, [
 			periods.currentStart,
 			periods.currentEnd,
 			filters.store ?? null,
@@ -78,7 +89,7 @@ export async function getCustomerIntelligence(
 
 	const totalCustomers = n(current[0]?.total_customers);
 	const previousCustomers = n(previous[0]?.total_customers);
-	const repeatCustomers = n(repeat[0]?.repeat_customers);
+	const repeatCustomers = n(current[0]?.repeat_customers);
 
 	return {
 		totalCustomers,

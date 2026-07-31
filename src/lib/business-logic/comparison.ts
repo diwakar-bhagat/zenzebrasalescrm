@@ -147,8 +147,8 @@ export function growthPct(current: number, previous: number): number | null {
 	return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
-export function calculateGrowth(current: number, previous: number): number {
-	return growthPct(current, previous) ?? (current === 0 ? 0 : 100);
+export function calculateGrowth(current: number, previous: number): number | null {
+	return growthPct(current, previous);
 }
 
 export function formatGrowth(pct: number | null): string {

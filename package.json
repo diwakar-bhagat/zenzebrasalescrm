@@ -14,13 +14,16 @@
     "generate:presets": "ts-node -P tsconfig.scripts.json src/scripts/generate-theme-presets.ts",
     "migrate:customer-analytics": "ts-node -P tsconfig.scripts.json src/scripts/migrate-customer-analytics.ts",
     "refresh:mv": "ts-node -P tsconfig.scripts.json src/scripts/refresh-materialized-views.ts",
+    "sync:worker": "node sync-worker.mjs",
     "verify": "ts-node -P tsconfig.scripts.json src/scripts/verify-all.ts",
     "verify:regression": "ts-node -P tsconfig.scripts.json src/scripts/verify-regression.ts",
     "verify:customer-intelligence": "ts-node -P tsconfig.scripts.json src/scripts/verify-customer-intelligence.ts",
     "verify:data-platform": "ts-node -P tsconfig.scripts.json src/scripts/verify-data-platform.ts",
     "verify:profitability": "ts-node -P tsconfig.scripts.json src/scripts/verify-profitability.ts",
     "verify:performance": "ts-node -P tsconfig.scripts.json src/scripts/verify-performance.ts",
-    "verify:ground-truth": "ts-node -P tsconfig.scripts.json src/scripts/verify-ground-truth.ts"
+    "verify:ground-truth": "ts-node -P tsconfig.scripts.json src/scripts/verify-ground-truth.ts",
+    "verify:live": "ts-node -P tsconfig.scripts.json src/scripts/verify-live.ts",
+    "test:load": "ts-node -P tsconfig.scripts.json src/scripts/load-test.ts"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx}": [

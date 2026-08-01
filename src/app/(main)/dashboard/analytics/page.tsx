@@ -94,16 +94,17 @@ export default function Page() {
 				<div className="max-w-md space-y-2">
 					<h2 className="text-2xl font-bold">Welcome to ZenZebra</h2>
 					<p className="text-muted-foreground">
-						No data has been uploaded yet. Upload your first daily sales sheet
-						to unlock insights.
+						No sales data yet. Once Odoo is connected, transactions appear here
+						automatically.
 					</p>
 				</div>
 				<Button
 					size="lg"
+					variant="outline"
 					onClick={() => router.push("/dashboard/sales/upload")}
 				>
 					<Upload className="mr-2 size-5" />
-					Upload Sales Data
+					Import historical data
 				</Button>
 			</div>
 		);

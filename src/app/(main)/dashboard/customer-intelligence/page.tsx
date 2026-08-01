@@ -12,7 +12,6 @@ import { IdentityConfidenceCard } from "@/components/customer-intelligence/Ident
 import { ReconciliationBanner } from "@/components/customer-intelligence/ReconciliationBanner";
 import { RetentionCohortTable } from "@/components/customer-intelligence/RetentionCohortTable";
 import { RevenueCompositionCards } from "@/components/customer-intelligence/RevenueCompositionCards";
-import { DataFreshnessBadge } from "@/components/dashboard/data-freshness-badge";
 import { GlobalFilterBar } from "@/components/founder/global-filter-bar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -128,16 +127,17 @@ export default function Page() {
 				<div className="max-w-md space-y-2">
 					<h2 className="text-2xl font-bold">Customer Intelligence</h2>
 					<p className="text-muted-foreground">
-						No data has been uploaded yet. Upload your sales sheets to unlock
-						retention, revenue composition, and lifetime value insights.
+						No sales data yet. Once Odoo is connected, retention, revenue
+						composition, and lifetime value insights appear here automatically.
 					</p>
 				</div>
 				<Button
 					size="lg"
+					variant="outline"
 					onClick={() => router.push("/dashboard/sales/upload")}
 				>
 					<Upload className="mr-2 size-5" />
-					Upload Sales Data
+					Import historical data
 				</Button>
 			</div>
 		);
@@ -155,7 +155,6 @@ export default function Page() {
 						</h1>
 						<p className="text-muted-foreground text-sm">{formattedDate}</p>
 					</div>
-					<DataFreshnessBadge />
 				</div>
 				<Button
 					variant="outline"

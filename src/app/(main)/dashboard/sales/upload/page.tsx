@@ -269,13 +269,13 @@ export default function FounderUploadPage() {
 				<div>
 					<h2 className="text-3xl font-bold tracking-tight">
 						{dataType === "purchase"
-							? "Upload Purchase Data"
-							: "Upload Sales Data"}
+							? "Import purchase data"
+							: "Import sales data"}
 					</h2>
 					<p className="text-muted-foreground mt-1">
-						{dataType === "purchase"
-							? "Upload your daily purchase sheet to update the Store Overview."
-							: "Upload your daily sales sheet to update the Sales Dashboard."}
+						Spreadsheet import adapter. Odoo is the live source of sales — use
+						this for pre-ERP history, backfills, and data the ERP does not
+						carry.
 					</p>
 				</div>
 				<Button

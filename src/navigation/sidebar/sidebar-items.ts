@@ -81,11 +81,6 @@ export const sidebarItems: NavGroup[] = [
 				url: "/dashboard/analytics",
 				icon: LineChart,
 			},
-			{
-				title: "Upload Data",
-				url: "/dashboard/sales/upload",
-				icon: Upload,
-			},
 		],
 	},
 	{
@@ -96,6 +91,14 @@ export const sidebarItems: NavGroup[] = [
 				title: "System",
 				url: "/dashboard/admin/system",
 				icon: Activity,
+			},
+			// Odoo is the operational source of truth; the Excel importer is a compatibility
+			// adapter for pre-ERP history and gap backfills, so it lives under admin rather
+			// than presenting itself as the way data normally arrives.
+			{
+				title: "Data Import",
+				url: "/dashboard/sales/upload",
+				icon: Upload,
 			},
 			{
 				title: "Settings",

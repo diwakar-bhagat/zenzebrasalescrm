@@ -1,315 +1,308 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { sql } from "../../../../lib/db";
-import { getOdooClient } from "../../../../lib/odoo-client";
+import { sql } from "@/lib/db";
+import { ingestSalesLines } from "@/lib/erp/ingest-sales";
+import {
+	extractModel,
+	extractRecordId,
+	isHydratedOrder,
+	normalizeOdooOrder,
+} from "@/lib/erp/normalize-odoo-order";
+import { fetchOrderById } from "@/lib/erp/odoo-fetch";
+import type { OdooPosOrder, OdooPosOrderLine } from "@/lib/erp/types";
+import { logWebhookEvent } from "@/lib/erp/webhook-log";
+import { OdooClient } from "@/lib/odoo-client";
 
 /**
- * POST /api/webhooks/odoo
+ * POST /api/webhooks/odoo — primary real-time ingestion endpoint.
  *
- * Production-Grade Odoo 19 Webhook Receiver & Authoritative Hydration Engine.
- * Implements the Stripe/GitHub Notification + JSON-RPC Hydration Pattern.
- * 
- * Pipeline:
- * 1. Verify Authentication & Fail Closed
- * 2. Record Event in `webhook_events` (Observability Audit Trail)
- * 3. Extract Record ID & Hydrate Authoritative Object from Odoo SaaS via JSON-RPC
- * 4. Upsert Canonical Sales Records into `sales_fact` (with ingested_at, source='WEBHOOK', webhook_event_id)
- * 5. Update Webhook Observability Metrics & System Health
+ * Accepts Odoo 19 Enterprise "Send Webhook Notification" deliveries for pos.order in two shapes:
+ *
+ *   1. Thin  — {"_model": "pos.order", "_id": 1582}. This is what Odoo's native automation
+ *              actually sends: a notification, not the record. The order is read back over
+ *              JSON-RPC before ingestion (the Stripe/GitHub notification pattern).
+ *   2. Full  — a complete order with date_order / amount_total / lines, e.g. from Make.com.
+ *
+ * Every delivery is written to webhook_events regardless of outcome — including ones rejected
+ * for a bad secret or malformed body. Silent rejection is what previously made a broken
+ * integration indistinguishable from an idle one.
  */
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-function verifyWebhookSecret(req: NextRequest): boolean {
-  const secretEnv = process.env.ODOO_WEBHOOK_SECRET;
-  if (!secretEnv) return true; // Fail-closed enforced when secret is configured in production env
+const ENDPOINT = "/api/webhooks/odoo";
 
-  const headerSecret = req.headers.get("x-webhook-secret") || req.headers.get("x-odoo-secret");
-  const querySecret = req.nextUrl.searchParams.get("secret");
+type AuthResult = { ok: true } | { ok: false; reason: string };
 
-  return headerSecret === secretEnv || querySecret === secretEnv;
+function verifyWebhookSecret(req: NextRequest): AuthResult {
+	const expected = process.env.ODOO_WEBHOOK_SECRET;
+
+	if (!expected) {
+		// Fail closed. This previously returned "allow" when the secret was unset, leaving an
+		// unauthenticated public write path into sales_fact in any environment that forgot to
+		// configure it. Local development opts out explicitly instead.
+		if (process.env.ODOO_WEBHOOK_ALLOW_INSECURE === "true") return { ok: true };
+		return {
+			ok: false,
+			reason: "ODOO_WEBHOOK_SECRET is not configured on the server",
+		};
+	}
+
+	// Header only. The query-string form leaked the shared secret into access logs and any
+	// intermediary that records URLs.
+	const provided =
+		req.headers.get("x-webhook-secret") ?? req.headers.get("x-odoo-secret");
+	if (provided === expected) return { ok: true };
+
+	return { ok: false, reason: "Invalid or missing x-webhook-secret header" };
 }
 
-/** Utility to safely extract string representation from Odoo M2O tuple [id, name] or string */
-function extractOdooRelation(val: any, fallback: string): string {
-  if (Array.isArray(val) && val.length > 1 && typeof val[1] === "string") {
-    return val[1];
-  }
-  if (typeof val === "string" && val.trim().length > 0) {
-    return val;
-  }
-  return fallback;
+/** Odoo may deliver a single record or a list; normalise to an array. */
+function toRecords(body: unknown): Record<string, unknown>[] {
+	if (Array.isArray(body)) {
+		return body.filter(
+			(r): r is Record<string, unknown> => Boolean(r) && typeof r === "object",
+		);
+	}
+	if (body && typeof body === "object")
+		return [body as Record<string, unknown>];
+	return [];
+}
+
+/** Mirrors the latest webhook outcome onto the shared sync cursor for the health engine. */
+async function recordWebhookHealth(
+	status: string,
+	latencyMs: number,
+): Promise<void> {
+	try {
+		await sql`
+			INSERT INTO sync_cursors (service_name, last_sync_at, last_webhook_at, last_webhook_latency_ms, last_webhook_status)
+			VALUES ('odoo_pos_sync', NOW(), NOW(), ${latencyMs}, ${status})
+			ON CONFLICT (service_name) DO UPDATE SET
+				last_webhook_at = NOW(),
+				last_webhook_latency_ms = EXCLUDED.last_webhook_latency_ms,
+				last_webhook_status = EXCLUDED.last_webhook_status
+		`;
+	} catch (error) {
+		console.error("[webhook/odoo] failed to update sync cursor:", error);
+	}
 }
 
 export async function POST(req: NextRequest) {
-  const startTime = Date.now();
+	const startedAt = Date.now();
 
-  // 1. Fail Closed Security Check
-  if (!verifyWebhookSecret(req)) {
-    return NextResponse.json({ error: "Unauthorized: Invalid Webhook Secret" }, { status: 401 });
-  }
+	// Read the body first so a rejected request is still logged with what was actually sent.
+	// Authentication is checked after, but before anything is written to sales_fact.
+	let rawBody: unknown = null;
+	let parseError: string | null = null;
+	try {
+		rawBody = await req.json();
+	} catch {
+		parseError = "Body was not valid JSON";
+	}
 
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
-  }
+	const auth = verifyWebhookSecret(req);
+	if (!auth.ok) {
+		await logWebhookEvent({
+			endpoint: ENDPOINT,
+			status: "REJECTED_AUTH",
+			payload: rawBody,
+			error: auth.reason,
+			latencyMs: Date.now() - startedAt,
+		});
+		return NextResponse.json(
+			{ error: "Unauthorized", detail: auth.reason },
+			{ status: 401 },
+		);
+	}
 
-  const model = body._model || body.model || "pos.order";
-  const recordId = body._id || body.id || (typeof body === "number" ? body : null);
+	if (parseError) {
+		await logWebhookEvent({
+			endpoint: ENDPOINT,
+			status: "INVALID_PAYLOAD",
+			error: parseError,
+			latencyMs: Date.now() - startedAt,
+		});
+		return NextResponse.json({ error: parseError }, { status: 400 });
+	}
 
-  // 2. Stage 1: Write Webhook Observability Audit Record (webhook_events)
-  let eventId: number | null = null;
-  try {
-    const eventResult = await sql`
-      INSERT INTO webhook_events (received_at, status, model, record_id, payload)
-      VALUES (NOW(), 'RECEIVED', ${model}, ${recordId ? Number(recordId) : null}, ${JSON.stringify(body)}::jsonb)
-      RETURNING id
-    `;
-    eventId = eventResult[0]?.id ? Number(eventResult[0].id) : null;
-  } catch (err) {
-    console.error("[webhook/odoo] Failed to log webhook_event audit trail:", err);
-  }
+	const records = toRecords(rawBody);
+	if (records.length === 0) {
+		await logWebhookEvent({
+			endpoint: ENDPOINT,
+			status: "INVALID_PAYLOAD",
+			payload: rawBody,
+			error: "Payload contained no records",
+			latencyMs: Date.now() - startedAt,
+		});
+		return NextResponse.json(
+			{ error: "Payload contained no records" },
+			{ status: 400 },
+		);
+	}
 
-  // 3. Stage 2: Authoritative JSON-RPC Hydration (Stripe/GitHub Pattern)
-  let hydratedOrder: any = null;
-  let hydratedLines: any[] = [];
-  let isHydratedViaJsonRpc = false;
+	let totalUpserted = 0;
+	let hydratedAny = false;
+	const processed: { bill: string; rows: number }[] = [];
 
-  if (recordId && model === "pos.order") {
-    try {
-      const client = getOdooClient();
-      const orders = await client.searchRead(
-        "pos.order",
-        [["id", "=", Number(recordId)]],
-        [
-          "id", "name", "date_order", "amount_total", "amount_tax",
-          "state", "session_id", "config_id", "partner_id", "lines",
-          "payment_ids", "company_id", "write_date"
-        ],
-        { limit: 1 }
-      );
+	for (const record of records) {
+		const model = extractModel(record) ?? "pos.order";
+		const recordId = extractRecordId(record);
 
-      if (orders && orders.length > 0) {
-        hydratedOrder = orders[0];
-        const lineIds = hydratedOrder.lines || [];
-        if (Array.isArray(lineIds) && lineIds.length > 0) {
-          hydratedLines = await client.searchRead(
-            "pos.order.line",
-            [["id", "in", lineIds]],
-            ["id", "product_id", "qty", "price_unit", "price_subtotal", "price_subtotal_incl", "discount", "tax_ids"]
-          );
-        }
-        isHydratedViaJsonRpc = true;
-        console.log(`[webhook/odoo] Successfully hydrated pos.order ${recordId} via Odoo JSON-RPC API`);
-      }
-    } catch (rpcErr) {
-      console.warn(`[webhook/odoo] Authoritative JSON-RPC hydration fallback for ID ${recordId}:`, rpcErr);
-    }
-  }
+		// Only POS orders are ingested here. Anything else is acknowledged and logged as ignored
+		// so an over-broad Odoo automation does not masquerade as a failure.
+		if (model !== "pos.order" && model !== "sale.order") {
+			await logWebhookEvent({
+				endpoint: ENDPOINT,
+				status: "IGNORED",
+				payload: record,
+				model,
+				recordId,
+				error: `Model ${model} is not handled by this endpoint`,
+				latencyMs: Date.now() - startedAt,
+			});
+			continue;
+		}
 
-  // Use hydrated order if available, otherwise fallback to webhook body
-  const sourceData = hydratedOrder || body;
-  const order_name =
-    sourceData.name ||
-    sourceData.order_name ||
-    (recordId ? `POS/${recordId}` : "POS-UNKNOWN");
+		// Open the event row before doing work, so fact rows can reference it.
+		const eventId = await logWebhookEvent({
+			endpoint: ENDPOINT,
+			status: "RECEIVED",
+			payload: record,
+			model,
+			recordId,
+		});
 
-  const rawDate = sourceData.date_order || sourceData.sale_date || new Date().toISOString();
-  const sale_date = rawDate.split(" ")[0].split("T")[0];
+		try {
+			let order = record as OdooPosOrder;
+			let lines: OdooPosOrderLine[] = Array.isArray(record.line_details)
+				? (record.line_details as OdooPosOrderLine[])
+				: [];
 
-  const rawStoreName =
-    sourceData.store_name ||
-    extractOdooRelation(sourceData.config_id, extractOdooRelation(sourceData.company_id, "Head office"));
+			// Thin notification: read the record back from Odoo. Without this the handler
+			// fabricates a zero-amount order from an id, which is how empty rows appear.
+			if (!isHydratedOrder(order)) {
+				if (recordId === null) {
+					throw new Error(
+						"Payload has no usable record id (expected `id` or `_id`) and no inline order data",
+					);
+				}
+				if (!OdooClient.isConfigured()) {
+					throw new Error(
+						"Received a thin Odoo notification but the Odoo API is not configured; cannot hydrate. Set ODOO_URL / ODOO_DB / ODOO_USERNAME / ODOO_PASSWORD.",
+					);
+				}
 
-  const customer_name =
-    sourceData.customer_name || extractOdooRelation(sourceData.partner_id, "Walk-in Customer");
+				const hydrated = await fetchOrderById(new OdooClient(), recordId);
+				if (!hydrated)
+					throw new Error(`pos.order ${recordId} not found in Odoo`);
 
-  const customer_mobile = sourceData.customer_mobile || sourceData.phone || sourceData.mobile || null;
-  const payment_method = sourceData.payment_method || "POS Cash/Card";
+				order = hydrated.order;
+				lines = hydrated.lines;
+				hydratedAny = true;
+			}
 
-  try {
-    // 4. Resolve Store Alias
-    const storeResult = await sql`
-      SELECT canonical_store FROM store_alias_mapping
-      WHERE lower(source_name) = lower(${rawStoreName})
-      LIMIT 1
-    `;
-    const canonicalStore = storeResult[0]?.canonical_store ?? rawStoreName;
+			const canonical = await normalizeOdooOrder(order, lines);
+			if (canonical.length === 0) {
+				throw new Error(
+					"Order produced no ingestible lines (missing both name and id)",
+				);
+			}
 
-    const storeRow = await sql`
-      SELECT id FROM store_dimension WHERE store_name = ${canonicalStore} LIMIT 1
-    `;
-    const storeId = storeRow[0]?.id ?? null;
+			const { upserted, unresolvedStores } = await ingestSalesLines(
+				canonical,
+				"odoo_webhook",
+				eventId,
+			);
+			totalUpserted += upserted;
+			processed.push({ bill: canonical[0].bill_no, rows: upserted });
 
-    // 5. Stage 3: Map Lines & Ingest into sales_fact
-    let linesToProcess: any[] = [];
-    if (isHydratedViaJsonRpc && hydratedLines.length > 0) {
-      linesToProcess = hydratedLines.map((l: any) => {
-        const prodName = extractOdooRelation(l.product_id, `Product ${l.id}`);
-        const qty = Number(l.qty ?? 1);
-        const netAmt = Number(l.price_subtotal_incl ?? l.price_subtotal ?? 0);
-        const grossAmt = Number(l.price_subtotal ?? netAmt);
-        const taxAmt = netAmt - grossAmt;
-        const priceUnit = Number(l.price_unit ?? 0);
+			await finaliseEvent(eventId, {
+				status: "PROCESSED",
+				rowsUpserted: upserted,
+				sourceEventAt: canonical[0].source_event_at,
+				storeName: canonical[0].billed_by,
+				latencyMs: Date.now() - startedAt,
+				// An ingested row with no store_dimension match still counts as delivered, but
+				// it is a data-quality problem worth surfacing rather than swallowing.
+				error:
+					unresolvedStores.length > 0
+						? `Ingested, but store not found in store_dimension: ${unresolvedStores.join(", ")}`
+						: null,
+			});
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Unknown ingestion error";
+			console.error("[webhook/odoo] ingestion failed:", error);
 
-        return {
-          product_key: `PROD-${Array.isArray(l.product_id) ? l.product_id[0] : l.id}`,
-          sku_code: `SKU-${Array.isArray(l.product_id) ? l.product_id[0] : l.id}`,
-          item_name: prodName,
-          category: "POS General",
-          brand: "Odoo",
-          quantity: qty,
-          mrp_amount: priceUnit * qty,
-          discount_amount: Number(l.discount ?? 0),
-          gross_amount: grossAmt,
-          tax_amount: taxAmt,
-          net_amount: netAmt,
-        };
-      });
-    } else if (Array.isArray(body.lines) && body.lines.length > 0) {
-      linesToProcess = body.lines;
-    } else {
-      const amountTotal = Number(sourceData.amount_total ?? sourceData.net_amount ?? 0);
-      const amountTax = Number(sourceData.amount_tax ?? sourceData.tax_amount ?? 0);
-      const grossAmount = amountTotal - amountTax;
+			await finaliseEvent(eventId, {
+				status: "FAILED",
+				error: message,
+				latencyMs: Date.now() - startedAt,
+			});
+			await recordWebhookHealth("FAILED", Date.now() - startedAt);
 
-      linesToProcess = [
-        {
-          product_key: `PROD-${recordId || "GENERAL"}`,
-          sku_code: `SKU-${order_name}`,
-          item_name: `POS Order ${order_name}`,
-          category: "POS General",
-          brand: "POS",
-          quantity: 1,
-          mrp_amount: amountTotal,
-          discount_amount: 0,
-          gross_amount: grossAmount,
-          tax_amount: amountTax,
-          net_amount: amountTotal,
-        },
-      ];
-    }
+			return NextResponse.json({ error: message, eventId }, { status: 500 });
+		}
+	}
 
-    // Ensure upload batch exists
-    await sql`
-      INSERT INTO upload_batches (id, filename, status, row_count, valid_row_count, date_range_start, date_range_end, uploaded_at)
-      VALUES (9999, 'Odoo Enterprise SaaS Pipeline', 'completed', 0, 0, '2025-01-01', NOW()::date, NOW())
-      ON CONFLICT (id) DO NOTHING
-    `;
+	const latencyMs = Date.now() - startedAt;
+	await recordWebhookHealth("PROCESSED", latencyMs);
 
-    let upserted = 0;
-    for (const line of linesToProcess) {
-      const product_key = line.product_key || `PROD-${order_name}`;
-      const item_name = line.item_name || `POS Item (${order_name})`;
-      const quantity = Number(line.quantity ?? 1);
-      const mrp_amount = Number(line.mrp_amount ?? line.price_unit ?? 0);
-      const discount_amount = Number(line.discount_amount ?? 0);
-      const gross_amount = Number(line.gross_amount ?? mrp_amount - discount_amount);
-      const tax_amount = Number(line.tax_amount ?? 0);
-      const net_amount = Number(line.net_amount ?? gross_amount + tax_amount);
+	return NextResponse.json({
+		success: true,
+		upserted: totalUpserted,
+		hydratedViaJsonRpc: hydratedAny,
+		records: processed,
+		latencyMs,
+	});
+}
 
-      await sql`
-        INSERT INTO sales_fact (
-          upload_id, sale_date, bill_no, billed_by, product_key,
-          category, brand, sku_code, item_name, quantity,
-          mrp_amount, discount_amount, gross_amount, tax_amount, net_amount,
-          payment_method, customer_mobile, customer_name, source_billed_by, store_id,
-          ingested_at, source, sync_type, webhook_event_id
-        ) VALUES (
-          9999, ${sale_date}::date, ${order_name}, ${canonicalStore}, ${product_key},
-          ${line.category ?? "General"}, ${line.brand ?? "Odoo"}, ${line.sku_code ?? null}, ${item_name}, ${quantity},
-          ${mrp_amount}, ${discount_amount}, ${gross_amount}, ${tax_amount}, ${net_amount},
-          ${payment_method}, ${customer_mobile}, ${customer_name}, ${rawStoreName}, ${storeId},
-          NOW(), 'WEBHOOK', 'REALTIME', ${eventId}
-        )
-        ON CONFLICT (sale_date, bill_no, billed_by, product_key) DO UPDATE SET
-          category = EXCLUDED.category,
-          brand = EXCLUDED.brand,
-          sku_code = EXCLUDED.sku_code,
-          item_name = EXCLUDED.item_name,
-          quantity = EXCLUDED.quantity,
-          mrp_amount = EXCLUDED.mrp_amount,
-          discount_amount = EXCLUDED.discount_amount,
-          gross_amount = EXCLUDED.gross_amount,
-          tax_amount = EXCLUDED.tax_amount,
-          net_amount = EXCLUDED.net_amount,
-          payment_method = EXCLUDED.payment_method,
-          customer_mobile = EXCLUDED.customer_mobile,
-          customer_name = EXCLUDED.customer_name,
-          ingested_at = NOW(),
-          source = 'WEBHOOK',
-          sync_type = 'REALTIME',
-          webhook_event_id = EXCLUDED.webhook_event_id
-      `;
-      upserted++;
-    }
-
-    const latencyMs = Date.now() - startTime;
-
-    // 6. Update Webhook Audit Trail & Sync Cursor Health Metrics
-    if (eventId) {
-      await sql`
-        UPDATE webhook_events
-        SET processed_at = NOW(),
-            latency_ms = ${latencyMs},
-            status = 'PROCESSED'
-        WHERE id = ${eventId}
-      `;
-    }
-
-    await sql`
-      INSERT INTO sync_cursors (service_name, last_sync_at, last_webhook_at, last_webhook_latency_ms, last_webhook_status)
-      VALUES ('odoo_pos_sales', NOW(), NOW(), ${latencyMs}, 'PROCESSED')
-      ON CONFLICT (service_name) DO UPDATE SET
-        last_sync_at = NOW(),
-        last_webhook_at = NOW(),
-        last_webhook_latency_ms = EXCLUDED.last_webhook_latency_ms,
-        last_webhook_status = EXCLUDED.last_webhook_status
-    `;
-
-    return NextResponse.json({
-      success: true,
-      hydratedViaJsonRpc: isHydratedViaJsonRpc,
-      upserted,
-      order: order_name,
-      store: canonicalStore,
-      date: sale_date,
-      latencyMs,
-      eventId,
-    });
-  } catch (error) {
-    const latencyMs = Date.now() - startTime;
-    const errorMsg = error instanceof Error ? error.message : "Internal database ingestion error";
-    console.error("[webhook/odoo] Ingestion Error:", error);
-
-    if (eventId) {
-      await sql`
-        UPDATE webhook_events
-        SET processed_at = NOW(),
-            latency_ms = ${latencyMs},
-            status = 'FAILED',
-            error = ${errorMsg}
-        WHERE id = ${eventId}
-      `;
-    }
-
-    return NextResponse.json({ error: errorMsg }, { status: 500 });
-  }
+/** Closes out a RECEIVED event row with its terminal outcome. */
+async function finaliseEvent(
+	eventId: number | null,
+	fields: {
+		status: "PROCESSED" | "FAILED";
+		error?: string | null;
+		rowsUpserted?: number;
+		sourceEventAt?: string | null;
+		storeName?: string | null;
+		latencyMs: number;
+	},
+): Promise<void> {
+	if (eventId === null) return;
+	try {
+		await sql`
+			UPDATE webhook_events
+			SET status = ${fields.status},
+				processed_at = NOW(),
+				latency_ms = ${fields.latencyMs},
+				error = ${fields.error ?? null},
+				rows_upserted = ${fields.rowsUpserted ?? 0},
+				source_event_at = ${fields.sourceEventAt ?? null},
+				store_name = ${fields.storeName ?? null}
+			WHERE id = ${eventId}
+		`;
+	} catch (error) {
+		console.error("[webhook/odoo] failed to finalise event:", error);
+	}
 }
 
 export async function GET() {
-  const auditLogs = await sql`
-    SELECT id, received_at, processed_at, latency_ms, status, model, record_id, error
-    FROM webhook_events
-    ORDER BY received_at DESC
-    LIMIT 10
-  `;
+	const recentEvents = await sql`
+		SELECT id, received_at, processed_at, latency_ms, status, model, record_id, rows_upserted, error
+		FROM webhook_events
+		ORDER BY received_at DESC
+		LIMIT 10
+	`;
 
-  return NextResponse.json({
-    status: "active",
-    endpoint: "/api/webhooks/odoo",
-    service: "ZenZebra Production Webhook & Authoritative Hydration Engine",
-    recentEventsCount: auditLogs.length,
-    recentEvents: auditLogs,
-  });
+	return NextResponse.json({
+		status: "active",
+		endpoint: ENDPOINT,
+		service: "ZenZebra Odoo ingestion receiver",
+		model: "pos.order",
+		secretConfigured: Boolean(process.env.ODOO_WEBHOOK_SECRET),
+		canHydrateThinPayloads: OdooClient.isConfigured(),
+		recentEvents,
+	});
 }

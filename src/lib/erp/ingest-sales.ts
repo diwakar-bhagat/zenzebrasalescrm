@@ -55,6 +55,8 @@ export interface IngestResult {
 export async function ingestSalesLines(
 	rows: CanonicalSaleLine[],
 	sourceSystem: SourceSystem,
+	/** Links each fact row back to the webhook delivery that produced it, when applicable. */
+	webhookEventId: number | null = null,
 ): Promise<IngestResult> {
 	if (rows.length === 0) return { upserted: 0, unresolvedStores: [] };
 
@@ -75,7 +77,7 @@ export async function ingestSalesLines(
 				category, brand, sku_code, item_name, quantity,
 				mrp_amount, discount_amount, gross_amount, tax_amount, net_amount,
 				payment_method, customer_mobile, customer_name, source_billed_by, store_id,
-				source_system, ingested_at, source_event_at
+				source_system, ingested_at, source_event_at, webhook_event_id
 			)
 			SELECT * FROM UNNEST (
 				${chunk.map(() => batchId)}::integer[],
@@ -100,7 +102,8 @@ export async function ingestSalesLines(
 				${chunk.map((r) => r.store_id)}::integer[],
 				${chunk.map(() => sourceSystem)}::text[],
 				${chunk.map(() => new Date().toISOString())}::timestamptz[],
-				${chunk.map((r) => r.source_event_at)}::timestamptz[]
+				${chunk.map((r) => r.source_event_at)}::timestamptz[],
+				${chunk.map(() => webhookEventId)}::bigint[]
 			)
 			ON CONFLICT (sale_date, bill_no, billed_by, product_key) DO UPDATE SET
 				category = EXCLUDED.category,
@@ -119,7 +122,8 @@ export async function ingestSalesLines(
 				store_id = COALESCE(EXCLUDED.store_id, sales_fact.store_id),
 				source_system = EXCLUDED.source_system,
 				ingested_at = EXCLUDED.ingested_at,
-				source_event_at = EXCLUDED.source_event_at
+				source_event_at = EXCLUDED.source_event_at,
+				webhook_event_id = COALESCE(EXCLUDED.webhook_event_id, sales_fact.webhook_event_id)
 		`;
 
 		upserted += chunk.length;

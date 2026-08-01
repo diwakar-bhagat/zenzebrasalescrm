@@ -325,7 +325,7 @@ export default function SalesDashboardPage() {
 					params.set("compareEndDate", compareEndDate);
 				}
 
-				const res = await fetch(`/api/sales/dashboard?${params.toString()}`);
+				const res = await fetch(`/api/sales/dashboard?${params.toString()}`, { cache: "no-store" });
 				if (res.status === 401) {
 					window.location.href = "/login";
 					return;
@@ -354,6 +354,8 @@ export default function SalesDashboardPage() {
 		};
 
 		fetchDashboardData();
+		const interval = setInterval(fetchDashboardData, 10000);
+		return () => clearInterval(interval);
 	}, [
 		status,
 		startDate,

@@ -50,7 +50,7 @@ export async function syncProducts(
 			"product.product",
 			fields,
 			domain,
-			"write_date asc",
+			"write_date desc",
 			limit,
 			offset,
 		);

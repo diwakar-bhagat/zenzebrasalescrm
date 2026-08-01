@@ -33,6 +33,8 @@ import { buildRootCause } from "@/lib/intelligence/root-cause-engine";
 import { getStoreDiagnostics } from "@/lib/intelligence/store-diagnostics";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function getDefaultDateRange() {
 	const defaults = getDefaultPeriod();

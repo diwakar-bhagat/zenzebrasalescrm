@@ -142,7 +142,7 @@ async function syncStandardSales(
 			"sale.order",
 			fields,
 			domain,
-			"write_date asc",
+			"write_date desc",
 			limit,
 			offset,
 		);
@@ -276,7 +276,7 @@ async function syncPosSales(
 			"pos.order",
 			fields,
 			domain,
-			"write_date asc",
+			"write_date desc",
 			limit,
 			offset,
 		);

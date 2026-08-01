@@ -89,7 +89,7 @@ export class AlwaysOnSyncWorker {
 					products: await getLastSyncTime("products"),
 					customers: await getLastSyncTime("customers"),
 					inventory: await getLastSyncTime("inventory"),
-					sales_orders: await getLastSyncTime("sales"),
+					sales_orders: await getLastSyncTime("sales_orders"),
 				};
 
 				// Enqueue jobs in foreign key order

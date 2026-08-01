@@ -25,10 +25,41 @@ export class OdooClient {
 	private uid: number | null = null;
 
 	constructor(config?: Partial<OdooConfig>) {
-		this.url = (config?.url || process.env.ODOO_URL || "https://zenzebra1.odoo.com").replace(/\/+$/, "");
-		this.db = config?.db || process.env.ODOO_DB || "zenzebra1";
-		this.username = config?.username || process.env.ODOO_USERNAME || "diwakar@zenzebra.in";
-		this.password = config?.password || process.env.ODOO_PASSWORD || "Jc775869w@";
+		// Credentials come from the environment only. Hardcoded fallbacks previously lived here,
+		// including the account password, which meant the secret shipped in the git history and
+		// a misconfigured deploy silently talked to the wrong database instead of failing.
+		const url = config?.url || process.env.ODOO_URL;
+		const db = config?.db || process.env.ODOO_DB;
+		const username = config?.username || process.env.ODOO_USERNAME;
+		const password = config?.password || process.env.ODOO_PASSWORD;
+
+		const missing = [
+			!url && "ODOO_URL",
+			!db && "ODOO_DB",
+			!username && "ODOO_USERNAME",
+			!password && "ODOO_PASSWORD",
+		].filter(Boolean);
+
+		if (missing.length > 0) {
+			throw new Error(
+				`Odoo client is not configured. Missing environment variables: ${missing.join(", ")}. See .env.example.`,
+			);
+		}
+
+		this.url = url!.replace(/\/+$/, "");
+		this.db = db!;
+		this.username = username!;
+		this.password = password!;
+	}
+
+	/** True when all required Odoo credentials are present, without constructing a client. */
+	public static isConfigured(): boolean {
+		return Boolean(
+			process.env.ODOO_URL &&
+				process.env.ODOO_DB &&
+				process.env.ODOO_USERNAME &&
+				process.env.ODOO_PASSWORD,
+		);
 	}
 
 	/** Authenticates with Odoo SaaS and captures the session cookie */

@@ -161,15 +161,6 @@ export default function Page() {
 						</div>
 						<Skeleton className="h-6 w-[280px] rounded-md" />
 					</div>
-					<div className="flex items-center gap-3">
-						<Button
-							variant="outline"
-							onClick={() => router.push("/dashboard/sales/upload")}
-						>
-							<Upload className="mr-2 size-4" />
-							Upload Data
-						</Button>
-					</div>
 				</div>
 
 				<GlobalFilterBar
@@ -216,16 +207,6 @@ export default function Page() {
 							</span>
 						</div>
 					)}
-				</div>
-
-				<div className="flex items-center gap-3">
-					<Button
-						variant="outline"
-						onClick={() => router.push("/dashboard/sales/upload")}
-					>
-						<Upload className="mr-2 size-4" />
-						Upload Data
-					</Button>
 				</div>
 			</div>
 

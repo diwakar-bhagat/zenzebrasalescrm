@@ -156,13 +156,6 @@ export default function Page() {
 						<p className="text-muted-foreground text-sm">{formattedDate}</p>
 					</div>
 				</div>
-				<Button
-					variant="outline"
-					onClick={() => router.push("/dashboard/sales/upload")}
-				>
-					<Upload className="mr-2 size-4" />
-					Upload Data
-				</Button>
 			</div>
 
 			<GlobalFilterBar

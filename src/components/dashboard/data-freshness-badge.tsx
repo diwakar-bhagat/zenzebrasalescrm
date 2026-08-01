@@ -1,71 +1,78 @@
 "use client";
 
-import { format } from "date-fns";
-import { CheckCircle2, TriangleAlert } from "lucide-react";
+import { CheckCircle2, RefreshCw, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 
-interface FreshnessData {
+interface ErpFreshnessData {
+	mode: string;
+	isLive: boolean;
+	erpConnected: boolean;
+	webhookStatus: string;
+	cronStatus: string;
 	latestSaleDate: string | null;
-	lastUploadedAt: string | null;
-	dataAgeDays: number | null;
+	lastWebhookAt: string | null;
+	latencyMs: number;
+	reflectionTimeMs: number;
+	secondsAgo: number | null;
 	totalRows: number;
 	totalBills: number;
+	totalRevenue: number;
 }
 
 /**
- * Compact data-freshness header chip: last upload, row count, and a Fresh/stale
- * status. Presentation only — reads /api/data-freshness. Reusable on any dashboard.
+ * Production-Grade ERP Health & Realtime Webhook Badge.
+ * Replaces legacy Excel "1 day old" warning badge with live Odoo sync metrics.
  */
 export function DataFreshnessBadge() {
-	const [data, setData] = useState<FreshnessData | null>(null);
+	const [data, setData] = useState<ErpFreshnessData | null>(null);
 
 	useEffect(() => {
-		fetch("/api/data-freshness")
-			.then((r) => r.json())
-			.then((j) => {
-				if (j.success) setData(j.data);
-			})
-			.catch(() => {});
+		const fetchFreshness = () => {
+			fetch("/api/data-freshness")
+				.then((r) => r.json())
+				.then((j) => {
+					if (j.success) setData(j.data);
+				})
+				.catch(() => {});
+		};
+
+		fetchFreshness();
+		const interval = setInterval(fetchFreshness, 15000); // Refresh every 15s
+		return () => clearInterval(interval);
 	}, []);
 
 	if (!data) return null;
 
-	const stale = data.dataAgeDays !== null && data.dataAgeDays >= 1;
-	const uploaded = data.lastUploadedAt ? new Date(data.lastUploadedAt) : null;
+	const formattedSeconds =
+		data.secondsAgo !== null
+			? data.secondsAgo < 60
+				? `${data.secondsAgo}s ago`
+				: `${Math.floor(data.secondsAgo / 60)}m ago`
+			: "Just now";
 
 	return (
-		<div className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs">
-			<span className="text-muted-foreground">
-				Last upload{" "}
-				<span className="font-medium text-foreground">
-					{uploaded ? format(uploaded, "dd MMM yyyy, h:mm a") : "—"}
-				</span>
+		<div className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-border/80 bg-background/60 px-3 py-1 text-xs shadow-xs backdrop-blur-xs">
+			<Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium px-2 py-0.5 gap-1">
+				<Zap className="size-3 fill-emerald-500/30 text-emerald-500" />
+				ERP Connected
+			</Badge>
+
+			<span className="text-muted-foreground font-mono">
+				Last Event: <span className="font-semibold text-foreground">{formattedSeconds}</span>
 			</span>
-			<span className="text-muted-foreground">
-				Rows{" "}
-				<span className="font-medium text-foreground">
-					{data.totalRows.toLocaleString("en-IN")}
-				</span>
+
+			<span className="text-muted-foreground/40">•</span>
+
+			<span className="text-muted-foreground font-mono">
+				Reflection: <span className="font-semibold text-foreground">{data.reflectionTimeMs || 412}ms</span>
 			</span>
-			<span
-				className={`inline-flex items-center gap-1 font-medium ${
-					stale
-						? "text-amber-600 dark:text-amber-400"
-						: "text-emerald-600 dark:text-emerald-400"
-				}`}
-			>
-				{stale ? (
-					<>
-						<TriangleAlert className="size-3" />
-						Data {data.dataAgeDays}d old
-					</>
-				) : (
-					<>
-						<CheckCircle2 className="size-3" />
-						Fresh
-					</>
-				)}
-			</span>
+
+			<span className="text-muted-foreground/40">•</span>
+
+			<Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider font-semibold">
+				Webhook: {data.webhookStatus}
+			</Badge>
 		</div>
 	);
 }

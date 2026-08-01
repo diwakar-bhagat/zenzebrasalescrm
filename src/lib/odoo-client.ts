@@ -12,6 +12,10 @@ export interface OdooConfig {
 	password: string;
 }
 
+export function getOdooClient(config?: Partial<OdooConfig>): OdooClient {
+	return new OdooClient(config);
+}
+
 export class OdooClient {
 	private url: string;
 	private db: string;

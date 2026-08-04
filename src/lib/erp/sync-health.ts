@@ -66,11 +66,11 @@ export interface SyncHealth {
 }
 
 /**
- * How often the reconciliation pull is expected to run, in minutes.
+ * How often the reconciliation pull runs, in minutes. Must match the scheduler's interval.
  *
- * The pull is the primary ingestion path: it is driven by an external scheduler, and unlike a
- * webhook it self-heals, because every run re-covers everything since the cursor. Set this to
- * match the scheduler's interval.
+ * Webhooks are the primary path and deliver a sale in about a second. The pull is the safety
+ * net: every run re-covers everything since the stored cursor, so a delivery lost to a deploy,
+ * a network blip or an outage is recovered automatically rather than disappearing.
  */
 export const SYNC_INTERVAL_MINUTES = Number(
 	process.env.SYNC_INTERVAL_MINUTES ?? 5,
@@ -87,13 +87,15 @@ const LATE_MS = EXPECTED_MS * 6;
 const OFFLINE_MS = Math.max(EXPECTED_MS * 12, 60 * MINUTE_MS);
 
 /**
- * Target for an Odoo sale to become a visible row: two poll intervals.
+ * Target for an Odoo sale to become a visible row.
  *
- * With a pull-based pipeline, reflection time is dominated by where in the polling cycle a sale
- * lands, so a sub-second target would be meaningless. A webhook, if one is added later, simply
- * lands far inside this budget.
+ * Deliberately set far below the poll interval. A webhook lands in roughly a second, so any
+ * sale exceeding this budget almost certainly had its webhook missed and was recovered by
+ * reconciliation instead. The on-time rate therefore doubles as the real answer to "is my
+ * real-time pipeline actually working?" — a number that would be meaningless if the target
+ * were loose enough for the fallback to satisfy it.
  */
-const SLA_TARGET_MS = EXPECTED_MS * 2;
+const SLA_TARGET_MS = Number(process.env.SLA_TARGET_SECONDS ?? 30) * 1000;
 /**
  * Below this many samples a percentage is noise, not a signal — one event would read as
  * either 100% or 0% SLA compliance. The UI shows "collecting data" instead.
@@ -298,8 +300,8 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 			recordsLastRun: Number(cursor.records_synced ?? 0),
 			consecutiveFailures,
 			lastError: cursor.last_error ?? null,
-			// The pull is the primary path, driven by an external scheduler because Vercel's
-			// Hobby plan caps its own cron at one run per day.
+			// Reconciliation cadence, driven by an external scheduler because Vercel's Hobby
+			// plan caps its own cron at one run per day. Webhooks carry the live traffic.
 			cadence: `every ${SYNC_INTERVAL_MINUTES} min`,
 		},
 		data: {

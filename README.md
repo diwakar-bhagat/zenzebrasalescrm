@@ -10,9 +10,9 @@ the dashboard reads a canonical PostgreSQL database that Odoo feeds.
 ```
 Odoo 19 Enterprise SaaS
         │
-        ├── webhook  ──►  /api/webhooks/odoo   ── primary, real-time
+        ├── webhook  ──►  /api/webhooks/odoo/<secret>  ── primary, ~1 second
         │                        │
-        └── JSON-RPC ──►  scheduled pull       ── safety net, daily
+        └── JSON-RPC ──►  reconciliation pull          ── safety net, every 5 min
                                  │
                                  ▼
                     normalize → ingest  (src/lib/erp)
@@ -35,13 +35,23 @@ adapter produced a row — provenance is recorded in `source_system`, not branch
 
 | Mode | Path | Cadence | Role |
 |---|---|---|---|
-| **Webhook** | `/api/webhooks/odoo` | Real-time | Primary. The only live path. |
-| **Scheduled pull** | `/api/admin/odoo-sync` | Daily | Recovers whatever the webhook missed. |
+| **Webhook** | `/api/webhooks/odoo/<secret>` | ~1 second | **Primary.** Odoo pushes each sale as it is billed. |
+| **Reconciliation pull** | `/api/admin/odoo-sync` | Every 5 min | Recovers anything the webhook missed. |
 | **Excel adapter** | `/dashboard/sales/upload` | Manual | Pre-ERP history and gap backfills. |
 
-> On Vercel's Hobby plan cron is capped at one run per day. The scheduled pull is therefore a
-> safety net, **not** a near-real-time fallback: if webhooks stop, data goes stale until the
-> next daily run. The status badge reports this honestly as `Synced` rather than `Live`.
+> Vercel's Hobby plan caps its own cron at one run per day, so the reconciliation pull is
+> driven by an external scheduler instead. Webhooks alone would lose data silently whenever a
+> delivery fails; the pull re-covers everything since the stored cursor, so nothing is lost.
+
+**Authentication.** Odoo's webhook action has no field for request headers, so the shared
+secret is the final path segment of the URL — the pattern Slack uses for incoming webhooks:
+
+```
+https://<your-domain>/api/webhooks/odoo/<ODOO_WEBHOOK_SECRET>
+```
+
+`/api/webhooks/odoo` also accepts an `x-webhook-secret` header, for relays and smoke tests.
+Both share one handler and produce identical rows.
 
 ### How Odoo actually delivers
 
@@ -89,16 +99,26 @@ npx ts-node -P tsconfig.scripts.json \
 `GET /api/system/sync-health` reports the pipeline's real state, and backs the status badge in
 the dashboard header.
 
+Health is measured by **when the pipeline last ran**, not when data last changed — the shops
+close overnight, so keying off the newest row would raise a false outage every night. A
+reconciliation run that finds zero new orders is a healthy run.
+
+Thresholds derive from `SYNC_INTERVAL_MINUTES` (default 5):
+
 | Mode | Meaning |
 |---|---|
-| `live` | A webhook succeeded in the last 5 minutes. |
-| `scheduled` | No recent webhook; data is arriving from the daily pull. |
-| `delayed` | Data is 26–48h old, or deliveries are failing. |
-| `offline` | Nothing for 48h, or three consecutive sync failures. |
+| `live` | Webhook or reconciliation succeeded within 2 intervals. |
+| `scheduled` | Succeeded within 6 intervals — a missed tick. |
+| `delayed` | Succeeded within 12 intervals, or ≥1 hour. |
+| `offline` | Longer than that, or three consecutive failures. |
 
-Metrics that cannot be measured are returned as `null` and rendered as pending — reflection
-time is absent until a webhook has actually been delivered, and the SLA percentage is withheld
-below 20 samples. Nothing on this endpoint is a placeholder constant.
+Metrics that cannot be measured are returned as `null` and rendered as pending. Nothing on this
+endpoint is a placeholder constant.
+
+**On-time rate** is the most useful single number: the share of sales visible within
+`SLA_TARGET_SECONDS` (default 30). A webhook lands in about a second, so a low rate means
+webhooks are being missed and reconciliation is doing the work. It is withheld below 20
+samples, where one sale would read as 0% or 100%.
 
 Every inbound delivery is recorded in `webhook_events`, **including rejected and malformed
 ones**. To diagnose a silent integration, start there:

@@ -41,13 +41,13 @@ const MODE_PRESENTATION: Record<
 		label: "Live",
 		variant: "outline",
 		dot: "bg-emerald-500",
-		summary: "Odoo is connected and syncing on schedule.",
+		summary: "Odoo is connected. Sales are arriving as they are billed.",
 	},
 	scheduled: {
 		label: "Synced",
 		variant: "outline",
 		dot: "bg-sky-500",
-		summary: "Connected. The last sync ran slightly later than expected.",
+		summary: "Connected. The last update arrived slightly later than expected.",
 	},
 	delayed: {
 		label: "Delayed",
@@ -239,7 +239,7 @@ export function ErpSyncStatus() {
 								<Metric
 									label="Median"
 									value={duration(data.reflection.p50Ms)}
-									hint="Time from Odoo recording the sale to the row being queryable here. With a polled pipeline this is mostly determined by where in the sync cycle the sale landed."
+									hint="Time from Odoo recording the sale to the row being queryable here. A webhook delivers in about a second; a sale recovered by reconciliation instead can take up to the poll interval."
 								/>
 								<Metric
 									label="95th percentile"
@@ -309,18 +309,18 @@ export function ErpSyncStatus() {
 								label="Status"
 								value="not enabled"
 								pending
-								hint="Sales arrive via the scheduled pull, which is the primary path. Webhooks are optional and would only reduce latency; the endpoint rejects all traffic until ODOO_WEBHOOK_SECRET is set."
+								hint="Webhooks are the live path: Odoo pushes each sale as it is billed. The endpoint rejects all traffic until ODOO_WEBHOOK_SECRET is set, so nothing can arrive this way yet."
 							/>
 						)}
 					</Section>
 
 					<Separator />
 
-					<Section title="Sync">
+					<Section title="Reconciliation">
 						<Metric
 							label="Last run"
 							value={relative(data.sync.lastSuccessAt)}
-							hint="A run that finds no new orders is still a healthy run — the shops are simply closed. Health is measured by whether the sync is firing, not by whether data changed."
+							hint="The safety net that recovers any sale whose webhook was missed. A run finding no new orders is still healthy — the shops are simply closed."
 						/>
 						<Metric label="Interval" value={data.sync.cadence} />
 						<Metric

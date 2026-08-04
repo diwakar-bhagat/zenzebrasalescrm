@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { OdooClient } from "../odoo-client";
+import { getRealtimeStatus, type RealtimeStatus } from "../realtime/publisher";
 import { currentEnvironment } from "./webhook-log";
 
 /**
@@ -55,6 +56,7 @@ export interface SyncHealth {
 		rowsToday: number;
 		totalRows: number;
 	};
+	realtime: RealtimeStatus;
 	reflection: ReflectionStats | null;
 	sla: SlaStats | null;
 	stores: {
@@ -330,6 +332,7 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 			rowsToday: Number(data.rows_today ?? 0),
 			totalRows: Number(data.total_rows ?? 0),
 		},
+		realtime: getRealtimeStatus(),
 		reflection,
 		sla,
 		stores: storeRows.map((row) => ({

@@ -351,6 +351,23 @@ export function ErpSyncStatus() {
 					<Separator />
 
 					<Section title="System">
+						<Metric
+							label="Live updates"
+							value={
+								!data.realtime.configured
+									? "not enabled"
+									: data.realtime.ok
+										? "connected"
+										: "misconfigured"
+							}
+							pending={!data.realtime.configured}
+							hint={
+								data.realtime.error ??
+								(data.realtime.configured
+									? "Dashboards refresh within about a second of a sale."
+									: "Without this, dashboards update on their next fetch rather than instantly. Ingestion is unaffected.")
+							}
+						/>
 						<Metric label="Query latency" value={`${data.apiLatencyMs} ms`} />
 						<Metric
 							label="Odoo API"

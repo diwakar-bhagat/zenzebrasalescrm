@@ -64,6 +64,35 @@ export function isRealtimeConfigured(): boolean {
 	return Boolean(process.env.ABLY_API_KEY);
 }
 
+export interface RealtimeStatus {
+	configured: boolean;
+	/** False when the key is present but malformed — the case that is otherwise silent. */
+	ok: boolean;
+	error: string | null;
+}
+
+/**
+ * Reports whether realtime actually initialised.
+ *
+ * A malformed ABLY_API_KEY is now caught and swallowed so it cannot break ingestion, which
+ * means the only remaining symptom is dashboards quietly not updating. This makes that state
+ * visible instead of leaving it to be inferred from silence.
+ */
+export function getRealtimeStatus(): RealtimeStatus {
+	if (!process.env.ABLY_API_KEY) {
+		return { configured: false, ok: false, error: null };
+	}
+	// Forces construction, which is what validates the key format.
+	const client = getClient();
+	return {
+		configured: true,
+		ok: Boolean(client),
+		error: client
+			? null
+			: "ABLY_API_KEY is malformed. Expected 'appId.keyId:secret' — it must contain both a dot and a colon.",
+	};
+}
+
 export interface PublishInput {
 	name: RealtimeEventName;
 	store?: string | null;

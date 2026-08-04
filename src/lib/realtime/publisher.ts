@@ -19,9 +19,21 @@ import {
 
 let client: Ably.Rest | null = null;
 let warned = false;
+/** Set once construction has failed, so a bad key is not re-attempted on every sale. */
+let clientUnavailable = false;
 
-/** The API key never leaves the server; browsers authenticate with short-lived tokens. */
+/**
+ * The API key never leaves the server; browsers authenticate with short-lived tokens.
+ *
+ * Returns null rather than throwing on any misconfiguration. `new Ably.Rest()` validates the
+ * key format eagerly and throws ("invalid key parameter") — if that escaped, it would surface
+ * as an ingestion failure and a 500 on the webhook, losing the sale over an optional feature.
+ * Realtime must never be able to break ingestion.
+ */
 function getClient(): Ably.Rest | null {
+	if (clientUnavailable) return null;
+	if (client) return client;
+
 	const key = process.env.ABLY_API_KEY;
 
 	if (!key) {
@@ -34,8 +46,17 @@ function getClient(): Ably.Rest | null {
 		return null;
 	}
 
-	if (!client) client = new Ably.Rest({ key });
-	return client;
+	try {
+		client = new Ably.Rest({ key });
+		return client;
+	} catch (error) {
+		clientUnavailable = true;
+		console.error(
+			"[realtime] ABLY_API_KEY is invalid — realtime publishing disabled. Ingestion is unaffected. Expected format 'appId.keyId:secret'. Error:",
+			error instanceof Error ? error.message : error,
+		);
+		return null;
+	}
 }
 
 /** True when realtime is configured. Surfaced in sync health so the UI can say so honestly. */
@@ -59,6 +80,17 @@ export interface PublishInput {
  * scheme, and so a per-store view can subscribe to exactly one channel.
  */
 export async function publishRealtimeEvent(input: PublishInput): Promise<void> {
+	// Belt and braces around the entire body. Callers await this immediately after committing a
+	// sale, so anything that escapes here would be caught by the caller as an ingestion failure
+	// and turn a successful write into a 500. Nothing about a notification justifies that.
+	try {
+		await publish(input);
+	} catch (error) {
+		console.error("[realtime] publish failed (ingestion unaffected):", error);
+	}
+}
+
+async function publish(input: PublishInput): Promise<void> {
 	const ably = getClient();
 	if (!ably) return;
 

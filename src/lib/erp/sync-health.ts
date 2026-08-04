@@ -127,6 +127,8 @@ function classifyMode(
 	lastSyncSuccessAt: string | null,
 	lastWebhookSuccessAt: string | null,
 	consecutiveFailures: number,
+	successRate24h: number | null,
+	failures24h: number,
 ): SyncMode {
 	if (consecutiveFailures >= 3) return "offline";
 
@@ -137,7 +139,15 @@ function classifyMode(
 	if (ages.length === 0) return "offline";
 
 	const age = Math.min(...ages);
-	if (age < HEALTHY_MS) return "live";
+
+	// Deliveries are arriving, but a meaningful share are failing. That is flowing, not
+	// healthy: some sales are reaching the dashboard only because reconciliation caught them.
+	// Reporting an unqualified "Live" here would hide exactly the problem worth seeing.
+	// Requires several failures so one bad request cannot downgrade a working pipeline.
+	const unreliable =
+		successRate24h !== null && successRate24h < 90 && failures24h >= 3;
+
+	if (age < HEALTHY_MS) return unreliable ? "scheduled" : "live";
 	if (age < LATE_MS) return "scheduled";
 	if (age < OFFLINE_MS) return "delayed";
 	return "offline";
@@ -279,6 +289,8 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 			lastSyncSuccessAt,
 			lastWebhookSuccessAt,
 			consecutiveFailures,
+			successRate24h,
+			Number(wh.failures_24h ?? 0),
 		),
 		erp: {
 			name: "Odoo 19 Enterprise SaaS",

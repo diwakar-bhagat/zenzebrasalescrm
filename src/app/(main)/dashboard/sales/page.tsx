@@ -50,6 +50,7 @@ import { exportToExcel } from "@/lib/export-excel";
 import { formatSignedPercent, growthTextClass } from "@/lib/growth-ui";
 import { formatCurrency } from "@/lib/utils";
 import { useFilterStore } from "@/stores/founder/filter-store";
+import { useRealtimeRevision } from "@/stores/realtime-store";
 
 /** Safely format a number to fixed decimal places; returns "0.0" on null/undefined/NaN. */
 function safeFixed(value: number | null | undefined, digits = 1): string {
@@ -302,6 +303,8 @@ export default function SalesDashboardPage() {
 	const [data, setData] = useState<any>(null);
 	const [status, setStatus] = useState<any>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	// Bumps when Odoo pushes a sale; listed in the fetch effect below so new data pulls itself in.
+	const realtimeRevision = useRealtimeRevision();
 
 	const {
 		startDate,
@@ -332,6 +335,7 @@ export default function SalesDashboardPage() {
 		fetchStatus();
 	}, []);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: realtimeRevision is a deliberate re-run trigger, not a value read by this effect. It increments when Odoo pushes a sale, which re-runs the fetch so the dashboard reloads from PostgreSQL.
 	useEffect(() => {
 		if (!status?.hasData) return;
 
@@ -375,6 +379,7 @@ export default function SalesDashboardPage() {
 		compareMode,
 		compareStartDate,
 		compareEndDate,
+		realtimeRevision,
 	]);
 
 	if (!status) {

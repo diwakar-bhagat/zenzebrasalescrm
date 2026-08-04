@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFilterStore } from "@/stores/founder/filter-store";
+import { useRealtimeRevision } from "@/stores/realtime-store";
 
 import { AnalyticsKpiStrip } from "./_components/analytics-kpi-strip";
 import { AnalyticsToolbar } from "./_components/analytics-toolbar";
@@ -27,6 +28,8 @@ export default function Page() {
 	const [data, setData] = useState<any>(null);
 	const [status, setStatus] = useState<any>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	// Bumps when Odoo pushes a sale; listed in the fetch effect below so new data pulls itself in.
+	const realtimeRevision = useRealtimeRevision();
 
 	const { startDate, endDate, store, category, brand, sku, categoryScope } =
 		useFilterStore();
@@ -47,6 +50,7 @@ export default function Page() {
 		fetchStatus();
 	}, []);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: realtimeRevision is a deliberate re-run trigger, not a value read by this effect. It increments when Odoo pushes a sale, which re-runs the fetch so the dashboard reloads from PostgreSQL.
 	useEffect(() => {
 		if (!status?.hasData) return;
 
@@ -75,7 +79,17 @@ export default function Page() {
 		};
 
 		fetchDashboardData();
-	}, [status, startDate, endDate, store, category, brand, sku, categoryScope]);
+	}, [
+		status,
+		startDate,
+		endDate,
+		store,
+		category,
+		brand,
+		sku,
+		categoryScope,
+		realtimeRevision,
+	]);
 
 	if (!status) {
 		return (

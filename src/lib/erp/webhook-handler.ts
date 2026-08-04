@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { sql } from "../db";
 import { OdooClient } from "../odoo-client";
+import { publishRealtimeEvent } from "../realtime/publisher";
 import { ingestSalesLines } from "./ingest-sales";
 import {
 	extractModel,
@@ -272,6 +273,18 @@ export async function handleOdooWebhook(
 			);
 			totalUpserted += upserted;
 			processed.push({ bill: canonical[0].bill_no, rows: upserted });
+
+			// Notify dashboards only after the write has committed. Publishing earlier would
+			// have subscribers refetch rows that are not visible yet, and they would never be
+			// told again. Failures here are swallowed: realtime is a latency optimisation, and
+			// losing a notification must never turn an ingested sale into a 500.
+			await publishRealtimeEvent({
+				name: "sale.ingested",
+				store: canonical[0].billed_by,
+				rows: upserted,
+				billNo: canonical[0].bill_no,
+				eventId: eventId ?? canonical[0].bill_no,
+			});
 
 			await finaliseEvent(eventId, {
 				status: "PROCESSED",

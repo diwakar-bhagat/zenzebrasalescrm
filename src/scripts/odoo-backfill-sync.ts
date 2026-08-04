@@ -9,6 +9,7 @@ import { normalizeOdooOrder } from "../lib/erp/normalize-odoo-order";
 import { fetchOrderLines, POS_ORDER_FIELDS } from "../lib/erp/odoo-fetch";
 import type { CanonicalSaleLine, OdooPosOrder } from "../lib/erp/types";
 import { OdooClient } from "../lib/odoo-client";
+import { publishRealtimeEvent } from "../lib/realtime/publisher";
 
 /**
  * Odoo scheduled reconciliation and historical backfill.
@@ -173,6 +174,17 @@ export async function runOdooSync(options: OdooSyncOptions = {}) {
 		}
 
 		await markSuccess(totalUpserted);
+
+		// A sale recovered by reconciliation is still new to anyone watching, so notify —
+		// but only when something actually changed, otherwise every idle tick would wake
+		// every dashboard for nothing.
+		if (totalUpserted > 0) {
+			await publishRealtimeEvent({
+				name: "sync.completed",
+				rows: totalUpserted,
+				eventId: `sync-${Date.now()}`,
+			});
+		}
 
 		if (unresolved.size > 0) {
 			console.warn(

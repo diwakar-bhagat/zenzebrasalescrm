@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFilterStore } from "@/stores/founder/filter-store";
+import { useRealtimeRevision } from "@/stores/realtime-store";
 
 export default function Page() {
 	const router = useRouter();
@@ -23,6 +24,8 @@ export default function Page() {
 	const [status, setStatus] = useState<any>(null);
 	const [health, setHealth] = useState<any>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	// Bumps when Odoo pushes a sale; listed in the fetch effect below so new data pulls itself in.
+	const realtimeRevision = useRealtimeRevision();
 
 	const {
 		startDate,
@@ -66,6 +69,7 @@ export default function Page() {
 		fetchHealth();
 	}, []);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: realtimeRevision is a deliberate re-run trigger, not a value read by this effect. It increments when Odoo pushes a sale, which re-runs the fetch so the dashboard reloads from PostgreSQL.
 	useEffect(() => {
 		if (!status?.hasData) return;
 
@@ -111,6 +115,7 @@ export default function Page() {
 		compareMode,
 		compareStartDate,
 		compareEndDate,
+		realtimeRevision,
 	]);
 
 	if (!status) {

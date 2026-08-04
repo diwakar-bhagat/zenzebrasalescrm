@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { sql } from "../db";
 
 /**
  * Store identity resolution, memoized per process.
@@ -34,7 +34,10 @@ async function loadSnapshot(): Promise<StoreSnapshot> {
 	]);
 
 	const aliases = new Map<string, string>();
-	for (const row of aliasRows as { source_name: string; canonical_store: string }[]) {
+	for (const row of aliasRows as {
+		source_name: string;
+		canonical_store: string;
+	}[]) {
 		if (row.source_name) {
 			aliases.set(row.source_name.trim().toLowerCase(), row.canonical_store);
 		}
@@ -59,7 +62,9 @@ export function invalidateStoreCache(): void {
  * Returns storeId: null when the canonical name has no store_dimension row — callers should
  * treat that as a data-quality signal rather than a normal outcome.
  */
-export async function resolveStore(rawStoreName: string): Promise<ResolvedStore> {
+export async function resolveStore(
+	rawStoreName: string,
+): Promise<ResolvedStore> {
 	if (!snapshot || Date.now() - snapshot.loadedAt > TTL_MS) {
 		snapshot = await loadSnapshot();
 	}

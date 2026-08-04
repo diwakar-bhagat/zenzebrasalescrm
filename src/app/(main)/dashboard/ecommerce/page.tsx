@@ -27,7 +27,6 @@ export default function Page() {
 	const {
 		startDate,
 		endDate,
-		isDateFiltered,
 		store,
 		category,
 		brand,
@@ -104,7 +103,6 @@ export default function Page() {
 		status,
 		startDate,
 		endDate,
-		isDateFiltered,
 		store,
 		category,
 		brand,
@@ -132,16 +130,17 @@ export default function Page() {
 				<div className="max-w-md space-y-2">
 					<h2 className="text-2xl font-bold">Welcome to ZenZebra</h2>
 					<p className="text-muted-foreground">
-						No data has been uploaded yet. Upload your first daily sales sheet
-						to unlock insights.
+						No sales data yet. Once Odoo is connected, transactions appear here
+						automatically.
 					</p>
 				</div>
 				<Button
 					size="lg"
+					variant="outline"
 					onClick={() => router.push("/dashboard/sales/upload")}
 				>
 					<Upload className="mr-2 size-5" />
-					Upload Sales Data
+					Import historical data
 				</Button>
 			</div>
 		);
@@ -161,15 +160,6 @@ export default function Page() {
 							<p className="text-muted-foreground text-sm">{formattedDate}</p>
 						</div>
 						<Skeleton className="h-6 w-[280px] rounded-md" />
-					</div>
-					<div className="flex items-center gap-3">
-						<Button
-							variant="outline"
-							onClick={() => router.push("/dashboard/sales/upload")}
-						>
-							<Upload className="mr-2 size-4" />
-							Upload Data
-						</Button>
 					</div>
 				</div>
 
@@ -217,16 +207,6 @@ export default function Page() {
 							</span>
 						</div>
 					)}
-				</div>
-
-				<div className="flex items-center gap-3">
-					<Button
-						variant="outline"
-						onClick={() => router.push("/dashboard/sales/upload")}
-					>
-						<Upload className="mr-2 size-4" />
-						Upload Data
-					</Button>
 				</div>
 			</div>
 

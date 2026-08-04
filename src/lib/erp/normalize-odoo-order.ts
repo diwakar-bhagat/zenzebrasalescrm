@@ -1,5 +1,9 @@
 import { resolveStore } from "./store-resolver";
-import type { CanonicalSaleLine, OdooPosOrder, OdooPosOrderLine } from "./types";
+import type {
+	CanonicalSaleLine,
+	OdooPosOrder,
+	OdooPosOrderLine,
+} from "./types";
 
 /**
  * The single Odoo -> canonical mapper.
@@ -25,7 +29,9 @@ const dateFormatter = new Intl.DateTimeFormat("en-CA", {
  * calendar date. Taking the UTC date directly — as the previous code did — files any sale
  * transacted after 18:30 UTC under the wrong day.
  */
-export function odooTimestampToStoreDate(raw: string | undefined | null): string {
+export function odooTimestampToStoreDate(
+	raw: string | undefined | null,
+): string {
 	if (!raw) return dateFormatter.format(new Date());
 
 	const trimmed = String(raw).trim();
@@ -42,7 +48,9 @@ export function odooTimestampToStoreDate(raw: string | undefined | null): string
 }
 
 /** Converts an Odoo naive-UTC timestamp to a real ISO instant, or null. */
-export function odooTimestampToIso(raw: string | undefined | null): string | null {
+export function odooTimestampToIso(
+	raw: string | undefined | null,
+): string | null {
 	if (!raw) return null;
 	const trimmed = String(raw).trim();
 	const isoish = trimmed.includes("T") ? trimmed : trimmed.replace(" ", "T");
@@ -53,7 +61,11 @@ export function odooTimestampToIso(raw: string | undefined | null): string | nul
 
 /** Odoo many-to-one fields arrive as [id, "Display Name"]. Pull the name. */
 export function relationName(value: unknown, fallback: string): string {
-	if (Array.isArray(value) && value.length > 1 && typeof value[1] === "string") {
+	if (
+		Array.isArray(value) &&
+		value.length > 1 &&
+		typeof value[1] === "string"
+	) {
 		return value[1];
 	}
 	if (typeof value === "string" && value.trim().length > 0) return value;
@@ -62,7 +74,11 @@ export function relationName(value: unknown, fallback: string): string {
 
 /** Odoo many-to-one fields arrive as [id, "Display Name"]. Pull the id. */
 export function relationId(value: unknown): number | null {
-	if (Array.isArray(value) && value.length > 0 && typeof value[0] === "number") {
+	if (
+		Array.isArray(value) &&
+		value.length > 0 &&
+		typeof value[0] === "number"
+	) {
 		return value[0];
 	}
 	if (typeof value === "number") return value;
@@ -75,6 +91,23 @@ function toNumber(value: unknown, fallback = 0): number {
 }
 
 /**
+ * Normalises a category to the canonical uppercase, trimmed form.
+ *
+ * The retail scope filter compares categories with an exact, case-sensitive
+ * `category <> ALL(ARRAY['LIVE MENU','SNACK CORNER','BEVERAGES'])`. Odoo's product categories
+ * are free text and arrive as "Live menu " and "Beverages " — trailing space, mixed case — so
+ * without this every food sale sourced from the ERP was silently counted as retail, and the
+ * dashboard listed "LIVE MENU" and "Live menu " as two separate categories.
+ *
+ * Uppercasing also aligns Odoo's "Cosmetics"/"Skincare" with the existing Excel COSMETICS and
+ * SKINCARE, so the two sources report one category list rather than two.
+ */
+export function canonicalCategory(value: unknown): string {
+	const raw = typeof value === "string" ? value.trim() : "";
+	return raw.length > 0 ? raw.toUpperCase() : "UNCATEGORISED";
+}
+
+/**
  * True when a payload carries enough detail to ingest without calling back to Odoo.
  *
  * Odoo 19's native "Send Webhook Notification" action posts only {"_model", "_id"}. Treating
@@ -83,14 +116,20 @@ function toNumber(value: unknown, fallback = 0): number {
  */
 export function isHydratedOrder(payload: OdooPosOrder): boolean {
 	const hasLines = Array.isArray(payload.lines) && payload.lines.length > 0;
-	const hasInlineLines = Array.isArray((payload as { line_details?: unknown }).line_details);
+	const hasInlineLines = Array.isArray(
+		(payload as { line_details?: unknown }).line_details,
+	);
 	const hasAmounts =
 		payload.amount_total !== undefined && payload.amount_total !== null;
-	return Boolean(payload.date_order) && (hasLines || hasInlineLines || hasAmounts);
+	return (
+		Boolean(payload.date_order) && (hasLines || hasInlineLines || hasAmounts)
+	);
 }
 
 /** Extracts the Odoo record id from either a full record or a thin webhook notification. */
-export function extractRecordId(payload: Record<string, unknown>): number | null {
+export function extractRecordId(
+	payload: Record<string, unknown>,
+): number | null {
 	const candidate = payload.id ?? payload._id ?? payload.res_id;
 	const n = Number(candidate);
 	return Number.isFinite(n) && n > 0 ? n : null;
@@ -99,7 +138,9 @@ export function extractRecordId(payload: Record<string, unknown>): number | null
 /** Extracts the Odoo model name from a thin webhook notification. */
 export function extractModel(payload: Record<string, unknown>): string | null {
 	const candidate = payload._model ?? payload.model;
-	return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
+	return typeof candidate === "string" && candidate.length > 0
+		? candidate
+		: null;
 }
 
 /**
@@ -120,7 +161,8 @@ export async function normalizeOdooOrder(
 	const sale_date = odooTimestampToStoreDate(order.date_order);
 	// write_date is when Odoo last touched the record: the instant reflection time measures from.
 	const source_event_at =
-		odooTimestampToIso(order.write_date) ?? odooTimestampToIso(order.date_order);
+		odooTimestampToIso(order.write_date) ??
+		odooTimestampToIso(order.date_order);
 
 	const rawStoreName = relationName(
 		order.config_id,
@@ -130,7 +172,10 @@ export async function normalizeOdooOrder(
 
 	const customer_name = relationName(order.partner_id, "Walk-in Customer");
 	const customer_mobile =
-		(order.customer_mobile as string) ?? (order.phone as string) ?? (order.mobile as string) ?? null;
+		(order.customer_mobile as string) ??
+		(order.phone as string) ??
+		(order.mobile as string) ??
+		null;
 
 	const shared = {
 		sale_date,
@@ -153,7 +198,7 @@ export async function normalizeOdooOrder(
 				product_key: `PROD-SUMMARY-${recordId ?? bill_no}`,
 				sku_code: `SKU-${recordId ?? bill_no}`,
 				item_name: `POS Order ${bill_no}`,
-				category: "POS Summary",
+				category: canonicalCategory("POS Summary"),
 				brand: "Odoo POS",
 				quantity: 1,
 				mrp_amount: net_amount,
@@ -178,16 +223,26 @@ export async function normalizeOdooOrder(
 		const discountPercent = toNumber(line.discount);
 		const discount_amount = (mrp_amount * discountPercent) / 100;
 
-		const gross_amount = toNumber(line.price_subtotal, mrp_amount - discount_amount);
+		const gross_amount = toNumber(
+			line.price_subtotal,
+			mrp_amount - discount_amount,
+		);
 		const net_amount = toNumber(line.price_subtotal_incl, gross_amount);
 		const tax_amount = net_amount - gross_amount;
 
+		// categ_id / default_code are enrichment keys attached by fetchOrderLines — pos.order.line
+		// itself carries neither. Falls back cleanly when a payload arrives un-enriched.
 		return {
 			...shared,
 			product_key: productId ? `PROD-${productId}` : `PROD-${bill_no}-${index}`,
-			sku_code: productId ? `SKU-${productId}` : null,
+			sku_code:
+				typeof line.default_code === "string" && line.default_code.length > 0
+					? line.default_code
+					: productId
+						? `SKU-${productId}`
+						: null,
 			item_name: productName,
-			category: relationName(line.categ_id, "POS General"),
+			category: canonicalCategory(relationName(line.categ_id, "POS General")),
 			brand: "Odoo POS",
 			quantity,
 			mrp_amount,

@@ -9,13 +9,21 @@
 /** Which adapter produced a sales_fact row. Stored in sales_fact.source_system. */
 export type SourceSystem = "odoo_webhook" | "odoo_sync" | "excel";
 
-/** Outcome recorded for every inbound webhook delivery. */
+/**
+ * Outcome recorded for every inbound webhook delivery, in webhook_events.status.
+ *
+ * PROCESSED / FAILED / RECEIVED are the pre-existing vocabulary and are preserved so historic
+ * rows keep their meaning. The remaining three cover deliveries that were turned away before
+ * processing — previously these were rejected with no record at all, which is exactly how the
+ * integration sat at zero successful deliveries with nothing explaining why.
+ */
 export type WebhookStatus =
-	| "accepted"
-	| "rejected_auth"
-	| "invalid_payload"
-	| "error"
-	| "ignored";
+	| "PROCESSED"
+	| "FAILED"
+	| "RECEIVED"
+	| "REJECTED_AUTH"
+	| "INVALID_PAYLOAD"
+	| "IGNORED";
 
 /** One sales_fact row, fully resolved and ready to upsert. */
 export interface CanonicalSaleLine {

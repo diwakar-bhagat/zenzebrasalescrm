@@ -16,7 +16,6 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
-import { DataFreshnessSystem } from "@/components/dashboard/data-freshness-system";
 import {
 	formatStoreName,
 	GlobalFilterBar,
@@ -395,16 +394,17 @@ export default function SalesDashboardPage() {
 				<div className="max-w-md space-y-2">
 					<h2 className="text-2xl font-bold">Welcome to ZenZebra</h2>
 					<p className="text-muted-foreground">
-						No data has been uploaded yet. Upload your first daily sales sheet
-						to unlock insights.
+						No sales data yet. Once Odoo is connected, transactions appear here
+						automatically.
 					</p>
 				</div>
 				<Button
 					size="lg"
+					variant="outline"
 					onClick={() => router.push("/dashboard/sales/upload")}
 				>
 					<Upload className="mr-2 size-5" />
-					Upload Sales Data
+					Import historical data
 				</Button>
 			</div>
 		);
@@ -418,16 +418,6 @@ export default function SalesDashboardPage() {
 					<p className="text-muted-foreground mt-1">
 						Sales, inventory cost, and the profit you actually made
 					</p>
-				</div>
-				<div className="flex items-center gap-3">
-					<DataFreshnessSystem />
-					<Button
-						variant="outline"
-						onClick={() => router.push("/dashboard/sales/upload")}
-					>
-						<Upload className="mr-2 size-4" />
-						Upload Data
-					</Button>
 				</div>
 			</div>
 

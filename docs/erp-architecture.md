@@ -114,6 +114,57 @@ any number would be invented.
 
 ---
 
+## Reconciliation scheduling
+
+Driven by an external scheduler, because Vercel's Hobby plan caps its own cron at one run per
+day. Any HTTP scheduler works:
+
+```
+POST https://<your-domain>/api/admin/odoo-sync?mode=delta
+Authorization: Bearer <CRON_SECRET>
+```
+
+| Scheduler | Minimum interval | Notes |
+|---|---|---|
+| cron-job.org | 1 minute | Free, email alerts on failure. Recommended. |
+| GitHub Actions | 5 minutes | Hard floor; `*/1` is not honoured. Disabled after 60 days of repo inactivity. |
+| Vercel Cron | 1 day (Hobby) | Backstop only. |
+
+Set `SYNC_INTERVAL_MINUTES` to the interval you actually chose — the health badge uses it to
+decide when a sync is late, so a mismatch makes a healthy pipeline look broken.
+
+A one-minute cadence is cheap: a delta run with nothing to do is one Odoo `search_count` and
+exits. The endpoint is idempotent (upsert on the fact grain), so a duplicate or missed run is
+harmless.
+
+**Overlap protection.** `sync_locks` holds a lease for the duration of a run. Two concurrent
+syncs would contend on the same upsert keys and interleave their cursor writes — the one
+finishing second advancing the cursor past records the other had not yet written, which loses
+those sales permanently. A second run finds the lease held and exits quietly.
+
+Advisory locks (`pg_advisory_lock`) are deliberately **not** used: they live for the duration of
+a session, and Neon's HTTP driver opens a new connection per query, so the lock would release
+the instant the acquiring statement returned. The lease row carries an expiry so a run killed
+mid-flight cannot wedge reconciliation.
+
+---
+
+## Audit trail
+
+`webhook_events` classifies rather than discards:
+
+| Column | Values |
+|---|---|
+| `environment` | `production` · `preview` · `development` |
+| `origin` | `webhook` · `reconciliation` · `manual` |
+| `status` | `PROCESSED` · `FAILED` · `RECEIVED` · `REJECTED_AUTH` · `INVALID_PAYLOAD` · `IGNORED` |
+
+Health metrics filter on the current `environment`, so preview and local traffic never drag
+production health down — and nothing has to be deleted to keep the numbers honest. Rows are
+kept: "why did sync fail on 4 August?" is asked months later, when deleted rows cannot answer.
+
+---
+
 ## Deployment constraints
 
 - **Vercel Hobby caps cron at one run per day.** The scheduled pull cannot be a near-real-time

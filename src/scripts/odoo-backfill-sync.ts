@@ -7,6 +7,7 @@ import { sql } from "../lib/db";
 import { ingestSalesLines } from "../lib/erp/ingest-sales";
 import { normalizeOdooOrder } from "../lib/erp/normalize-odoo-order";
 import { fetchOrderLines, POS_ORDER_FIELDS } from "../lib/erp/odoo-fetch";
+import { acquireSyncLock } from "../lib/erp/sync-lock";
 import type { CanonicalSaleLine, OdooPosOrder } from "../lib/erp/types";
 import { OdooClient } from "../lib/odoo-client";
 import { publishRealtimeEvent } from "../lib/realtime/publisher";
@@ -96,6 +97,15 @@ export async function runOdooSync(options: OdooSyncOptions = {}) {
 	console.log(`\n🚀 Odoo ingestion [${mode}]...`);
 
 	await ensureSyncCursorTable();
+
+	// One reconciliation at a time. A slow run overlapping the next tick would double the Odoo
+	// traffic and interleave cursor writes, which can skip records permanently.
+	const lock = await acquireSyncLock("odoo_pos_sync");
+	if (!lock) {
+		console.log("⏭️  Another sync is already running; skipping this tick.");
+		return { success: true, processed: 0, skipped: true as const };
+	}
+
 	await markAttempt();
 
 	try {
@@ -201,6 +211,10 @@ export async function runOdooSync(options: OdooSyncOptions = {}) {
 		const message = error instanceof Error ? error.message : String(error);
 		await markFailure(message);
 		throw error;
+	} finally {
+		// Released on success and on failure alike. The lease would lapse on its own anyway,
+		// but holding it for the full TTL after a crash needlessly delays the next tick.
+		await lock.release();
 	}
 }
 

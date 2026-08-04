@@ -15,8 +15,23 @@ import type { WebhookStatus } from "./types";
  * not the ERP-namespaced names used elsewhere in this module.
  */
 
+/** Where the event came from, so operational traffic can be told apart from test traffic. */
+export type EventOrigin = "webhook" | "reconciliation" | "manual";
+
+/**
+ * Which deployment produced the event.
+ *
+ * Vercel sets VERCEL_ENV to production/preview/development. Recording it means preview-branch
+ * and local traffic can be filtered out of production health without deleting anything — the
+ * history stays intact for the "why did sync fail on 4 August?" question months later.
+ */
+export function currentEnvironment(): string {
+	return process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development";
+}
+
 export interface WebhookEventInput {
 	endpoint: string;
+	origin?: EventOrigin;
 	status: WebhookStatus;
 	payload?: unknown;
 	model?: string | null;
@@ -66,12 +81,13 @@ export async function logWebhookEvent(
 			INSERT INTO webhook_events (
 				endpoint, model, record_id, payload, status, error,
 				rows_upserted, source_event_at, latency_ms, store_name,
-				received_at, processed_at
+				environment, origin, received_at, processed_at
 			) VALUES (
 				${input.endpoint}, ${input.model ?? null}, ${input.recordId ?? null},
 				${safePayload(input.payload)}::jsonb, ${input.status}, ${input.error ?? null},
 				${input.rowsUpserted ?? 0}, ${input.sourceEventAt ?? null},
 				${input.latencyMs ?? null}, ${input.storeName ?? null},
+				${currentEnvironment()}, ${input.origin ?? "webhook"},
 				NOW(), ${processedAt}::timestamptz
 			)
 			RETURNING id

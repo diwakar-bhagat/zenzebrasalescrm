@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { OdooClient } from "../odoo-client";
+import { currentEnvironment } from "./webhook-log";
 
 /**
  * ERP sync health engine.
@@ -170,8 +171,13 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 		reflectionRows,
 		storeRows,
 	] = await Promise.all([
-		// Delivery counts over the last 24h. RECEIVED rows are in-flight and excluded from the
-		// success-rate denominator so a request being processed cannot look like a failure.
+		// Delivery counts over the last 24h, scoped to this environment. RECEIVED rows are
+		// in-flight and excluded from the success-rate denominator so a request being processed
+		// cannot look like a failure.
+		//
+		// Scoping is what lets noisy events be *classified* rather than deleted: preview-branch
+		// and local traffic stay in the table for forensics without dragging production health
+		// down. Deleting them would destroy the audit trail exactly when it is needed.
 		sql`
 			SELECT
 				MAX(received_at) FILTER (WHERE status = 'PROCESSED')                       AS last_success_at,
@@ -184,10 +190,12 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 				COUNT(*) FILTER (WHERE received_at >= NOW() - INTERVAL '24 hours'
 					AND status IN ('FAILED', 'REJECTED_AUTH', 'INVALID_PAYLOAD'))::int      AS failures_24h
 			FROM webhook_events
+			WHERE environment = ${currentEnvironment()}
 		`,
 		sql`
 			SELECT error, received_at FROM webhook_events
 			WHERE status IN ('FAILED', 'REJECTED_AUTH', 'INVALID_PAYLOAD') AND error IS NOT NULL
+				AND environment = ${currentEnvironment()}
 			ORDER BY received_at DESC LIMIT 1
 		`,
 		sql`

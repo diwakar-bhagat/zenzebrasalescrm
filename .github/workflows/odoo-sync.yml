@@ -10,11 +10,17 @@ name: Odoo sync
 # missed run, a deploy, or an outage self-heals on the next tick. Nothing is lost silently.
 #
 # Caveats worth knowing:
+#   - Five minutes is GitHub's hard floor for scheduled workflows; */1 is not honoured. For a
+#     one-minute cadence use an external scheduler (cron-job.org and similar allow it) and set
+#     SYNC_INTERVAL_MINUTES to match, or the status badge will call a healthy sync "late".
 #   - GitHub throttles scheduled workflows under load; ticks can arrive late. The dashboard
 #     reports that honestly rather than pretending otherwise.
 #   - GitHub disables scheduled workflows after 60 days with no repository activity. For an
 #     unattended production system prefer an external scheduler (see docs/erp-architecture.md);
 #     this workflow is the zero-extra-accounts option.
+#
+# Overlap is prevented server-side by a lock in sync_locks, so a slow run cannot be doubled up
+# by the next tick regardless of which scheduler drives it.
 
 on:
   schedule:

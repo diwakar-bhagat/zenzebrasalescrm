@@ -1,5 +1,6 @@
 import type { DashboardFilters } from "@/lib/founder/types";
 
+import { formatStoreDate } from "@/lib/store-time";
 import { FOOD_CATEGORIES } from "./filter-sql";
 
 export interface ComparisonPeriods {
@@ -16,8 +17,15 @@ export interface ComparisonPeriod {
 	previous: { startDate: string; endDate: string };
 }
 
+/**
+ * Formats an instant as a store-local calendar date.
+ *
+ * Previously toISOString(), i.e. UTC. Because sale_date is stored store-local, that made the
+ * default window end "yesterday" for the five and a half hours between midnight and 05:30 IST
+ * — so anyone opening the dashboard after midnight saw none of the current trading day.
+ */
 function fmt(date: Date) {
-	return date.toISOString().slice(0, 10);
+	return formatStoreDate(date);
 }
 
 function parseISODate(value: string) {

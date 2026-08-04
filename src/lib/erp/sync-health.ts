@@ -209,7 +209,7 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 			SELECT MAX(sale_date)::text AS latest_sale_date,
 				MAX(ingested_at)         AS last_ingested_at,
 				COUNT(*)::int            AS total_rows,
-				COUNT(*) FILTER (WHERE sale_date = CURRENT_DATE)::int AS rows_today
+				COUNT(*) FILTER (WHERE sale_date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date)::int AS rows_today
 			FROM sales_fact
 		`,
 		// Reflection time: Odoo write_date -> row visible here.
@@ -243,7 +243,7 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 		sql`
 			SELECT billed_by AS name,
 				MAX(sale_date)::text AS last_sale_date,
-				COUNT(*) FILTER (WHERE sale_date >= CURRENT_DATE - 7)::int AS rows_last_7_days
+				COUNT(*) FILTER (WHERE sale_date >= (NOW() AT TIME ZONE 'Asia/Kolkata')::date - 7)::int AS rows_last_7_days
 			FROM sales_fact_v
 			GROUP BY billed_by ORDER BY billed_by
 		`,

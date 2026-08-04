@@ -17,7 +17,10 @@ import { runOdooSync } from "@/scripts/odoo-backfill-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+// Vercel's Hobby plan caps serverless execution at 60s. A delta pull covers only what changed
+// since the last cursor, so it finishes in well under that; a full historical backfill will
+// not, and must be run from the CLI (npm run sync:odoo -- --backfill) rather than over HTTP.
+export const maxDuration = 60;
 
 function isAuthorized(req: NextRequest): boolean {
 	const cronSecret = process.env.CRON_SECRET;

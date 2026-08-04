@@ -1,0 +1,54 @@
+name: Odoo sync
+
+# Drives the reconciliation pull that keeps the dashboard current.
+#
+# Vercel's Hobby plan caps its own cron at one run per day, which would leave a sale rung up at
+# 11:00 invisible until the following morning. This workflow calls the same endpoint every five
+# minutes instead.
+#
+# Why a pull and not a webhook: every run re-covers everything since the stored cursor, so a
+# missed run, a deploy, or an outage self-heals on the next tick. Nothing is lost silently.
+#
+# Caveats worth knowing:
+#   - GitHub throttles scheduled workflows under load; ticks can arrive late. The dashboard
+#     reports that honestly rather than pretending otherwise.
+#   - GitHub disables scheduled workflows after 60 days with no repository activity. For an
+#     unattended production system prefer an external scheduler (see docs/erp-architecture.md);
+#     this workflow is the zero-extra-accounts option.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # allows a manual run from the Actions tab
+
+concurrency:
+  # Never let a slow run overlap the next tick: two syncs writing the same rows would contend
+  # on the same upsert keys for no benefit.
+  group: odoo-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger reconciliation pull
+        run: |
+          set -euo pipefail
+
+          response=$(curl -sS -m 120 -w '\n%{http_code}' \
+            -X POST "${{ secrets.APP_URL }}/api/admin/odoo-sync?mode=delta" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+
+          body=$(printf '%s' "$response" | sed '$d')
+          code=$(printf '%s' "$response" | tail -n1)
+
+          echo "HTTP $code"
+          echo "$body"
+
+          # Fail loudly. A silent non-2xx would let the pipeline rot unnoticed, which is the
+          # exact failure mode this whole setup exists to prevent.
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::Odoo sync failed with HTTP $code"
+            exit 1
+          fi

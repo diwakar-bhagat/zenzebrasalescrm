@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { sql } from "../db";
 import type { WebhookStatus } from "./types";
 
 /**

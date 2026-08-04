@@ -91,6 +91,23 @@ function toNumber(value: unknown, fallback = 0): number {
 }
 
 /**
+ * Normalises a category to the canonical uppercase, trimmed form.
+ *
+ * The retail scope filter compares categories with an exact, case-sensitive
+ * `category <> ALL(ARRAY['LIVE MENU','SNACK CORNER','BEVERAGES'])`. Odoo's product categories
+ * are free text and arrive as "Live menu " and "Beverages " — trailing space, mixed case — so
+ * without this every food sale sourced from the ERP was silently counted as retail, and the
+ * dashboard listed "LIVE MENU" and "Live menu " as two separate categories.
+ *
+ * Uppercasing also aligns Odoo's "Cosmetics"/"Skincare" with the existing Excel COSMETICS and
+ * SKINCARE, so the two sources report one category list rather than two.
+ */
+export function canonicalCategory(value: unknown): string {
+	const raw = typeof value === "string" ? value.trim() : "";
+	return raw.length > 0 ? raw.toUpperCase() : "UNCATEGORISED";
+}
+
+/**
  * True when a payload carries enough detail to ingest without calling back to Odoo.
  *
  * Odoo 19's native "Send Webhook Notification" action posts only {"_model", "_id"}. Treating
@@ -181,7 +198,7 @@ export async function normalizeOdooOrder(
 				product_key: `PROD-SUMMARY-${recordId ?? bill_no}`,
 				sku_code: `SKU-${recordId ?? bill_no}`,
 				item_name: `POS Order ${bill_no}`,
-				category: "POS Summary",
+				category: canonicalCategory("POS Summary"),
 				brand: "Odoo POS",
 				quantity: 1,
 				mrp_amount: net_amount,
@@ -225,7 +242,7 @@ export async function normalizeOdooOrder(
 						? `SKU-${productId}`
 						: null,
 			item_name: productName,
-			category: relationName(line.categ_id, "POS General"),
+			category: canonicalCategory(relationName(line.categ_id, "POS General")),
 			brand: "Odoo POS",
 			quantity,
 			mrp_amount,

@@ -1,4 +1,4 @@
-import type { OdooClient } from "@/lib/odoo-client";
+import type { OdooClient } from "../odoo-client";
 import { relationId } from "./normalize-odoo-order";
 import type { OdooPosOrder, OdooPosOrderLine } from "./types";
 

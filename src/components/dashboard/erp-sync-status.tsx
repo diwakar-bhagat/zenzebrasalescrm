@@ -41,28 +41,41 @@ const MODE_PRESENTATION: Record<
 		label: "Live",
 		variant: "outline",
 		dot: "bg-emerald-500",
-		summary: "Odoo is streaming sales as they happen.",
+		summary: "Odoo is connected and syncing on schedule.",
 	},
 	scheduled: {
 		label: "Synced",
 		variant: "outline",
 		dot: "bg-sky-500",
-		summary:
-			"No recent webhook. Data is arriving from the once-daily scheduled pull.",
+		summary: "Connected. The last sync ran slightly later than expected.",
 	},
 	delayed: {
 		label: "Delayed",
 		variant: "secondary",
 		dot: "bg-amber-500",
-		summary: "Data is behind. Deliveries are failing or the last pull is late.",
+		summary:
+			"The sync is running late. Check that the scheduler is still firing.",
 	},
 	offline: {
 		label: "Offline",
 		variant: "destructive",
 		dot: "bg-destructive",
-		summary: "No data has arrived from Odoo. The connection needs attention.",
+		summary:
+			"The sync has stopped or is failing repeatedly. Data will not update until it recovers.",
 	},
 };
+
+/**
+ * Reflection time spans a wide range: a webhook lands in milliseconds, a polled sale in
+ * minutes. Render each at a readable scale rather than printing "312450 ms".
+ */
+function duration(ms: number): string {
+	if (ms < 1000) return `${Math.round(ms)} ms`;
+	if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
+	const minutes = Math.floor(ms / 60_000);
+	const seconds = Math.round((ms % 60_000) / 1000);
+	return seconds === 0 ? `${minutes} min` : `${minutes} min ${seconds} s`;
+}
 
 function relative(iso: string | null): string {
 	if (!iso) return "never";
@@ -192,13 +205,12 @@ export function ErpSyncStatus() {
 						</Alert>
 					)}
 
-					{!data.webhook.secretConfigured && (
+					{data.sync.lastError && (
 						<Alert variant="destructive">
 							<AlertCircle />
-							<AlertTitle>Webhook endpoint is unauthenticated</AlertTitle>
-							<AlertDescription>
-								ODOO_WEBHOOK_SECRET is not set, so deliveries are rejected.
-								Configure it in Odoo and in the server environment.
+							<AlertTitle>Last sync error</AlertTitle>
+							<AlertDescription className="break-words">
+								{data.sync.lastError}
 							</AlertDescription>
 						</Alert>
 					)}
@@ -226,12 +238,12 @@ export function ErpSyncStatus() {
 							<>
 								<Metric
 									label="Median"
-									value={`${data.reflection.p50Ms} ms`}
-									hint="Time from Odoo recording the sale to the row being queryable here."
+									value={duration(data.reflection.p50Ms)}
+									hint="Time from Odoo recording the sale to the row being queryable here. With a polled pipeline this is mostly determined by where in the sync cycle the sale landed."
 								/>
 								<Metric
 									label="95th percentile"
-									value={`${data.reflection.p95Ms} ms`}
+									value={duration(data.reflection.p95Ms)}
 								/>
 								<Metric
 									label="Sample"
@@ -241,63 +253,76 @@ export function ErpSyncStatus() {
 						) : (
 							<Metric
 								label="Median"
-								value="awaiting first webhook"
+								value="no sales in last 24h"
 								pending
-								hint="Reflection time is measured from real deliveries. No webhook events have been recorded in the last 24 hours, so there is nothing to average yet."
+								hint="Reflection time is averaged over sales actually ingested in the last 24 hours. Nothing has arrived in that window, so there is nothing to measure."
 							/>
 						)}
 						{data.sla ? (
 							<Metric
-								label={`Within ${data.sla.targetMs / 1000}s`}
+								label={`Within ${duration(data.sla.targetMs)}`}
 								value={`${data.sla.metPct}%`}
-								hint={`SLA ${data.sla.state} over ${data.sla.sampleSize} events.`}
+								hint={`SLA ${data.sla.state} over ${data.sla.sampleSize} sales.`}
 							/>
 						) : (
 							<Metric
-								label="SLA"
-								value={
-									data.reflection ? "collecting data" : "no events measured"
-								}
+								label="On-time rate"
+								value={data.reflection ? "collecting data" : "—"}
 								pending
-								hint="An SLA percentage is only shown once at least 20 events have been measured; below that a single delivery would read as 0% or 100%."
+								hint="Shown once at least 20 sales have been measured; below that a single sale would read as 0% or 100%."
 							/>
 						)}
 					</Section>
 
 					<Separator />
 
+					{/* Webhooks are an optional latency optimisation on top of the poll. When they
+					    are not enabled this section states that plainly instead of rendering a
+					    wall of zeroes that looks like a failure. */}
 					<Section title="Webhook">
-						<Metric
-							label="Last delivery"
-							value={relative(data.webhook.lastEventAt)}
-						/>
-						<Metric
-							label="Events today"
-							value={String(data.webhook.eventsToday)}
-						/>
-						<Metric
-							label="Success rate (24h)"
-							value={
-								data.webhook.successRate24h === null
-									? "no deliveries"
-									: `${data.webhook.successRate24h}%`
-							}
-							pending={data.webhook.successRate24h === null}
-						/>
-						<Metric
-							label="Failures (24h)"
-							value={String(data.webhook.failures24h)}
-						/>
+						{data.webhook.secretConfigured ? (
+							<>
+								<Metric
+									label="Last delivery"
+									value={relative(data.webhook.lastEventAt)}
+								/>
+								<Metric
+									label="Events today"
+									value={String(data.webhook.eventsToday)}
+								/>
+								<Metric
+									label="Success rate (24h)"
+									value={
+										data.webhook.successRate24h === null
+											? "no deliveries"
+											: `${data.webhook.successRate24h}%`
+									}
+									pending={data.webhook.successRate24h === null}
+								/>
+								<Metric
+									label="Failures (24h)"
+									value={String(data.webhook.failures24h)}
+								/>
+							</>
+						) : (
+							<Metric
+								label="Status"
+								value="not enabled"
+								pending
+								hint="Sales arrive via the scheduled pull, which is the primary path. Webhooks are optional and would only reduce latency; the endpoint rejects all traffic until ODOO_WEBHOOK_SECRET is set."
+							/>
+						)}
 					</Section>
 
 					<Separator />
 
-					<Section title="Scheduled pull">
+					<Section title="Sync">
 						<Metric
 							label="Last run"
 							value={relative(data.sync.lastSuccessAt)}
-							hint="Runs once daily. On Vercel's Hobby plan this is the maximum cron frequency, so it is a safety net rather than a real-time fallback."
+							hint="A run that finds no new orders is still a healthy run — the shops are simply closed. Health is measured by whether the sync is firing, not by whether data changed."
 						/>
+						<Metric label="Interval" value={data.sync.cadence} />
 						<Metric
 							label="Records last run"
 							value={String(data.sync.recordsLastRun)}

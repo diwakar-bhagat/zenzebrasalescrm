@@ -1,5 +1,5 @@
-import { sql } from "@/lib/db";
-import { OdooClient } from "@/lib/odoo-client";
+import { sql } from "../db";
+import { OdooClient } from "../odoo-client";
 
 /**
  * ERP sync health engine.
@@ -65,14 +65,35 @@ export interface SyncHealth {
 	generatedAt: string;
 }
 
-/** A webhook delivered inside this window means data is flowing right now. */
-const LIVE_WINDOW_MS = 5 * 60 * 1000;
-/** The scheduled pull runs daily; allow a couple of hours of slack before calling it late. */
-const SCHEDULED_WINDOW_MS = 26 * 60 * 60 * 1000;
-const DELAYED_WINDOW_MS = 48 * 60 * 60 * 1000;
+/**
+ * How often the reconciliation pull is expected to run, in minutes.
+ *
+ * The pull is the primary ingestion path: it is driven by an external scheduler, and unlike a
+ * webhook it self-heals, because every run re-covers everything since the cursor. Set this to
+ * match the scheduler's interval.
+ */
+export const SYNC_INTERVAL_MINUTES = Number(
+	process.env.SYNC_INTERVAL_MINUTES ?? 5,
+);
 
-/** Target for an Odoo event to become a visible row. */
-const SLA_TARGET_MS = 2000;
+const MINUTE_MS = 60 * 1000;
+const EXPECTED_MS = SYNC_INTERVAL_MINUTES * MINUTE_MS;
+
+/** One missed tick is normal scheduler jitter. */
+const HEALTHY_MS = EXPECTED_MS * 2;
+/** Several missed ticks: worth showing, not yet an outage. */
+const LATE_MS = EXPECTED_MS * 6;
+/** Beyond this the pipeline is not running. */
+const OFFLINE_MS = Math.max(EXPECTED_MS * 12, 60 * MINUTE_MS);
+
+/**
+ * Target for an Odoo sale to become a visible row: two poll intervals.
+ *
+ * With a pull-based pipeline, reflection time is dominated by where in the polling cycle a sale
+ * lands, so a sub-second target would be meaningless. A webhook, if one is added later, simply
+ * lands far inside this budget.
+ */
+const SLA_TARGET_MS = EXPECTED_MS * 2;
 /**
  * Below this many samples a percentage is noise, not a signal — one event would read as
  * either 100% or 0% SLA compliance. The UI shows "collecting data" instead.
@@ -93,29 +114,30 @@ function ageMs(iso: string | null): number | null {
 /**
  * Classifies the pipeline's actual state.
  *
- * "live" requires a recent *successful* webhook — a burst of failing deliveries is not
- * liveness. Everything else degrades by how stale the newest data is, so a dashboard running
- * off yesterday's cron says so instead of claiming real-time it is not delivering.
+ * Health is measured by **when the pipeline last ran**, not when data last changed. Those are
+ * different things: the shops close overnight, so no new sales arrive for hours while the sync
+ * is working perfectly. Keying off the newest row would raise a false outage every night.
+ *
+ * A successful pull that found zero new orders is a healthy pull. Data recency is reported
+ * separately, as information rather than as a verdict.
  */
 function classifyMode(
+	lastSyncSuccessAt: string | null,
 	lastWebhookSuccessAt: string | null,
-	lastIngestedAt: string | null,
 	consecutiveFailures: number,
-	successRate24h: number | null,
 ): SyncMode {
 	if (consecutiveFailures >= 3) return "offline";
 
-	const webhookAge = ageMs(lastWebhookSuccessAt);
-	if (webhookAge !== null && webhookAge < LIVE_WINDOW_MS) {
-		// Deliveries are arriving but a meaningful share are failing: flowing, not healthy.
-		if (successRate24h !== null && successRate24h < 95) return "delayed";
-		return "live";
-	}
+	// Either mechanism proves the pipeline is alive; take whichever ran most recently.
+	const ages = [ageMs(lastSyncSuccessAt), ageMs(lastWebhookSuccessAt)].filter(
+		(a): a is number => a !== null,
+	);
+	if (ages.length === 0) return "offline";
 
-	const ingestAge = ageMs(lastIngestedAt);
-	if (ingestAge === null) return "offline";
-	if (ingestAge < SCHEDULED_WINDOW_MS) return "scheduled";
-	if (ingestAge < DELAYED_WINDOW_MS) return "delayed";
+	const age = Math.min(...ages);
+	if (age < HEALTHY_MS) return "live";
+	if (age < LATE_MS) return "scheduled";
+	if (age < OFFLINE_MS) return "delayed";
 	return "offline";
 }
 
@@ -168,9 +190,14 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 				COUNT(*) FILTER (WHERE sale_date = CURRENT_DATE)::int AS rows_today
 			FROM sales_fact
 		`,
-		// Reflection time: Odoo write_date -> row visible here. Only webhook-sourced rows have
-		// a meaningful source_event_at; the scheduled pull reflects on its cron cadence, so
-		// including it would drown the real-time signal in multi-hour values.
+		// Reflection time: Odoo write_date -> row visible here.
+		//
+		// Measured across every ERP path, not just webhooks. Under a pull-based pipeline the
+		// dominant term is where in the polling cycle a sale lands, and that IS the latency a
+		// founder experiences. Restricting this to webhook rows would report nothing at all.
+		//
+		// Rows where source_event_at is ahead of ingested_at are excluded rather than counted
+		// as negative: that means Odoo's clock ran ahead of ours, not a sub-zero latency.
 		sql`
 			SELECT
 				PERCENTILE_CONT(0.5) WITHIN GROUP (
@@ -182,10 +209,14 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 					WHERE EXTRACT(EPOCH FROM (ingested_at - source_event_at)) * 1000 <= ${SLA_TARGET_MS}
 				)::int                                                                   AS within_sla
 			FROM sales_fact
-			WHERE source_system = 'odoo_webhook'
+			WHERE source_system IN ('odoo_webhook', 'odoo_sync')
 				AND source_event_at IS NOT NULL
 				AND ingested_at >= NOW() - INTERVAL '24 hours'
 				AND ingested_at >= source_event_at
+				-- Both ends must be recent. A historical backfill re-ingests old orders *now*,
+				-- which would otherwise register as multi-day "latency" and swamp the real
+				-- steady-state figure. Only sales that actually happened recently are measured.
+				AND source_event_at >= NOW() - INTERVAL '24 hours'
 		`,
 		sql`
 			SELECT billed_by AS name,
@@ -211,6 +242,9 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 			: null;
 
 	const lastWebhookSuccessAt = toIso(wh.last_success_at);
+	const lastSyncSuccessAt = toIso(
+		cursor.last_success_at ?? cursor.last_sync_at,
+	);
 	const lastIngestedAt = toIso(data.last_ingested_at);
 	const consecutiveFailures = Number(cursor.consecutive_failures ?? 0);
 
@@ -240,10 +274,9 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 
 	return {
 		mode: classifyMode(
+			lastSyncSuccessAt,
 			lastWebhookSuccessAt,
-			lastIngestedAt,
 			consecutiveFailures,
-			successRate24h,
 		),
 		erp: {
 			name: "Odoo 19 Enterprise SaaS",
@@ -261,13 +294,13 @@ export async function getSyncHealth(): Promise<SyncHealth> {
 		},
 		sync: {
 			lastRunAt: toIso(cursor.last_attempt_at ?? cursor.last_sync_at),
-			lastSuccessAt: toIso(cursor.last_success_at ?? cursor.last_sync_at),
+			lastSuccessAt: lastSyncSuccessAt,
 			recordsLastRun: Number(cursor.records_synced ?? 0),
 			consecutiveFailures,
 			lastError: cursor.last_error ?? null,
-			// Vercel's Hobby plan permits one cron execution per day, so the scheduled pull is a
-			// safety net rather than a near-real-time fallback. Webhooks are the only live path.
-			cadence: "daily",
+			// The pull is the primary path, driven by an external scheduler because Vercel's
+			// Hobby plan caps its own cron at one run per day.
+			cadence: `every ${SYNC_INTERVAL_MINUTES} min`,
 		},
 		data: {
 			latestSaleDate: data.latest_sale_date ?? null,

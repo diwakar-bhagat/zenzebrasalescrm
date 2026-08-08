@@ -289,85 +289,126 @@ export function LtvCacAovTab() {
 
 	return (
 		<div className="flex flex-col gap-4 text-zinc-100 font-sans">
-			{/* Dense bento grid: KPI tiles + ratio hero + charts + breakdown, packed masonry-style */}
-			<div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
+			{/* 1. Standardized KPI strip - 6 cards with uniform height and styling */}
+			<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
 				{/* Customer LTV */}
-				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col gap-1">
+				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col justify-between">
 					<span className="text-xs text-zinc-500 font-mono">Customer LTV</span>
-					<span className="text-3xl font-semibold text-white font-mono mt-1">
+					<span className="text-2xl xl:text-3xl font-semibold text-white font-mono mt-1">
 						{formatCurrency(Math.round(ltv), { noDecimals: true })}
 					</span>
 				</Card>
 
 				{/* CAC */}
-				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col gap-1">
+				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col justify-between">
 					<span className="text-xs text-zinc-500 font-mono">CAC</span>
-					<span className="text-3xl font-semibold text-white font-mono mt-1">
+					<span className="text-2xl xl:text-3xl font-semibold text-white font-mono mt-1">
 						{formatCurrency(Math.round(cac), { noDecimals: true })}
 					</span>
 				</Card>
 
 				{/* Average AOV */}
-				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col gap-1">
+				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col justify-between">
 					<span className="text-xs text-zinc-500 font-mono">Average AOV</span>
-					<span className="text-3xl font-semibold text-white font-mono mt-1">
+					<span className="text-2xl xl:text-3xl font-semibold text-white font-mono mt-1">
 						{formatCurrency(Math.round(aov), { noDecimals: true })}
 					</span>
 				</Card>
 
 				{/* Net value / customer */}
-				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col gap-1">
+				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col justify-between">
 					<span className="text-xs text-zinc-500 font-mono">
 						Net value / customer
 					</span>
-					<span className="text-3xl font-semibold text-white font-mono mt-1">
+					<span className="text-2xl xl:text-3xl font-semibold text-white font-mono mt-1">
 						{formatCurrency(Math.round(netValue), { noDecimals: true })}
 					</span>
 				</Card>
 
 				{/* CAC payback */}
-				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col gap-1">
+				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col justify-between">
 					<span className="text-xs text-zinc-500 font-mono">CAC payback</span>
-					<span className="text-3xl font-semibold text-white font-mono mt-1">
+					<span className="text-2xl xl:text-3xl font-semibold text-white font-mono mt-1">
 						{payback} mo
 					</span>
 				</Card>
 
 				{/* AOV expansion */}
-				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col gap-1">
+				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 rounded-[12px] p-5 shadow-none flex flex-col justify-between">
 					<span className="text-xs text-zinc-500 font-mono">AOV expansion</span>
-					<span className="text-3xl font-semibold text-white font-mono mt-1">
+					<span className="text-2xl xl:text-3xl font-semibold text-white font-mono mt-1">
 						{aovExpansion >= 0 ? "+" : ""}
 						{Math.round(aovExpansion)}%
 					</span>
 				</Card>
+			</div>
 
-				{/* LTV : CAC Ratio Green Banner Card */}
-				<Card className="border border-emerald-950 bg-emerald-950/20 p-6 rounded-[12px] shadow-none flex flex-col gap-3">
-					<span className="text-xs font-semibold text-emerald-500 font-mono">
-						LTV : CAC ratio
-					</span>
-					<span className="text-5xl font-bold font-mono tracking-tight text-emerald-500">
-						{ratio.toFixed(1)}x
-					</span>
-					<div className="flex flex-col gap-1">
-						<span className="text-xs font-semibold text-emerald-500 uppercase tracking-wider font-mono">
-							{ratio >= 3.0 ? "Healthy" : "Below Target"}
-						</span>
-						<span className="text-[10px] text-emerald-600 font-mono">
-							Benchmark: 3-5x
-						</span>
-					</div>
-				</Card>
+			{/* 2. Structured Analytics Grid - 2 columns side-by-side with equal heights */}
+			<div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+				{/* Left Column: LTV:CAC Banner + CAC Payback Breakdown */}
+				<div className="flex flex-col gap-4">
+					{/* LTV : CAC Ratio Green Banner Card */}
+					<Card className="border border-emerald-950 bg-emerald-950/20 p-6 rounded-[12px] shadow-none flex-1 flex flex-col justify-between min-h-[140px]">
+						<div className="flex flex-col gap-1">
+							<span className="text-xs font-semibold text-emerald-500 font-mono">
+								LTV : CAC ratio
+							</span>
+							<span className="text-4xl xl:text-5xl font-bold font-mono tracking-tight text-emerald-500 mt-1">
+								{ratio.toFixed(1)}x
+							</span>
+						</div>
+						<div className="flex flex-col gap-0.5 mt-4">
+							<span className="text-xs font-semibold text-emerald-500 uppercase tracking-wider font-mono">
+								{ratio >= 3.0 ? "Healthy" : "Below Target"}
+							</span>
+							<span className="text-[10px] text-emerald-600 font-mono">
+								Benchmark: 3-5x
+							</span>
+						</div>
+					</Card>
 
-				{/* Cohort LTV Growth Line Chart */}
-				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 p-6 rounded-[12px] shadow-none flex flex-col gap-4">
+					{/* CAC Payback Breakdown */}
+					<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 p-6 rounded-[12px] shadow-none flex flex-col justify-between">
+						<div>
+							<h3 className="text-sm font-medium text-zinc-100 font-mono mb-3">
+								CAC payback breakdown
+							</h3>
+						</div>
+						<div className="border border-zinc-800 rounded-lg overflow-hidden divide-y divide-zinc-800">
+							<div className="flex justify-between items-center p-3.5 bg-zinc-950/20 text-xs font-mono">
+								<span className="text-zinc-400">CAC</span>
+								<span className="text-zinc-200 font-semibold font-mono">
+									{formatCurrency(Math.round(cac), { noDecimals: true })}
+								</span>
+							</div>
+							<div className="flex justify-between items-center p-3.5 bg-zinc-950/20 text-xs font-mono">
+								<span className="text-zinc-400">
+									Avg monthly margin / customer
+								</span>
+								<span className="text-zinc-200 font-semibold font-mono">
+									{formatCurrency(avgMonthlyMargin, { noDecimals: true })}
+								</span>
+							</div>
+							<div className="flex justify-between items-center p-3.5 bg-zinc-950/20 text-xs font-mono">
+								<span className="text-zinc-200 font-semibold">
+									Payback period
+								</span>
+								<span className="text-white font-bold font-mono">
+									{payback} months
+								</span>
+							</div>
+						</div>
+					</Card>
+				</div>
+
+				{/* Right Column: Cohort LTV Growth Line Chart */}
+				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 p-6 rounded-[12px] shadow-none flex flex-col justify-between min-h-[300px]">
 					<div>
 						<h3 className="text-sm font-medium text-zinc-100 font-mono">
 							Cohort LTV growth
 						</h3>
 					</div>
-					<div className="h-[240px] w-full mt-2">
+					<div className="h-[240px] w-full mt-4 flex-1">
 						<ResponsiveContainer width="100%" height="100%">
 							<LineChart
 								data={cohortChartData}
@@ -434,7 +475,10 @@ export function LtvCacAovTab() {
 						))}
 					</div>
 				</Card>
+			</div>
 
+			{/* 3. AOV Expansion Bar Chart Card (Takes full width underneath) */}
+			<div className="grid gap-4 grid-cols-1">
 				{/* AOV Expansion Bar Chart */}
 				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 p-6 rounded-[12px] shadow-none flex flex-col gap-4">
 					<div>
@@ -484,37 +528,6 @@ export function LtvCacAovTab() {
 								/>
 							</BarChart>
 						</ResponsiveContainer>
-					</div>
-				</Card>
-
-				{/* CAC Payback Breakdown */}
-				<Card className="border-[0.5px] border-zinc-800 bg-zinc-950 p-6 rounded-[12px] shadow-none flex flex-col gap-4">
-					<div>
-						<h3 className="text-sm font-medium text-zinc-100 font-mono">
-							CAC payback breakdown
-						</h3>
-					</div>
-					<div className="border border-zinc-800 rounded-lg overflow-hidden divide-y divide-zinc-800">
-						<div className="flex justify-between items-center p-4 bg-zinc-950/20 text-xs font-mono">
-							<span className="text-zinc-400">CAC</span>
-							<span className="text-zinc-200 font-semibold">
-								{formatCurrency(Math.round(cac), { noDecimals: true })}
-							</span>
-						</div>
-						<div className="flex justify-between items-center p-4 bg-zinc-950/20 text-xs font-mono">
-							<span className="text-zinc-400">
-								Avg monthly margin / customer
-							</span>
-							<span className="text-zinc-200 font-semibold">
-								{formatCurrency(avgMonthlyMargin, { noDecimals: true })}
-							</span>
-						</div>
-						<div className="flex justify-between items-center p-4 bg-zinc-950/20 text-xs font-mono">
-							<span className="text-zinc-200 font-semibold">
-								Payback period
-							</span>
-							<span className="text-white font-bold">{payback} months</span>
-						</div>
 					</div>
 				</Card>
 			</div>
